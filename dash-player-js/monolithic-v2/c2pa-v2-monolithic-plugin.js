@@ -64,7 +64,6 @@ async function c2pa_init(player, onPlaybackTimeUpdated) {
 
         console.log('[C2PA] Store', manifestStore);
 
-        //TODO: Change to Valid
         if (manifestStore.validation_state === 'Valid' || manifestStore.validation_state === 'Trusted') {
             detail['valid'] = true;
         } else {

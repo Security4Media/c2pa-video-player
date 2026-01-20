@@ -155,6 +155,9 @@ import { providerInfoFromSocialId } from './Providers.js';
 
 //C2PA menu instance
 let c2paMenuInstance = new C2PAMenu();
+// Store the state of collapsible sections
+let cawgIdentityExpanded = false;
+
 export let initializeC2PAMenu = function (videoPlayer) {
   const MenuButton = videojs.getComponent('MenuButton');
   const MenuItem = videojs.getComponent('MenuItem');
@@ -283,7 +286,13 @@ export let updateC2PAMenu = function (
         )}`;
       } else if (c2paItemKey === 'CAWG_IDENTITY') {
         if (c2paItemValue && typeof c2paItemValue === 'object') {
-          let cawgHtml = '<div class="cawg-identity">';
+          // Check if there's an existing state before rebuilding
+          const existingContent = c2paItem.el().querySelector('.cawg-identity');
+          if (existingContent) {
+            cawgIdentityExpanded = existingContent.style.display === 'flex';
+          }
+
+          let cawgHtml = `<div class="cawg-identity" style="display: ${cawgIdentityExpanded ? 'flex' : 'none'};">`;
 
           // Display issuer
           if (c2paItemValue.issuer) {
@@ -296,7 +305,26 @@ export let updateC2PAMenu = function (
           }
           cawgHtml += '</div>';
 
-          c2paItem.el().innerHTML = `<div class="itemName">${c2paItemName}</div><div style="padding-left: 20px;">${cawgHtml}</div>`;
+          c2paItem.el().innerHTML = `<div class="cawg-header"><span class="itemName">${c2paItemName}</span><span class="cawg-toggle ${cawgIdentityExpanded ? 'expanded' : ''}">›</span></div>${cawgHtml}`;
+
+          // Add click handler for toggle
+          const header = c2paItem.el().querySelector('.cawg-header');
+          const toggle = c2paItem.el().querySelector('.cawg-toggle');
+          const content = c2paItem.el().querySelector('.cawg-identity');
+
+          header.style.cursor = 'pointer';
+          header.onclick = function (e) {
+            e.stopPropagation();
+            if (content.style.display === 'none') {
+              content.style.display = 'flex';
+              toggle.classList.add('expanded');
+              cawgIdentityExpanded = true;
+            } else {
+              content.style.display = 'none';
+              toggle.classList.remove('expanded');
+              cawgIdentityExpanded = false;
+            }
+          };
         } else {
           c2paItem.el().innerHTML = `<span class="itemName"> ${c2paItemName}</span> ${c2paItemValue}`;
         }

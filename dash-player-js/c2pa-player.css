@@ -168,11 +168,37 @@ z-index: 100;
     padding-bottom: 4px;
   }
 
+  .vjs-menu li.vjs-menu-item .cawg-header {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 0.5rem;
+    cursor: pointer;
+  }
+  
+  .vjs-menu li.vjs-menu-item .cawg-header .itemName {
+    padding-bottom: 0;
+    line-height: 1.5rem;
+  }
+
+  .vjs-menu li.vjs-menu-item .cawg-toggle {
+    font-size: 1.5rem;
+    line-height: 1.5rem;
+    transition: transform 0.2s ease;
+    display: inline-block;
+    user-select: none;
+  }
+
+  .vjs-menu li.vjs-menu-item .cawg-toggle.expanded {
+    transform: rotate(90deg);
+  }
+
   .vjs-menu li.vjs-menu-item .cawg-identity {
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
-    padding-top: 0.25rem;
+    padding-top: 0.5rem;
+    padding-left: 2rem;
   }
 
   .vjs-menu li.vjs-menu-item .cawg-identity div {
