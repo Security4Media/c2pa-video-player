@@ -106,7 +106,6 @@ export var C2PAPlayer = function (
                     lastPlaybackTime,
                     currentTime
                 );
-
                 //Creates new c2pa progress segment to be added to the progress bar
                 handleC2PAValidation(c2paStatus.validation_state, currentTime, c2paControlBar);
                 //Update c2pa progress timeline

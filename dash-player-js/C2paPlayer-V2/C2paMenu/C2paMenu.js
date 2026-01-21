@@ -8,7 +8,8 @@ export var C2PAMenu = function () {
     LOCATION: 'Location',
     WEBSITE: 'Website',
     CAWG_IDENTITY: 'Publisher Identity (CAWG)',
-    VALIDATION_STATUS: 'Current Validation Status',
+    C2PA_VALIDATION_STATUS: 'Current C2PA Validation Status',
+    CAWG_VALIDATION_STATUS: 'Current CAWG Validation Status',
     ALERT: 'Alert',
   };
 
@@ -103,7 +104,7 @@ export var C2PAMenu = function () {
         return socialMedia?.map((account) => account['@id']) ?? null;
       }
 
-      if (itemName == 'VALIDATION_STATUS') {
+      if (itemName == 'C2PA_VALIDATION_STATUS') {
         switch (verificationStatus) {
           case "Trusted":
             return 'Trusted';
@@ -117,9 +118,17 @@ export var C2PAMenu = function () {
       }
 
       if (itemName == 'CAWG_IDENTITY') {
-        let [cawgIdentityStr, cawgIdentityObj] = selectCawgIdentity(activeManifest);
-
+        let cawgId = selectCawgIdentity(activeManifest);
+        if (!cawgId) {
+          return "Not Present";
+        }
+        const [cawgIdentityStr, cawgIdentityObj] = cawgId;
         return cawgIdentityObj ?? null;
+      }
+
+      if (itemName == 'CAWG_VALIDATION_STATUS') {
+        const cawgValidationStatus = getCAWGValidationStatus(manifestStore);
+        return cawgValidationStatus;
       }
 
       if (itemName == 'ALERT') {
@@ -200,7 +209,7 @@ function selectCawgIdentity(manifest) {
 
   let cawgString = '';
   let cawgObj = {};
-  
+
 
   // Add issuer
   let signature_info = cawgAssertion.data.signature_info;
@@ -227,4 +236,49 @@ function selectCawgIdentity(manifest) {
   }
 
   return [cawgString, cawgObj];
+}
+
+
+
+function getCAWGValidationStatus(manifestStore) {
+
+  // Check if CAWG identity assertion is present
+  const cawgAssertion = manifestStore.manifests[manifestStore.active_manifest].assertions.find(
+    assertion => assertion.label === 'cawg.identity'
+  );
+
+  if (!cawgAssertion) {
+    return 'Not Present';
+  }
+
+  // Evaluate validation results for CAWG identity
+  const validationResults = manifestStore.validation_results;
+  if (!validationResults) {
+    return 'Unknown';
+  }
+
+  //Check that the CAWG is Trusted : well fomed + trusted credentials  
+  const successResults = validationResults.activeManifest.success;
+  let isWellFormed, isTrusted = false;
+
+  if (successResults && successResults.length > 0) {
+    isTrusted = successResults.some(result => (result.code === 'signingCredential.trusted') && result.url.includes('cawg.identity'));
+    isWellFormed = successResults.some(result => (result.code === 'cawg.identity.well-formed') && result.url.includes('cawg.identity'));
+    if (isWellFormed && isTrusted) {
+      return 'Trusted';
+    }
+  }
+
+  //Check that the CAWG is Valid =  well formed + trusted credentials  
+  if (isWellFormed) {
+    const failureResults = validationResults.activeManifest.failure;
+    if (failureResults && failureResults.length > 0) {
+      const isUntrusted = failureResults.some(result => (result.code === 'signingCredential.untrusted') && result.url.includes('cawg.identity'));
+      if (isUntrusted) {
+        return 'Valid';
+      }
+    }
+  }
+
+  return 'Invalid';
 }

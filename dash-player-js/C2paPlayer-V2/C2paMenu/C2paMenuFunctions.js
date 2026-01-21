@@ -333,7 +333,7 @@ export let updateC2PAMenu = function (
       } else if (c2paItemKey === 'ALERT') {
         c2paItem.el().innerHTML = `<div class="alert-div"><img class="alert-icon"></img><div>${c2paItemValue}</div></div>`;
       } else if (
-        c2paItemKey === 'VALIDATION_STATUS' &&
+        c2paItemKey === 'C2PA_VALIDATION_STATUS' &&
         c2paItemValue === 'Failed'
       ) {
         c2paItem.el().innerHTML = `<span class="itemName nextLine">${c2paItemName}</span>`;

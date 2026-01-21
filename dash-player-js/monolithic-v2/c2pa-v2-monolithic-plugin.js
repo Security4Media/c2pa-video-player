@@ -1,4 +1,6 @@
 import { createC2pa } from 'https://cdn.jsdelivr.net/npm/@contentauth/c2pa-web@0.5.6/+esm';
+import { tryUpgradeToTrustedC2PAValidationStatus } from '../UpdateStatusFunctions.js';
+
 
 async function c2pa_init(player, onPlaybackTimeUpdated) {
 
@@ -51,7 +53,6 @@ async function c2pa_init(player, onPlaybackTimeUpdated) {
         };
 
         let detail = {
-            'validation_state': "unknown",
             'manifestStore': null,
             'error': null,
         }
@@ -61,6 +62,12 @@ async function c2pa_init(player, onPlaybackTimeUpdated) {
         }
 
         detail['manifestStore'] = manifestStore;
+
+
+        // HACK: Update validation state to "Trusted" to only take account of active manifest.
+        let newStatus = tryUpgradeToTrustedC2PAValidationStatus(manifestStore);
+        manifestStore.validation_state = newStatus;
+
 
         console.log('[C2PA] Store', manifestStore);
 
