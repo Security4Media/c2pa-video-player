@@ -1,0 +1,18 @@
+{
+    "assertions" : [
+        {
+            "label": "stds.schema-org.CreativeWork",
+            "data": {
+                "@context": "https://schema.org",
+                "@type": "CreativeWork",
+                "author": [
+                    {
+                        "@type": "Person",
+                        "name": "Badr Tad (EBU)"
+                    }
+                ],
+                "url": "https://www.ebu.ch/standards/c2pa"
+            }
+        }
+    ]
+}
