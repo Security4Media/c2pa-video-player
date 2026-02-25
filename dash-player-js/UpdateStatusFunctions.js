@@ -15,6 +15,10 @@ export function tryUpgradeToTrustedC2PAValidationStatus(manifestStore) {
         return 'Unknown';
     }
 
+    if (manifestStore.validation_state === 'Invalid') { 
+        return 'Invalid';
+    }
+
     //Check that if C2PA is trusted
     const successResults = validationResults.activeManifest.success;
 

@@ -65,8 +65,8 @@ async function c2pa_init(player, onPlaybackTimeUpdated) {
 
 
         // HACK: Update validation state to "Trusted" to only take account of active manifest.
-        let newStatus = tryUpgradeToTrustedC2PAValidationStatus(manifestStore);
-        manifestStore.validation_state = newStatus;
+        //let newStatus = tryUpgradeToTrustedC2PAValidationStatus(manifestStore);
+        //manifestStore.validation_state = newStatus;
 
 
         console.log('[C2PA] Store', manifestStore);
