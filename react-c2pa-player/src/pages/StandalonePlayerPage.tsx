@@ -13,10 +13,15 @@ interface StreamInfo {
   message: string;
 }
 
+interface VideoItem {
+  name: string;
+  source: 'local' | 'server';
+}
+
 export function StandalonePlayerPage() {
-  const [mp4Url, setMp4Url] = useState('/playlists/mp4s/cawg_robot_wdr_c2pa.mp4');
+  const [mp4Url, setMp4Url] = useState('');
   const [selectedVideo, setSelectedVideo] = useState('');
-  const [availableVideos, setAvailableVideos] = useState<string[]>([]);
+  const [availableVideos, setAvailableVideos] = useState<VideoItem[]>([]);
   const [playerStatus, setPlayerStatus] = useState<PlayerStatus>('ready');
   const [statusMessage, setStatusMessage] = useState('Player Ready');
   const [streamInfos, setStreamInfos] = useState<StreamInfo[]>([]);
@@ -36,6 +41,18 @@ export function StandalonePlayerPage() {
   const [showC2PAOverlay, setShowC2PAOverlay] = useState(false);
   const [c2paValidationState, setC2paValidationState] = useState<'Unknown' | 'Valid' | 'Trusted' | 'Invalid'>('Unknown');
   const [c2paStatus, setC2paStatus] = useState<any>(null);
+  const [localVideoFiles, setLocalVideoFiles] = useState<Map<string, File>>(new Map());
+  const [uploadProgress, setUploadProgress] = useState<{
+    isLoading: boolean;
+    processed: number;
+    total: number;
+    currentFile: string;
+  }>({
+    isLoading: false,
+    processed: 0,
+    total: 0,
+    currentFile: '',
+  });
   const [videoJsOptions, setVideoJsOptions] = useState<VideoJSOptions>({
     autoplay: false,
     controls: true,
@@ -64,20 +81,25 @@ export function StandalonePlayerPage() {
       });
 
       // Extract just the filenames from the full paths
-      const mp4Files = Object.keys(videoModules).map((path) => {
+      const mp4Files: VideoItem[] = Object.keys(videoModules).map((path) => {
         const filename = path.split('/').pop() || '';
-        return filename;
+        return { name: filename, source: 'server' as const };
       });
 
       console.log('Found video files:', mp4Files);
       setAvailableVideos(mp4Files);
-      updateStreamInfo(`Loaded ${mp4Files.length} videos from local directory`);
+      setLocalVideoFiles(new Map()); // Clear local files when loading from server
+      updateStreamInfo(`Loaded ${mp4Files.length} videos from server`);
     } catch (error) {
       console.error('Error loading video list:', error);
       updateStreamInfo('Error loading video list');
     }
   };
 
+  const urlFromFile = (file: File) => {
+    const URL = window.URL || window.webkitURL;
+    return URL.createObjectURL(file);
+  } 
   // Load video list on mount
   useEffect(() => {
     loadVideoList();
@@ -199,9 +221,8 @@ export function StandalonePlayerPage() {
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file && file.type === 'video/mp4') {
-      const URL = window.URL || window.webkitURL;
-      const blobUrl = URL.createObjectURL(file);
-      setMp4Url(`Local file: ${file.name}`);
+      const blobUrl = urlFromFile(file);
+      setMp4Url(`Local: ${file.name}`);
       setSelectedVideo('');
       loadStreamFromUrl(blobUrl);
     } else {
@@ -209,12 +230,115 @@ export function StandalonePlayerPage() {
     }
   };
 
+  const handleFolderSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files || files.length === 0) {
+      updateStreamInfo('No files selected from folder');
+      return;
+    }
+
+    // Start loading animation
+    setUploadProgress({
+      isLoading: true,
+      processed: 0,
+      total: files.length,
+      currentFile: '',
+    });
+
+    // Process files with simulated progress for better UX
+    const mp4Files: { name: string; file: File }[] = [];
+    
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      
+      // Update progress
+      setUploadProgress({
+        isLoading: true,
+        processed: i,
+        total: files.length,
+        currentFile: file.name,
+      });
+
+      // Small delay to show progress (can be removed for instant loading)
+      await new Promise(resolve => setTimeout(resolve, 50));
+
+      if (file.type === 'video/mp4' || file.name.endsWith('.mp4')) {
+        mp4Files.push({ name: file.name, file });
+      }
+    }
+
+    // Mark as complete
+    setUploadProgress({
+      isLoading: true,
+      processed: files.length,
+      total: files.length,
+      currentFile: 'Complete!',
+    });
+
+    if (mp4Files.length === 0) {
+      alert('No MP4 files found in the selected folder.');
+      updateStreamInfo('No MP4 files found in selected folder');
+      // Hide progress after a short delay
+      setTimeout(() => {
+        setUploadProgress({ isLoading: false, processed: 0, total: 0, currentFile: '' });
+      }, 1500);
+      return;
+    }
+
+    // Store the file objects in React state
+    const fileMap = new Map(mp4Files.map(({ name, file }) => [name, file]));
+    console.log('Storing local video files in state:', fileMap);
+    setLocalVideoFiles(fileMap);
+
+    // Update available videos list with local file names
+    const videoItems: VideoItem[] = mp4Files.map(({ name }) => ({ 
+      name, 
+      source: 'local' as const 
+    }));
+    setAvailableVideos(videoItems);
+    updateStreamInfo(`Loaded ${mp4Files.length} MP4 files from local folder`);
+    console.log('Loaded local MP4 files:', videoItems);
+
+    // Clear current selection and load the first video from the folder
+    let firstVideo = mp4Files[0].file;
+    setMp4Url(`Local: ${firstVideo.name}`)
+    setSelectedVideo(`${firstVideo.name}|local`);
+    loadStreamFromUrl(urlFromFile(firstVideo));
+
+    // Hide progress after 2 seconds
+    setTimeout(() => {
+      setUploadProgress({ isLoading: false, processed: 0, total: 0, currentFile: '' });
+    }, 2000);
+  };
+
   const handleVideoSelect = (event: React.ChangeEvent<HTMLSelectElement>) => {
-    const selectedPath = event.target.value;
-    if (selectedPath) {
-      setMp4Url(selectedPath);
-      setSelectedVideo(selectedPath);
-      loadStreamFromUrl(selectedPath);
+    const selectedValue = event.target.value;
+    console.log('Selected video value:', selectedValue);
+    
+    if (!selectedValue) return;
+
+    // Parse the selected value (format: "filename|source")
+    const [filename, source] = selectedValue.split('|');
+    
+    setSelectedVideo(selectedValue);
+
+    if (source === 'local') {
+      // Load from local file object
+      console.log('Loading video from local file:', filename);
+      const file = localVideoFiles.get(filename);
+      if (file) {
+        const blobUrl = urlFromFile(file);
+        setMp4Url(`Local: ${filename}`);
+        loadStreamFromUrl(blobUrl);
+      } else {
+        console.error('Local file not found in map:', filename);
+      }
+    } else {
+      // Load from server path
+      const serverPath = `/playlists/mp4s/${filename}`;
+      console.log('Loading video from server path:', serverPath);
+      setMp4Url(serverPath);
+      loadStreamFromUrl(serverPath);
     }
   };
 
@@ -223,7 +347,6 @@ export function StandalonePlayerPage() {
       alert('Please enter an MP4 URL or select a local file.');
       return;
     }
-
     loadStreamFromUrl(mp4Url);
   };
 
@@ -277,7 +400,7 @@ export function StandalonePlayerPage() {
     window.location.reload();
   };
 
-  return (
+  return (  
     <div className="standalone-player-page">
       <div className="container">
         <div className="header">
@@ -289,6 +412,62 @@ export function StandalonePlayerPage() {
         </div>
 
         <div className="input-section">
+          {/* Upload Progress Indicator */}
+          {uploadProgress.isLoading && (
+            <div style={{
+              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              color: 'white',
+              padding: '16px 20px',
+              borderRadius: '12px',
+              marginBottom: '16px',
+              boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
+              animation: 'slideDown 0.3s ease-out',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <div style={{
+                    width: '20px',
+                    height: '20px',
+                    border: '3px solid rgba(255,255,255,0.3)',
+                    borderTop: '3px solid white',
+                    borderRadius: '50%',
+                    animation: 'spin 1s linear infinite',
+                  }}></div>
+                  <span style={{ fontWeight: '600', fontSize: '16px' }}>
+                    Loading Files...
+                  </span>
+                </div>
+                <span style={{ fontWeight: '700', fontSize: '18px' }}>
+                  {uploadProgress.processed} / {uploadProgress.total}
+                </span>
+              </div>
+              
+              <div style={{
+                background: 'rgba(255,255,255,0.2)',
+                borderRadius: '10px',
+                height: '8px',
+                overflow: 'hidden',
+                marginBottom: '8px',
+              }}>
+                <div style={{
+                  background: 'white',
+                  height: '100%',
+                  width: `${(uploadProgress.processed / uploadProgress.total) * 100}%`,
+                  transition: 'width 0.3s ease',
+                  borderRadius: '10px',
+                }}></div>
+              </div>
+              
+              <div style={{ fontSize: '13px', opacity: 0.9, marginTop: '4px' }}>
+                {uploadProgress.processed < uploadProgress.total ? (
+                  <>Processing: {uploadProgress.currentFile}</>
+                ) : (
+                  <>✓ {uploadProgress.currentFile}</>
+                )}
+              </div>
+            </div>
+          )}
+
           <div className="input-group">
             <select
               id="videoSelect"
@@ -305,23 +484,38 @@ export function StandalonePlayerPage() {
                 minWidth: '250px',
               }}
             >
-              <option value="">-- Select a video from /playlists/mp4s --</option>
+              <option value="">Select a video...</option>
               {availableVideos.map((video) => (
-                <option key={video} value={`/playlists/mp4s/${video}`}>
-                  {video}
+                <option key={`${video.name}|${video.source}`} value={`${video.name}|${video.source}`}>
+                  {video.source === 'local' ? '📁 ' : '🌐 '}{video.name}
                 </option>
               ))}
             </select>
             <button className="btn btn-secondary" onClick={loadVideoList}>
               🔄 Refresh List
             </button>
+            <button 
+              className="btn btn-secondary" 
+              onClick={() => document.getElementById('folderInput')?.click()}
+              disabled={uploadProgress.isLoading}
+            >
+              📁 Load Folder
+            </button>
+            <input
+              type="file"
+              id="folderInput"
+              {...({ webkitdirectory: '', directory: '' } as any)}
+              multiple
+              onChange={handleFolderSelect}
+              style={{ display: 'none' }}
+            />
           </div>
 
           <div className="input-group">
             <input
               type="text"
               id="mp4Url"
-              placeholder="Enter MP4 URL or select local file..."
+              placeholder="Select a video or enter MP4 URL..."
               value={mp4Url}
               onChange={(e) => setMp4Url(e.target.value)}
             />

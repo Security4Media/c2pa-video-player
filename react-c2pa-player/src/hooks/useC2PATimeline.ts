@@ -113,8 +113,8 @@ export function useC2PATimeline({ videoPlayer, isMonolithic }: UseC2PATimelinePr
         console.log('[C2PA Timeline] Component already registered');
       }
 
-      // Now add the child component
-      videoPlayer.controlBar.progressControl.seekBar.addChild('C2PALoadProgressBar', {});
+      // Now add the child component using the component class directly
+      videoPlayer.controlBar.progressControl.seekBar.addChild(C2PALoadProgressBarComponent, {});
       
       // Get reference to the added component
       const c2paTimeline = videoPlayer.controlBar.progressControl.seekBar.getChild('C2PALoadProgressBar');
