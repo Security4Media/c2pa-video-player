@@ -13,6 +13,12 @@ export default defineConfig({
       '/playlists': {
         target: 'http://localhost:9000',
         changeOrigin: true,
+        bypass: (req, res, options) => {
+          // Bypass proxy for MP4 files - serve them from /public instead
+          if (req.url?.endsWith('.mp4')) {
+            return req.url;
+          }
+        },
       },
     },
   },

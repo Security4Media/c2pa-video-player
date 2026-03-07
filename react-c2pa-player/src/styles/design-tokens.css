@@ -1,0 +1,109 @@
+/* Design Tokens - Color System */
+:root {
+  /* Primary Colors */
+  --color-primary: #0e4194;
+  --color-primary-hover: #0a2e6a;
+  --color-primary-foreground: #ffffff;
+  
+  /* Secondary Colors */
+  --color-secondary: #6c757d;
+  --color-secondary-hover: #5a6268;
+  --color-secondary-foreground: #ffffff;
+  
+  /* Validation States */
+  --color-trusted: #28a745;
+  --color-valid: #17a2b8;
+  --color-invalid: #dc3545;
+  --color-unknown: #ffc107;
+  
+  /* Neutral Colors */
+  --color-background: #ffffff;
+  --color-surface: #f8f9fa;
+  --color-surface-variant: #e9ecef;
+  --color-border: #dee2e6;
+  --color-foreground: #212529;
+  --color-foreground-muted: #6c757d;
+  
+  /* Overlay Colors */
+  --color-overlay-bg: rgba(0, 0, 0, 0.95);
+  --color-overlay-border: rgba(255, 255, 255, 0.15);
+  
+  /* Spacing Scale */
+  --space-xs: 0.25rem;   /* 4px */
+  --space-sm: 0.5rem;    /* 8px */
+  --space-md: 1rem;      /* 16px */
+  --space-lg: 1.5rem;    /* 24px */
+  --space-xl: 2rem;      /* 32px */
+  --space-2xl: 3rem;     /* 48px */
+  
+  /* Border Radius */
+  --radius-sm: 0.5rem;   /* 8px */
+  --radius-md: 0.75rem;  /* 12px */
+  --radius-lg: 1rem;     /* 16px */
+  --radius-xl: 1.25rem;  /* 20px */
+  --radius-full: 9999px;
+  
+  /* Typography */
+  --font-family-base: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-size-xs: 0.75rem;    /* 12px */
+  --font-size-sm: 0.875rem;   /* 14px */
+  --font-size-base: 1rem;     /* 16px */
+  --font-size-lg: 1.125rem;   /* 18px */
+  --font-size-xl: 1.25rem;    /* 20px */
+  --font-size-2xl: 1.5rem;    /* 24px */
+  --font-size-3xl: 2rem;      /* 32px */
+  
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+  
+  /* Shadows */
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  
+  /* Focus Ring */
+  --ring-width: 2px;
+  --ring-color: var(--color-primary);
+  --ring-offset: 2px;
+  
+  /* Transitions */
+  --transition-fast: 150ms ease;
+  --transition-base: 200ms ease;
+  --transition-slow: 300ms ease;
+  
+  /* Touch Targets (WCAG 2.5.8) */
+  --touch-target-min: 44px;  /* Minimum 44x44px for touch targets */
+  
+  /* Z-index Scale */
+  --z-base: 0;
+  --z-dropdown: 1000;
+  --z-overlay: 1100;
+  --z-modal: 1200;
+  --z-tooltip: 1300;
+}
+
+/* Dark Mode Support (optional) */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-background: #121212;
+    --color-surface: #1e1e1e;
+    --color-surface-variant: #2a2a2a;
+    --color-border: #3a3a3a;
+    --color-foreground: #e0e0e0;
+    --color-foreground-muted: #a0a0a0;
+  }
+}
+
+/* Reduced Motion (WCAG 2.3.3) */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
