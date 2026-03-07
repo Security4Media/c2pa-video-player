@@ -77,3 +77,21 @@
     min-height: 300px;
   }
 }
+
+/* C2PA Timeline Styling */
+.video-js .vjs-progress-control {
+  color: var(--c2pa-unknown);
+}
+
+.video-js .vjs-progress-holder .vjs-play-progress {
+  background-color: var(--c2pa-unknown);
+}
+
+/* C2PA Timeline Segments */
+.seekbar-play-c2pa {
+  position: absolute;
+  height: 100%;
+  left: 0;
+  top: 0;
+  pointer-events: none;
+}

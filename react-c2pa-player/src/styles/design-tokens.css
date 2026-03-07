@@ -16,6 +16,12 @@
   --color-invalid: #dc3545;
   --color-unknown: #ffc107;
   
+  /* C2PA Timeline Colors (matching JavaScript version) */
+  --c2pa-passed: rgb(42, 122, 243);
+  --c2pa-trusted: rgb(42, 243, 122);
+  --c2pa-failed: #d31510;
+  --c2pa-unknown: rgb(172, 172, 172);
+  
   /* Neutral Colors */
   --color-background: #ffffff;
   --color-surface: #f8f9fa;
