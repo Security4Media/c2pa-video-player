@@ -1,4 +1,4 @@
-import { useCallback, useRef, useEffect } from 'react';
+import { useCallback, useRef, useEffect, useState } from 'react';
 import type { ProgressSegmentElement } from '../types/c2pa.types';
 
 interface UseC2PATimelineProps {
@@ -9,28 +9,131 @@ interface UseC2PATimelineProps {
 export function useC2PATimeline({ videoPlayer, isMonolithic }: UseC2PATimelineProps) {
   const progressSegmentsRef = useRef<ProgressSegmentElement[]>([]);
   const c2paControlBarRef = useRef<any>(null);
+  const [isInitialized, setIsInitialized] = useState(false);
 
   // Initialize C2PA Control Bar
   const initializeControlBar = useCallback(() => {
-    if (!videoPlayer || !window.videojs) return;
-
-    const LoadProgressBar = (window.videojs as any).getComponent('LoadProgressBar');
-
-    class C2PALoadProgressBar extends LoadProgressBar {
-      update() {
-        // Override update to handle C2PA validation
-      }
+    if (!videoPlayer || !window.videojs) {
+      console.warn('[C2PA Timeline] Player or videojs not ready');
+      return false;
     }
 
-    (window.videojs as any).registerComponent('C2PALoadProgressBar', C2PALoadProgressBar);
-    videoPlayer.controlBar.progressControl.seekBar.addChild('C2PALoadProgressBar');
+    // Check if control bar components exist
+    if (!videoPlayer.controlBar || 
+        !videoPlayer.controlBar.progressControl || 
+        !videoPlayer.controlBar.progressControl.seekBar) {
+      console.warn('[C2PA Timeline] Control bar components not ready');
+      return false;
+    }
 
-    const c2paTimeline = videoPlayer.controlBar.progressControl.seekBar.getChild('C2PALoadProgressBar');
-    c2paTimeline.el().style.width = '100%';
-    c2paTimeline.el().style.backgroundColor = 'transparent';
+    try {
+      // Check if child already exists before doing anything
+      const existingChild = videoPlayer.controlBar.progressControl.seekBar.getChild('C2PALoadProgressBar');
+      if (existingChild) {
+        console.log('[C2PA Timeline] Child already exists, reusing');
+        c2paControlBarRef.current = existingChild;
+        setIsInitialized(true);
+        return true;
+      }
+    } catch (e) {
+      // Child doesn't exist, continue
+    }
 
-    c2paControlBarRef.current = c2paTimeline;
-    console.log('[C2PA Timeline] Control bar initialized');
+    // Fallback: Use a simple div overlay if component registration fails
+    const useFallback = () => {
+      console.log('[C2PA Timeline] Using fallback DOM element approach');
+      const seekBar = videoPlayer.controlBar.progressControl.seekBar.el();
+      if (!seekBar) {
+        console.error('[C2PA Timeline] Seekbar element not found');
+        return false;
+      }
+
+      // Create a container div for our timeline segments
+      let container = seekBar.querySelector('.c2pa-timeline-container');
+      if (!container) {
+        container = document.createElement('div');
+        container.className = 'c2pa-timeline-container';
+        container.style.position = 'absolute';
+        container.style.width = '100%';
+        container.style.height = '100%';
+        container.style.top = '0';
+        container.style.left = '0';
+        container.style.pointerEvents = 'none';
+        container.style.zIndex = '1';
+        seekBar.appendChild(container);
+      }
+
+      c2paControlBarRef.current = {
+        el: () => container
+      };
+      setIsInitialized(true);
+      console.log('[C2PA Timeline] Fallback initialized successfully');
+      return true;
+    };
+
+    // Try to register and add as Video.js component
+    try {
+      const videoJsGlobal = window.videojs as any;
+      
+      // Check if component is already registered
+      let C2PALoadProgressBarComponent = null;
+      try {
+        C2PALoadProgressBarComponent = videoJsGlobal.getComponent('C2PALoadProgressBar');
+      } catch (e) {
+        // Component not registered yet
+      }
+
+      if (!C2PALoadProgressBarComponent) {
+        const LoadProgressBar = videoJsGlobal.getComponent('LoadProgressBar');
+        if (!LoadProgressBar) {
+          console.warn('[C2PA Timeline] LoadProgressBar component not found, using fallback');
+          return useFallback();
+        }
+
+        // Create the component class using ES6 class syntax
+        class C2PALoadProgressBarClass extends LoadProgressBar {
+          constructor(player: any, options: any) {
+            super(player, options);
+          }
+
+          update() {
+            // Override update to handle C2PA validation
+            // Call parent update if needed
+            if (super.update) {
+              super.update();
+            }
+          }
+        }
+
+        // Register the component
+        videoJsGlobal.registerComponent('C2PALoadProgressBar', C2PALoadProgressBarClass);
+        C2PALoadProgressBarComponent = C2PALoadProgressBarClass;
+        console.log('[C2PA Timeline] Registered C2PALoadProgressBar component');
+      } else {
+        console.log('[C2PA Timeline] Component already registered');
+      }
+
+      // Now add the child component
+      videoPlayer.controlBar.progressControl.seekBar.addChild('C2PALoadProgressBar', {});
+      
+      // Get reference to the added component
+      const c2paTimeline = videoPlayer.controlBar.progressControl.seekBar.getChild('C2PALoadProgressBar');
+      
+      if (c2paTimeline && c2paTimeline.el()) {
+        c2paTimeline.el().style.width = '100%';
+        c2paTimeline.el().style.backgroundColor = 'transparent';
+        c2paControlBarRef.current = c2paTimeline;
+        setIsInitialized(true);
+        console.log('[C2PA Timeline] Control bar initialized successfully');
+        return true;
+      } else {
+        console.warn('[C2PA Timeline] Component added but element not found, using fallback');
+        return useFallback();
+      }
+    } catch (error) {
+      console.warn('[C2PA Timeline] Error during initialization, using fallback:', error);
+      return useFallback();
+    }
   }, [videoPlayer]);
 
   // Create timeline segment
@@ -147,8 +250,26 @@ export function useC2PATimeline({ videoPlayer, isMonolithic }: UseC2PATimelinePr
   }, [isMonolithic, createTimelineSegment, updateTimeline]);
 
   useEffect(() => {
-    initializeControlBar();
-  }, [initializeControlBar]);
+    if (!videoPlayer || isInitialized) return;
+
+    // Wait for player to be ready before initializing control bar
+    const initWhenReady = () => {
+      if (videoPlayer.isReady_) {
+        setTimeout(() => {
+          initializeControlBar();
+        }, 100);
+      } else {
+        videoPlayer.ready(() => {
+          // Give it a small delay to ensure all components are initialized
+          setTimeout(() => {
+            initializeControlBar();
+          }, 200);
+        });
+      }
+    };
+
+    initWhenReady();
+  }, [initializeControlBar, videoPlayer, isInitialized]);
 
   return {
     addSegment,

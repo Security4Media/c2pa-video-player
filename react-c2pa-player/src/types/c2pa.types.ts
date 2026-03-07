@@ -1,9 +1,11 @@
+import type { ManifestStore } from '@contentauth/c2pa-web';
+
 export interface C2PAStatus {
   verified: boolean;
   validation_state: 'Trusted' | 'Valid' | 'Invalid' | 'Unknown';
   details: {
     [key: string]: {
-      manifestStore: any;
+      manifestStore: ManifestStore | null;
       error: string | null;
       valid: boolean;
     };

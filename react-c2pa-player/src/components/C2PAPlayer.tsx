@@ -4,7 +4,6 @@ import { C2PAFrictionOverlay } from './C2PAFrictionOverlay';
 import { C2PAStatusBadge } from './C2PAStatusBadge';
 import { TimelineSegmentVisualizer } from './TimelineSegmentVisualizer';
 import { C2PADataOverlay } from './C2PADataOverlay';
-import { C2PAControlButton } from './C2PAControlButton';
 import { useC2PATimeline } from '../hooks/useC2PATimeline';
 import { useC2PAValidation } from '../hooks/useC2PAValidation';
 import { useC2PASeekHandler } from '../hooks/useC2PASeekHandler';
@@ -14,23 +13,35 @@ interface C2PAPlayerProps {
   videoPlayer: any;
   videoElement: HTMLVideoElement;
   isMonolithic?: boolean;
+  showOverlay?: boolean;
+  onToggleOverlay?: () => void;
+  onValidationStateChange?: (state: 'Unknown' | 'Valid' | 'Trusted' | 'Invalid') => void;
+  c2paStatus?: any;
 }
 
-export function C2PAPlayer({ videoPlayer, videoElement, isMonolithic = false }: C2PAPlayerProps) {
+export function C2PAPlayer({ videoPlayer, videoElement, isMonolithic = false, showOverlay = false, onToggleOverlay, onValidationStateChange, c2paStatus: externalC2paStatus }: C2PAPlayerProps) {
   const [isManifestInvalid] = useState(false);
   const [playbackStarted, setPlaybackStarted] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
-  const [showOverlay, setShowOverlay] = useState(false);
   const [currentC2PAStatus, setCurrentC2PAStatus] = useState<C2PAStatus | null>(null);
+
+  // Use external C2PA status if provided (monolithic mode)
+  useEffect(() => {
+    if (externalC2paStatus) {
+      setCurrentC2PAStatus(externalC2paStatus as C2PAStatus);
+    }
+  }, [externalC2paStatus]);
   
   const c2paMenuRef = useRef<any>(null);
   const c2paMenuHeightOffset = 30;
 
   // Toggle overlay handler
   const handleToggleOverlay = useCallback(() => {
-    setShowOverlay(prev => !prev);
-  }, []);
+    if (onToggleOverlay) {
+      onToggleOverlay();
+    }
+  }, [onToggleOverlay]);
 
   // Use custom hooks for separated concerns
   const timeline = useC2PATimeline({ videoPlayer, isMonolithic });
@@ -51,6 +62,13 @@ export function C2PAPlayer({ videoPlayer, videoElement, isMonolithic = false }: 
   });
 
   const manifest = useC2PAManifest();
+
+  // Notify parent of validation state changes
+  useEffect(() => {
+    if (onValidationStateChange) {
+      onValidationStateChange(manifest.validationState);
+    }
+  }, [manifest.validationState, onValidationStateChange]);
 
   // Playback update handler
   const playbackUpdate = useCallback((c2paStatus: C2PAStatus) => {
@@ -98,7 +116,16 @@ export function C2PAPlayer({ videoPlayer, videoElement, isMonolithic = false }: 
   useEffect(() => {
     if (!videoPlayer || !videoElement) return;
 
-    c2paMenuRef.current = videoPlayer.controlBar.getChild('C2PAMenuButton');
+    // Try to get C2PAMenuButton if it exists (from old implementation)
+    try {
+      const menuButton = videoPlayer.controlBar.getChild('C2PAMenuButton');
+      if (menuButton) {
+        c2paMenuRef.current = menuButton;
+      }
+    } catch (e) {
+      // Component doesn't exist, which is fine - we're using our own overlay
+      console.log('[C2PA Player] No C2PAMenuButton found (using overlay instead)');
+    }
 
     const interval = setInterval(() => {
       adjustC2PAMenu();
@@ -144,12 +171,7 @@ export function C2PAPlayer({ videoPlayer, videoElement, isMonolithic = false }: 
             duration={duration}
           />
 
-          {/* Video.js player-level overlay */}
-          <C2PAControlButton
-            videoPlayer={videoPlayer}
-            onToggle={handleToggleOverlay}
-            validationState={manifest.validationState}
-          />
+          {/* C2PAControlButton removed - now in VideoJSWithC2PA wrapper */}
 
           <C2PADataOverlay
             c2paStatus={currentC2PAStatus}

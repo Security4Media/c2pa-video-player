@@ -8,6 +8,7 @@
         "preview": "vite preview"
     },
     "dependencies": {
+        "@contentauth/c2pa-web": "^0.5.6",
         "react": "^19.0.0",
         "react-dom": "^19.0.0",
         "video.js": "^8.3.0"

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 import crIconUrl from '../assets/icons/cr-icon.svg?url';
 import crInvalidIconUrl from '../assets/icons/cr-invalid.svg?url';
 
@@ -9,9 +9,6 @@ interface C2PAControlButtonProps {
 }
 
 export function C2PAControlButton({ videoPlayer, onToggle, validationState }: C2PAControlButtonProps) {
-  const buttonRef = useRef<HTMLDivElement>(null);
-  const [isHovered, setIsHovered] = useState(false);
-
   // Get icon based on validation state
   const getIcon = () => {
     switch (validationState) {
@@ -38,141 +35,147 @@ export function C2PAControlButton({ videoPlayer, onToggle, validationState }: C2
     }
   };
 
-  // Position the button in the Video.js control bar (before play button)
+  // Register and add button as a Video.js component
   useEffect(() => {
-    if (!videoPlayer || !buttonRef.current) return;
+    if (!videoPlayer || !window.videojs) return;
 
-    const controlBar = videoPlayer.controlBar?.el();
-    if (!controlBar) return;
+    const videojs = window.videojs as any;
+    const Button = videojs.getComponent('Button');
+    if (!Button) {
+      console.error('[C2PA Button] Button component not found');
+      return;
+    }
 
-    const playButton = controlBar.querySelector('.vjs-play-control');
-    
-    if (playButton) {
-      controlBar.insertBefore(buttonRef.current, playButton);
-    } else {
-      const firstChild = controlBar.firstChild;
-      if (firstChild) {
-        controlBar.insertBefore(buttonRef.current, firstChild);
-      } else {
-        controlBar.appendChild(buttonRef.current);
+    // Check if button already exists in control bar
+    try {
+      const existingButton = videoPlayer.controlBar.getChild('C2PAButton');
+      if (existingButton) {
+        console.log('[C2PA Button] Button already exists');
+        // Update the callback
+        if (existingButton.options_) {
+          existingButton.options_.onToggle = onToggle;
+        }
+        return;
+      }
+    } catch (e) {
+      // Button doesn't exist, continue
+    }
+
+    // Check if component is already registered
+    let C2PAButton = null;
+    try {
+      C2PAButton = videojs.getComponent('C2PAButton');
+      console.log('[C2PA Button] Component already registered');
+    } catch (e) {
+      // Component not registered yet, register it
+      console.log('[C2PA Button] Registering component...');
+      
+      // Create the button component using ES6 class syntax
+      class C2PAButtonClass extends Button {
+        constructor(player: any, options: any) {
+          super(player, options);
+          this.controlText('Content Credentials');
+          this.addClass('vjs-c2pa-button');
+          
+          // Store options for later use
+          this.options_ = options;
+        }
+
+        buildCSSClass() {
+          return `vjs-c2pa-button ${super.buildCSSClass()}`;
+        }
+
+        handleClick() {
+          // Trigger the React callback
+          if (this.options_ && this.options_.onToggle) {
+            this.options_.onToggle();
+          }
+        }
+
+        createEl() {
+          const el = super.createEl('button', {
+            className: 'vjs-c2pa-button vjs-control vjs-button',
+          });
+
+          // Create icon element
+          const icon = document.createElement('img');
+          icon.src = this.options_?.iconUrl || crIconUrl;
+          icon.alt = 'Content Credentials';
+          icon.style.width = '2em';
+          icon.style.height = '2em';
+          icon.style.pointerEvents = 'none';
+          if (this.options_?.color) {
+            icon.style.filter = `drop-shadow(0 0 2px ${this.options_.color})`;
+          }
+
+          el.appendChild(icon);
+          return el;
+        }
+      }
+
+      // Register the component
+      videojs.registerComponent('C2PAButton', C2PAButtonClass);
+      console.log('[C2PA Button] Component registered successfully');
+      
+      // Verify registration
+      try {
+        C2PAButton = videojs.getComponent('C2PAButton');
+        console.log('[C2PA Button] Component verified:', !!C2PAButton);
+      } catch (verifyError) {
+        console.error('[C2PA Button] Failed to verify component registration:', verifyError);
+        return;
       }
     }
 
-    // Native event listener as backup
-    const handleNativeClick = (e: Event) => {
-      e.preventDefault();
-      e.stopPropagation();
-      onToggle();
+    const options = {
+      onToggle,
+      iconUrl: getIcon(),
+      color: getColor(),
     };
 
-    buttonRef.current.addEventListener('click', handleNativeClick, true);
+    try {
+      // Add button to control bar at the beginning (index 0)
+      videoPlayer.controlBar.addChild(
+        'C2PAButton',
+        options,
+        0 // Position at the start
+      );
+      console.log('[C2PA Button] Added button to control bar');
+    } catch (error) {
+      console.error('[C2PA Button] Error adding button:', error);
+    }
 
     return () => {
-      if (buttonRef.current) {
-        buttonRef.current.removeEventListener('click', handleNativeClick, true);
-        const currentRef = buttonRef.current;
-        if (controlBar.contains(currentRef)) {
-          controlBar.removeChild(currentRef);
+      // Cleanup: remove button when component unmounts
+      try {
+        const button = videoPlayer.controlBar.getChild('C2PAButton');
+        if (button) {
+          videoPlayer.controlBar.removeChild(button);
         }
+      } catch (e) {
+        // Button already removed or doesn't exist
       }
     };
   }, [videoPlayer, onToggle]);
 
-  return (
-    <div
-      ref={buttonRef}
-      onClick={(e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        onToggle();
-      }}
-      onMouseDown={(e) => {
-        e.preventDefault();
-        e.stopPropagation();
-      }}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
-      style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        width: '4em',
-        height: '100%',
-        cursor: 'pointer',
-        position: 'relative',
-        background: isHovered ? 'rgba(255,255,255,0.15)' : 'transparent',
-        transition: 'background 0.2s',
-        borderRight: '1px solid rgba(255,255,255,0.1)',
-        marginLeft: '0',
-        pointerEvents: 'all',
-        userSelect: 'none',
-        touchAction: 'manipulation',
-      }}
-      title="Content Credentials"
-      className="vjs-control vjs-button c2pa-control-button"
-      role="button"
-      tabIndex={0}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          e.stopPropagation();
-          onToggle();
-        }
-      }}
-    >
-      <div style={{
-        width: '2.5em',
-        height: '2.5em',
-        background: `url(${getIcon()}) center center / contain no-repeat`,
-        filter: isHovered ? 'brightness(1.2)' : 'none',
-        transition: 'filter 0.2s',
-        pointerEvents: 'none',
-      }} />
-      
-      {/* Status indicator dot */}
-      <div style={{
-        position: 'absolute',
-        top: '8px',
-        right: '8px',
-        width: '8px',
-        height: '8px',
-        borderRadius: '50%',
-        background: getColor(),
-        border: '1.5px solid rgba(0,0,0,0.5)',
-        boxShadow: `0 0 4px ${getColor()}`,
-      }} />
+  // Update button icon when validation state changes
+  useEffect(() => {
+    if (!videoPlayer) return;
 
-      {/* Hover tooltip */}
-      {isHovered && (
-        <div style={{
-          position: 'absolute',
-          bottom: '100%',
-          left: '50%',
-          transform: 'translateX(-50%)',
-          marginBottom: '8px',
-          background: 'rgba(0,0,0,0.9)',
-          color: 'white',
-          padding: '6px 12px',
-          borderRadius: '4px',
-          fontSize: '12px',
-          whiteSpace: 'nowrap',
-          pointerEvents: 'none',
-          zIndex: 1000,
-        }}>
-          Content Credentials: {validationState}
-          <div style={{
-            position: 'absolute',
-            top: '100%',
-            left: '50%',
-            transform: 'translateX(-50%)',
-            width: 0,
-            height: 0,
-            borderLeft: '4px solid transparent',
-            borderRight: '4px solid transparent',
-            borderTop: '4px solid rgba(0,0,0,0.9)',
-          }} />
-        </div>
-      )}
-    </div>
-  );
+    try {
+      const button = videoPlayer.controlBar.getChild('C2PAButton');
+      if (button && button.el()) {
+        const icon = button.el().querySelector('img');
+        if (icon) {
+          icon.src = getIcon();
+          icon.style.filter = `drop-shadow(0 0 2px ${getColor()})`;
+        }
+      }
+    } catch (e) {
+      // Button doesn't exist yet
+    }
+  }, [videoPlayer, validationState]);
+
+  // This component doesn't render anything - it just manages the Video.js button
+  return null;
 }

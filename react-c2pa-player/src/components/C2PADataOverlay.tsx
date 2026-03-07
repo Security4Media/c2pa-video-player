@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
+import type { ManifestStore, Manifest, ManifestAssertion } from '@contentauth/c2pa-web';
 import type { C2PAStatus } from '../types/c2pa.types';
 import crIconUrl from '../assets/icons/cr-icon.svg?url';
 import crInvalidIconUrl from '../assets/icons/cr-invalid.svg?url';
+import './C2PADataOverlay.css';
 
 interface C2PADataOverlayProps {
   c2paStatus: C2PAStatus | null;
@@ -36,10 +38,11 @@ export function C2PADataOverlay({ c2paStatus, isVisible, videoPlayer }: C2PAData
 
     try {
       const manifestStore = c2paStatus.details?.video?.manifestStore;
-      if (!manifestStore) return;
+      if (!manifestStore || !manifestStore.active_manifest) return;
 
       const activeManifestId = manifestStore.active_manifest;
       const activeManifest = manifestStore.manifests[activeManifestId];
+      if (!activeManifest) return;
 
       const data = {
         issuer: activeManifest?.signature_info?.issuer || null,
@@ -59,7 +62,7 @@ export function C2PADataOverlay({ c2paStatus, isVisible, videoPlayer }: C2PAData
     }
   }, [c2paStatus]);
 
-  const formatDate = (timeValue: string | null) => {
+  const formatDate = (timeValue: string | null | undefined) => {
     if (!timeValue) return null;
     const date = new Date(timeValue);
     return new Intl.DateTimeFormat('en-US', {
@@ -69,51 +72,77 @@ export function C2PADataOverlay({ c2paStatus, isVisible, videoPlayer }: C2PAData
     }).format(date);
   };
 
-  const selectClaimGenerator = (manifest: any) => {
+  const selectClaimGenerator = (manifest: Manifest | undefined) => {
     const genAssertion = manifest?.assertions?.find(
-      (a: any) => a.label === 'c2pa.actions'
+      (a: ManifestAssertion) => a.label === 'c2pa.actions'
     );
-    return genAssertion?.data?.[0]?.softwareAgent || manifest?.claim_generator || null;
+    const data = genAssertion?.data as any;
+    return data?.[0]?.softwareAgent || manifest?.claim_generator || null;
   };
 
-  const selectAuthors = (manifest: any) => {
+  const selectAuthors = (manifest: Manifest | undefined) => {
     const creativeWork = manifest?.assertions?.find(
-      (a: any) => a.label === 'stds.schema-org.CreativeWork'
+      (a: ManifestAssertion) => a.label === 'stds.schema-org.CreativeWork'
     );
-    const authors = creativeWork?.data?.author;
+    const data = creativeWork?.data as any;
+    const authors = data?.author;
     return authors?.length > 0 ? authors.map((a: any) => a.name).join(', ') : null;
   };
 
-  const selectWebsite = (manifest: any) => {
+  const selectWebsite = (manifest: Manifest | undefined) => {
     const creativeWork = manifest?.assertions?.find(
-      (a: any) => a.label === 'stds.schema-org.CreativeWork'
+      (a: ManifestAssertion) => a.label === 'stds.schema-org.CreativeWork'
     );
-    return creativeWork?.data?.url || null;
+    const data = creativeWork?.data as any;
+    return data?.url || null;
   };
 
-  const selectCawgIdentity = (manifest: any) => {
+  const selectCawgIdentity = (manifest: Manifest | undefined) => {
     const cawgAssertion = manifest?.assertions?.find(
-      (a: any) => a.label === 'cawg.publish_identity.v1'
+      (a: ManifestAssertion) => a.label === 'cawg.identity'
     );
     return cawgAssertion?.data || null;
   };
 
-  const getCAWGValidation = (manifestStore: any) => {
-    // Simplified CAWG validation check
-    const hasCAWG = manifestStore?.manifests?.[manifestStore.active_manifest]?.assertions?.some(
-      (a: any) => a.label === 'cawg.publish_identity.v1'
+  const getCAWGValidation = (manifestStore: ManifestStore) => {
+    // Check if CAWG identity assertion is present
+    if (!manifestStore.active_manifest) return 'Unknown';
+    
+    const activeManifest = manifestStore.manifests[manifestStore.active_manifest];
+    if (!activeManifest?.assertions) return 'Not Present';
+    
+    const cawgAssertion = activeManifest.assertions.find(
+      (assertion: ManifestAssertion) => assertion.label === 'cawg.identity'
     );
-    return hasCAWG ? 'Present' : 'Not Present';
+
+  if (!cawgAssertion) {
+    return 'Not Present';
+  }
+
+  // Evaluate validation results for CAWG identity
+  const validationResults = manifestStore.validation_results;
+  if (!validationResults) {
+    return 'Unknown';
+  }
+
+  //Check that the CAWG is Trusted : well formed + trusted credentials  
+  const activeManifestResults = validationResults.activeManifest;
+  if (!activeManifestResults) return 'Unknown';
+  
+  const successResults = activeManifestResults.success;
+  let isWellFormed = false;
+  let isTrusted = false;
+
+  if (successResults && successResults.length > 0) {
+    isTrusted = successResults.some((result: any) => (result.code === 'signingCredential.trusted') && result.url.includes('cawg.identity'));
+    isWellFormed = successResults.some((result: any) => (result.code === 'cawg.identity.well-formed') && result.url.includes('cawg.identity'));
+    if (isWellFormed && isTrusted) {
+      return 'Trusted';
+    }
+  }
   };
 
-  const getValidationColor = (state: string) => {
-    switch (state) {
-      case 'Trusted': return '#28a745';
-      case 'Valid': return '#17a2b8';
-      case 'Invalid': return '#dc3545';
-      default: return '#ffc107';
-    }
-  };
+  
 
   const getValidationIcon = (state: string) => {
     switch (state) {
@@ -129,98 +158,54 @@ export function C2PADataOverlay({ c2paStatus, isVisible, videoPlayer }: C2PAData
 
   if (!isVisible || !c2paData || !portalContainer) return null;
 
+  const validationStateClass = c2paData.c2paValidation.toLowerCase();
+
   const overlayContent = (
-    <div
+    <article
       className="c2pa-data-overlay"
-      style={{
-        position: 'absolute',
-        top: '10%',
-        right: '5%',
-        width: '450px',
-        maxWidth: '90%',
-        maxHeight: '80%',
-        background: 'rgba(0, 0, 0, 0.95)',
-        color: 'white',
-        zIndex: 1000,
-        display: 'flex',
-        flexDirection: 'column',
-        padding: '24px',
-        borderRadius: '12px',
-        boxShadow: '0 8px 32px rgba(0, 0, 0, 0.6)',
-        overflow: 'auto',
-        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-        backdropFilter: 'blur(10px)',
-        pointerEvents: 'all',
-      }}
+      role="dialog"
+      aria-label="Content Credentials Information"
+      aria-modal="false"
       onClick={(e) => e.stopPropagation()}
     >
       {/* Header */}
-      <div style={{ 
-        display: 'flex', 
-        alignItems: 'center', 
-        gap: '12px',
-        marginBottom: '20px',
-        borderBottom: '2px solid rgba(255,255,255,0.15)',
-        paddingBottom: '16px'
-      }}>
+      <header className="c2pa-overlay-header">
         <img 
           src={getValidationIcon(c2paData.c2paValidation)}
-          alt="Content Credentials"
-          style={{ width: '40px', height: '40px' }}
+          alt=""
+          aria-hidden="true"
         />
         <div>
-          <h2 style={{ margin: 0, fontSize: '22px', fontWeight: '700' }}>
+          <h2 className="c2pa-overlay-title">
             Content Credentials
           </h2>
-          <p style={{ margin: '4px 0 0 0', fontSize: '13px', opacity: 0.8 }}>
+          <p className="c2pa-overlay-subtitle">
             C2PA Verification Details
           </p>
         </div>
-      </div>
+      </header>
 
       {/* Validation Status Banner */}
-      <div style={{
-        background: getValidationColor(c2paData.c2paValidation),
-        padding: '18px',
-        borderRadius: '10px',
-        marginBottom: '20px',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '14px',
-        boxShadow: '0 4px 12px rgba(0,0,0,0.2)'
-      }}>
-        <div style={{
-          width: '44px',
-          height: '44px',
-          borderRadius: '50%',
-          background: 'rgba(255,255,255,0.25)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          fontSize: '22px',
-          fontWeight: 'bold',
-          boxShadow: '0 2px 8px rgba(0,0,0,0.2)'
-        }}>
+      <section
+        className={`c2pa-validation-banner ${validationStateClass}`}
+        aria-label="Validation Status"
+      >
+        <div className="c2pa-validation-icon" aria-hidden="true">
           {c2paData.c2paValidation === 'Trusted' || c2paData.c2paValidation === 'Valid' ? '✓' : 
            c2paData.c2paValidation === 'Invalid' ? '✗' : '?'}
         </div>
-        <div>
-          <div style={{ fontSize: '19px', fontWeight: '700' }}>
+        <div className="c2pa-validation-text">
+          <p className="c2pa-validation-state">
             {c2paData.c2paValidation}
-          </div>
-          <div style={{ fontSize: '14px', opacity: 0.95, marginTop: '2px' }}>
+          </p>
+          <p className="c2pa-validation-label">
             C2PA Validation Status
-          </div>
+          </p>
         </div>
-      </div>
+      </section>
 
       {/* Data Fields */}
-      <div style={{ 
-        flex: 1, 
-        overflow: 'auto',
-        paddingRight: '8px',
-        marginRight: '-8px'
-      }}>
+      <div className="c2pa-data-fields">
         {c2paData.issuer && (
           <DataField label="Issued by" value={c2paData.issuer} />
         )}
@@ -243,67 +228,40 @@ export function C2PADataOverlay({ c2paStatus, isVisible, videoPlayer }: C2PAData
         
         {/* CAWG Identity (Collapsible) */}
         {c2paData.cawgIdentity && (
-          <div style={{ marginBottom: '16px' }}>
-            <div
-              onClick={() => setIsExpanded(!isExpanded)}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                padding: '12px',
-                background: 'rgba(255,255,255,0.05)',
-                borderRadius: '6px',
-                cursor: 'pointer',
-                transition: 'background 0.2s'
+          <details className="c2pa-collapsible" open={isExpanded}>
+            <summary
+              className="c2pa-collapsible-trigger"
+              onClick={(e) => {
+                e.preventDefault();
+                setIsExpanded(!isExpanded);
               }}
-              onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.1)'}
-              onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
             >
               <div>
-                <div style={{ fontSize: '11px', opacity: 0.7, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                <div className="c2pa-field-label">
                   Publisher Identity (CAWG)
                 </div>
-                <div style={{ fontSize: '14px', marginTop: '4px' }}>
+                <div className="c2pa-field-value">
                   {isExpanded ? 'See details below' : 'Click to view details'}
                 </div>
               </div>
-              <div style={{ fontSize: '20px' }}>
-                {isExpanded ? '▼' : '▶'}
-              </div>
+              <span className="c2pa-collapsible-icon" aria-hidden="true">
+                ▶
+              </span>
+            </summary>
+            <div className="c2pa-collapsible-content">
+              {JSON.stringify(c2paData.cawgIdentity, null, 2)}
             </div>
-            {isExpanded && (
-              <div style={{
-                marginTop: '8px',
-                padding: '12px',
-                background: 'rgba(255,255,255,0.03)',
-                borderRadius: '6px',
-                fontSize: '13px',
-                fontFamily: 'monospace',
-                whiteSpace: 'pre-wrap',
-                maxHeight: '200px',
-                overflow: 'auto'
-              }}>
-                {JSON.stringify(c2paData.cawgIdentity, null, 2)}
-              </div>
-            )}
-          </div>
+          </details>
         )}
 
         <DataField label="CAWG Validation Status" value={c2paData.cawgValidation} />
       </div>
 
       {/* Footer */}
-      <div style={{
-        marginTop: '16px',
-        paddingTop: '16px',
-        borderTop: '1px solid rgba(255,255,255,0.2)',
-        fontSize: '11px',
-        opacity: 0.6,
-        textAlign: 'center'
-      }}>
+      <footer className="c2pa-overlay-footer">
         Verification details based on C2PA manifest data
-      </div>
-    </div>
+      </footer>
+    </article>
   );
 
   return createPortal(overlayContent, portalContainer);
@@ -319,21 +277,8 @@ function DataField({ label, value, isLink = false }: DataFieldProps) {
   if (!value) return null;
 
   return (
-    <div style={{ 
-      marginBottom: '14px',
-      padding: '14px',
-      background: 'rgba(255,255,255,0.08)',
-      borderRadius: '8px',
-      border: '1px solid rgba(255,255,255,0.1)'
-    }}>
-      <div style={{ 
-        fontSize: '12px', 
-        opacity: 0.75, 
-        textTransform: 'uppercase',
-        letterSpacing: '0.8px',
-        marginBottom: '8px',
-        fontWeight: '600'
-      }}>
+    <div className="c2pa-data-field">
+      <div className="c2pa-field-label">
         {label}
       </div>
       {isLink ? (
@@ -341,23 +286,14 @@ function DataField({ label, value, isLink = false }: DataFieldProps) {
           href={value}
           target="_blank"
           rel="noopener noreferrer"
-          style={{
-            color: '#5dade2',
-            textDecoration: 'none',
-            fontSize: '15px',
-            wordBreak: 'break-all',
-            fontWeight: '500'
-          }}
-          onMouseEnter={(e) => e.currentTarget.style.textDecoration = 'underline'}
-          onMouseLeave={(e) => e.currentTarget.style.textDecoration = 'none'}
+          className="c2pa-field-value c2pa-field-link"
         >
           {value}
         </a>
       ) : (
-        <div style={{ fontSize: '15px', lineHeight: '1.6', fontWeight: '500' }}>
-          {value}
-        </div>
+        <div className="c2pa-field-value">{value}</div>
       )}
     </div>
   );
 }
+
