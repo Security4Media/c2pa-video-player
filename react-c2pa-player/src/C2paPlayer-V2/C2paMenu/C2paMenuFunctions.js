@@ -159,6 +159,9 @@ let c2paMenuInstance = new C2PAMenu();
 let cawgIdentityExpanded = false;
 
 export let initializeC2PAMenu = function (videoPlayer) {
+  console.log('[C2PAMenu] Initializing C2PA menu, videoPlayer:', videoPlayer);
+  console.log('[C2PAMenu] videojs available:', typeof videojs !== 'undefined', window.videojs);
+
   const MenuButton = videojs.getComponent('MenuButton');
   const MenuItem = videojs.getComponent('MenuItem');
 
@@ -228,6 +231,9 @@ export let initializeC2PAMenu = function (videoPlayer) {
     },
     0,
   ); //0 indicates that the menu button will be the first item in the control bar
+
+  console.log('[C2PAMenu] C2PA menu button added to control bar');
+  console.log('[C2PAMenu] Control bar children:', videoPlayer.controlBar.children());
 };
 
 //Adjust c2pa menu size with respect to the player size

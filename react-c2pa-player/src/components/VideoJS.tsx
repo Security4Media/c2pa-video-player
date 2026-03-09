@@ -31,6 +31,8 @@ export function VideoJS({ options, onReady, onTimeUpdate, onDurationChange, clas
   useEffect(() => {
     // Make sure Video.js player is only initialized once
     if (!playerRef.current) {
+      console.log('[VideoJS] Initializing new Video.js player');
+      
       // The Video.js player needs to be _inside_ the component el for React 18 Strict Mode
       const videoElement = document.createElement('video-js');
 
@@ -70,18 +72,9 @@ export function VideoJS({ options, onReady, onTimeUpdate, onDurationChange, clas
           }
         });
       }
-
-      // You could update an existing player in the `else` block here
-      // on prop change, for example:
-    } else {
-      const player = playerRef.current;
-
-      player.autoplay(options.autoplay);
-      if (options.sources) {
-        player.src(options.sources);
-      }
     }
-  }, [options, onReady, onTimeUpdate, onDurationChange]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Dispose the Video.js player when the functional component unmounts
   useEffect(() => {

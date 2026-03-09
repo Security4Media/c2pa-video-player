@@ -38,6 +38,9 @@ export var C2PAPlayer = function (
     //Adjust height of c2pa menu with respect to the whole player
     const c2paMenuHeightOffset = 30;
 
+    // Store interval ID for cleanup
+    let menuAdjustInterval = null;
+
     let setPlaybackStarted = function () {
         playbackStarted = true;
     }
@@ -46,9 +49,12 @@ export var C2PAPlayer = function (
     return {
         initialize: function () {
             console.log('[C2PA] Initializing C2PAPlayer', videoPlayer, videoElement);
+            console.log('[C2PA] videoPlayer.controlBar:', videoPlayer.controlBar);
 
             //Initialize c2pa timeline and menu
+            console.log('[C2PA] Calling initializeC2PAControlBar...');
             initializeC2PAControlBar(videoPlayer);
+            console.log('[C2PA] Calling initializeC2PAMenu...');
             initializeC2PAMenu(videoPlayer);
             //Initialize friction overlay to be displayed if initial manifest validation fails
             frictionOverlay = initializeFrictionOverlay(videoPlayer, setPlaybackStarted);
@@ -59,6 +65,8 @@ export var C2PAPlayer = function (
                 videoPlayer.controlBar.progressControl.seekBar.getChild(
                     'C2PALoadProgressBar'
                 );
+
+            console.log('[C2PA] Components retrieved - c2paMenu:', c2paMenu, 'c2paControlBar:', c2paControlBar);
 
             videoPlayer.on('play', function () {
                 if (isManifestInvalid && !playbackStarted) {
@@ -83,12 +91,44 @@ export var C2PAPlayer = function (
 
             //Resize the c2pa menu
             //TODO: This is a workaround to resize the menu, as the menu is not resized when the player is resized
-            setInterval(function () {
+            menuAdjustInterval = setInterval(function () {
                 adjustC2PAMenu(c2paMenu, videoElement, c2paMenuHeightOffset);
             }, 500);
             adjustC2PAMenu(c2paMenu, videoElement, c2paMenuHeightOffset);
 
             console.log('[C2PA] Initialization complete');
+        },
+
+        dispose: function () {
+            console.log('[C2PA] Disposing C2PAPlayer');
+
+            // Clear the menu adjustment interval
+            if (menuAdjustInterval) {
+                clearInterval(menuAdjustInterval);
+                menuAdjustInterval = null;
+            }
+
+            // Remove C2PA UI components from Video.js player
+            try {
+                if (c2paMenu && videoPlayer && videoPlayer.controlBar) {
+                    videoPlayer.controlBar.removeChild('C2PAMenuButton');
+                }
+                if (c2paControlBar && videoPlayer && videoPlayer.controlBar && videoPlayer.controlBar.progressControl) {
+                    videoPlayer.controlBar.progressControl.seekBar.removeChild('C2PALoadProgressBar');
+                }
+            } catch (error) {
+                console.warn('[C2PA] Error removing UI components:', error);
+            }
+
+            // Reset state
+            c2paMenu = null;
+            c2paControlBar = null;
+            seeking = false;
+            playbackStarted = false;
+            lastPlaybackTime = 0.0;
+            isManifestInvalid = false;
+
+            console.log('[C2PA] Disposal complete');
         },
 
         //Playback update with updates on c2pa manifest and validation
