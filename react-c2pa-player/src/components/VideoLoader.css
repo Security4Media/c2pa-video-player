@@ -1,0 +1,151 @@
+/* VideoLoader Component Styles */
+
+.input-section {
+  background: var(--color-background);
+  border-radius: var(--radius-lg);
+  padding: var(--space-xl);
+  margin-bottom: var(--space-2xl);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-sm);
+}
+
+.input-group {
+  display: flex;
+  gap: var(--space-md);
+  margin-bottom: var(--space-lg);
+  flex-wrap: wrap;
+}
+
+.input-group:last-child {
+  margin-bottom: 0;
+}
+
+/* Form Controls */
+.input-section input[type='text'],
+.input-section input[type='file'],
+.input-section select {
+  flex: 1;
+  padding: var(--space-md);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-background);
+  color: var(--color-foreground);
+  font-size: var(--font-size-base);
+  font-family: var(--font-family-base);
+  transition: border-color var(--transition-base), box-shadow var(--transition-base);
+  min-width: 250px;
+  min-height: var(--touch-target-min);
+}
+
+.input-section input[type='text']::placeholder {
+  color: var(--color-foreground-muted);
+}
+
+.input-section input[type='text']:focus,
+.input-section select:focus,
+.input-section input[type='file']:focus {
+  outline: none;
+  border-color: var(--ring-color);
+  box-shadow: 0 0 0 var(--ring-width) var(--ring-color);
+}
+
+/* Buttons */
+.input-section .btn {
+  padding: var(--space-md) var(--space-xl);
+  min-height: var(--touch-target-min);
+  min-width: var(--touch-target-min);
+  border: none;
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-semibold);
+  font-family: var(--font-family-base);
+  cursor: pointer;
+  transition: all var(--transition-base);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-sm);
+  white-space: nowrap;
+}
+
+.input-section .btn:focus-visible {
+  outline: var(--ring-width) solid var(--ring-color);
+  outline-offset: var(--ring-offset);
+}
+
+.input-section .btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.input-section .btn-primary {
+  background: var(--color-primary);
+  color: var(--color-primary-foreground);
+  box-shadow: var(--shadow-sm);
+}
+
+.input-section .btn-primary:hover:not(:disabled) {
+  background: var(--color-primary-hover);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
+}
+
+.input-section .btn-primary:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: var(--shadow-sm);
+}
+
+.input-section .btn-secondary {
+  background: var(--color-secondary);
+  color: var(--color-secondary-foreground);
+  box-shadow: var(--shadow-sm);
+}
+
+.input-section .btn-secondary:hover:not(:disabled) {
+  background: var(--color-secondary-hover);
+  box-shadow: var(--shadow-md);
+}
+
+/* Upload Progress Animations */
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes scaleIn {
+  0% {
+    transform: scale(0);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(1.2);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .input-group {
+    flex-direction: column;
+  }
+  
+  .input-section input[type='text'],
+  .input-section input[type='file'],
+  .input-section select {
+    min-width: 100%;
+  }
+}

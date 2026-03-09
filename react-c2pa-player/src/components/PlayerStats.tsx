@@ -1,4 +1,5 @@
 import { memo } from 'react';
+import './PlayerStats.css';
 
 type PlayerStatus = 'ready' | 'loading' | 'error';
 

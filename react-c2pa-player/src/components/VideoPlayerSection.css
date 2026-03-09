@@ -1,0 +1,24 @@
+/* VideoPlayerSection Component Styles */
+
+.player-section {
+  background: var(--color-background);
+  border-radius: var(--radius-lg);
+  padding: var(--space-lg);
+  margin-bottom: var(--space-2xl); /* Spacing before PlayerStats */
+  box-shadow: var(--shadow-lg);
+  border: 1px solid var(--color-border);
+}
+
+/* Video.js Player Rounded Corners */
+.player-section .video-js {
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.player-section .video-js video {
+  border-radius: var(--radius-md);
+}
+
+.player-section .vjs-poster {
+  border-radius: var(--radius-md);
+}

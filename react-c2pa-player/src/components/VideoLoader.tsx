@@ -1,5 +1,6 @@
-import { memo, useCallback } from 'react';
+import { memo, useCallback, useEffect } from 'react';
 import { useVideoUpload } from '../hooks/useVideoUpload';
+import './VideoLoader.css';
 
 export interface VideoItem {
   name: string;
@@ -14,6 +15,7 @@ interface VideoLoaderProps {
   onVideoListLoad: (videos: VideoItem[]) => void;
   onLoadVideoList: () => void;
   onClearPlayer: () => void;
+  onExposeNavigate?: (navigateFn: (videoKey: string) => void) => void;
   
   // Display state only (controlled by parent for UI consistency)
   mp4Url: string;
@@ -29,6 +31,7 @@ export const VideoLoader = memo(function VideoLoader({
   onVideoListLoad,
   onLoadVideoList,
   onClearPlayer,
+  onExposeNavigate,
   mp4Url,
   selectedVideo,
   availableVideos,
@@ -41,11 +44,20 @@ export const VideoLoader = memo(function VideoLoader({
     handleFolderSelect: handleFolderSelectRaw,
     handleVideoSelect: handleVideoSelectRaw,
     validateAndLoadVideo,
+    reprocessLocalFiles,
+    selectVideoByKey,
   } = useVideoUpload({
     onVideoLoad,
     onError,
     onStatusUpdate,
   });
+
+  // Expose navigation function to parent on mount
+  useEffect(() => {
+    if (onExposeNavigate) {
+      onExposeNavigate(selectVideoByKey);
+    }
+  }, [onExposeNavigate, selectVideoByKey]);
 
   /**
    * Handles single file selection
@@ -95,19 +107,48 @@ export const VideoLoader = memo(function VideoLoader({
     validateAndLoadVideo(mp4Url);
   }, [mp4Url, validateAndLoadVideo]);
 
+  /**
+   * Smart refresh handler - refreshes local files or server list based on current mode
+   */
+  const handleRefreshList = useCallback(async () => {
+    // Check if we're in local mode (any video has source === 'local')
+    const hasLocalVideos = availableVideos.some((video) => video.source === 'local');
+
+    if (hasLocalVideos) {
+      // Local mode: re-process local files with progress animation
+      const videoFiles = await reprocessLocalFiles();
+      
+      if (videoFiles && videoFiles.length > 0) {
+        const videoItems: VideoItem[] = videoFiles.map((file) => ({
+          name: file.name,
+          source: 'local' as const,
+        }));
+        onVideoListLoad(videoItems);
+      }
+    } else {
+      // Server mode: call parent's load video list function
+      onLoadVideoList();
+    }
+  }, [availableVideos, reprocessLocalFiles, onVideoListLoad, onLoadVideoList]);
+
+  const isUploadComplete = uploadProgress.isLoading && uploadProgress.processed === uploadProgress.total;
+
   return (
     <div className="input-section">
       {/* Upload Progress Indicator */}
       {uploadProgress.isLoading && (
         <div
           style={{
-            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            background: isUploadComplete 
+              ? 'var(--color-primary)' 
+              : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
             color: 'white',
             padding: '16px 20px',
             borderRadius: '12px',
             marginBottom: '16px',
             boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
             animation: 'slideDown 0.3s ease-out',
+            transition: 'background 0.4s ease',
           }}
         >
           <div
@@ -119,17 +160,44 @@ export const VideoLoader = memo(function VideoLoader({
             }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <div
-                style={{
-                  width: '20px',
-                  height: '20px',
-                  border: '3px solid rgba(255,255,255,0.3)',
-                  borderTop: '3px solid white',
-                  borderRadius: '50%',
-                  animation: 'spin 1s linear infinite',
-                }}
-              />
-              <span style={{ fontWeight: '600', fontSize: '16px' }}>Loading Files...</span>
+              {isUploadComplete ? (
+                <div
+                  style={{
+                    width: '24px',
+                    height: '24px',
+                    background: '#28a745',
+                    borderRadius: '50%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    animation: 'scaleIn 0.4s ease-out',
+                  }}
+                >
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                    <path
+                      d="M13.5 4L6 11.5L2.5 8"
+                      stroke="white"
+                      strokeWidth="2.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                </div>
+              ) : (
+                <div
+                  style={{
+                    width: '20px',
+                    height: '20px',
+                    border: '3px solid rgba(255,255,255,0.3)',
+                    borderTop: '3px solid white',
+                    borderRadius: '50%',
+                    animation: 'spin 1s linear infinite',
+                  }}
+                />
+              )}
+              <span style={{ fontWeight: '600', fontSize: '16px' }}>
+                {isUploadComplete ? 'Upload Complete!' : 'Loading Files...'}
+              </span>
             </div>
             <span style={{ fontWeight: '700', fontSize: '18px' }}>
               {uploadProgress.processed} / {uploadProgress.total}
@@ -147,10 +215,10 @@ export const VideoLoader = memo(function VideoLoader({
           >
             <div
               style={{
-                background: 'white',
+                background: isUploadComplete ? '#28a745' : 'white',
                 height: '100%',
                 width: `${(uploadProgress.processed / uploadProgress.total) * 100}%`,
-                transition: 'width 0.3s ease',
+                transition: 'width 0.3s ease, background 0.4s ease',
                 borderRadius: '10px',
               }}
             />
@@ -160,7 +228,7 @@ export const VideoLoader = memo(function VideoLoader({
             {uploadProgress.processed < uploadProgress.total ? (
               <>Processing: {uploadProgress.currentFile}</>
             ) : (
-              <>✓ {uploadProgress.currentFile}</>
+              <>All files loaded successfully</>
             )}
           </div>
         </div>
@@ -190,7 +258,7 @@ export const VideoLoader = memo(function VideoLoader({
             </option>
           ))}
         </select>
-        <button className="btn btn-secondary" onClick={onLoadVideoList}>
+        <button className="btn btn-secondary" onClick={handleRefreshList}>
           🔄 Refresh List
         </button>
         <button

@@ -29,6 +29,8 @@ interface UseVideoUploadReturn {
   handleFolderSelect: (event: React.ChangeEvent<HTMLInputElement>) => Promise<File[] | undefined>;
   handleVideoSelect: (event: React.ChangeEvent<HTMLSelectElement>) => void;
   validateAndLoadVideo: (url: string) => boolean;
+  reprocessLocalFiles: () => Promise<File[] | undefined>;
+  selectVideoByKey: (videoKey: string) => void;
 }
 
 /**
@@ -172,12 +174,12 @@ export function useVideoUpload({
   );
 
   /**
-   * Handles video selection from dropdown
+   * Selects and loads a video directly by its key (filename|source)
+   * Used for programmatic navigation and dropdown selection
    */
-  const handleVideoSelect = useCallback(
-    (event: React.ChangeEvent<HTMLSelectElement>) => {
-      const selectedValue = event.target.value;
-      const parsed = parseVideoSelection(selectedValue);
+  const selectVideoByKey = useCallback(
+    (videoKey: string) => {
+      const parsed = parseVideoSelection(videoKey);
 
       if (!parsed) return;
 
@@ -204,6 +206,49 @@ export function useVideoUpload({
     [localVideoFiles, onVideoLoad, onError]
   );
 
+  /**
+   * Handles video selection from dropdown
+   */
+  const handleVideoSelect = useCallback(
+    (event: React.ChangeEvent<HTMLSelectElement>) => {
+      const selectedValue = event.target.value;
+      selectVideoByKey(selectedValue);
+    },
+    [selectVideoByKey]
+  );
+
+  /**
+   * Re-processes stored local files (for refresh functionality)
+   */
+  const reprocessLocalFiles = useCallback(async () => {
+    if (localVideoFiles.size === 0) {
+      onStatusUpdate('No local files to refresh');
+      return;
+    }
+
+    const filesArray = Array.from(localVideoFiles.values());
+    const totalFiles = filesArray.length;
+
+    // Initialize progress
+    updateProgress(0, totalFiles, '');
+
+    // Process each file with progress feedback
+    for (let i = 0; i < filesArray.length; i++) {
+      updateProgress(i, totalFiles, filesArray[i].name);
+      await new Promise((resolve) => setTimeout(resolve, UPLOAD_CONFIG.PROGRESS_DELAY_MS));
+    }
+
+    // Mark as complete
+    updateProgress(totalFiles, totalFiles, 'Complete!');
+
+    onStatusUpdate(`Refreshed ${totalFiles} local video file(s)`);
+
+    // Hide progress after delay
+    resetProgressAfterDelay(UPLOAD_CONFIG.PROGRESS_HIDE_DELAY_MS);
+
+    return filesArray;
+  }, [localVideoFiles, onStatusUpdate, updateProgress, resetProgressAfterDelay]);
+
   return {
     uploadProgress,
     localVideoFiles,
@@ -211,5 +256,7 @@ export function useVideoUpload({
     handleFolderSelect,
     handleVideoSelect,
     validateAndLoadVideo,
+    reprocessLocalFiles,
+    selectVideoByKey,
   };
 }

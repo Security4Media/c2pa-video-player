@@ -1,0 +1,110 @@
+/* VideoNavigationControls Component Styles */
+
+.video-navigation-controls {
+  display: flex;
+  gap: var(--space-md);
+  margin-top: var(--space-md); /* Position inside player section */
+  margin-bottom: 0;
+  justify-content: space-between;
+  align-items: stretch;
+  position: relative;
+  z-index: 10;
+  padding: 0;
+}
+
+.btn-navigation {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-md) var(--space-lg);
+  background: var(--color-primary);
+  color: var(--color-primary-foreground);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: var(--shadow-md);
+  max-width: 400px;
+}
+
+.btn-navigation:hover:not(:disabled) {
+  background: var(--color-primary-hover);
+  color: var(--color-primary-foreground);
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-lg);
+  border-color: var(--color-primary-hover);
+}
+
+.btn-navigation:active:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
+  color: var(--color-primary-foreground);
+}
+
+.btn-navigation:disabled {
+  background: var(--color-surface-variant);
+  color: var(--color-foreground-muted);
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.btn-navigation .nav-icon {
+  font-size: 20px;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+}
+
+.btn-navigation .nav-content {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.btn-navigation.btn-next .nav-content {
+  align-items: flex-end;
+}
+
+.btn-navigation .nav-label {
+  font-size: 12px;
+  font-weight: var(--font-weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  opacity: 0.9;
+}
+
+.btn-navigation .nav-video-name {
+  font-size: 14px;
+  font-weight: var(--font-weight-normal);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 300px;
+  opacity: 0.95;
+}
+
+.btn-navigation:disabled .nav-video-name {
+  opacity: 0.5;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .video-navigation-controls {
+    flex-direction: column;
+    margin-top: calc(-1 * var(--space-lg) - 8px); /* Smaller overlap on mobile */
+    padding: 0 var(--space-md);
+  }
+
+  .btn-navigation {
+    max-width: 100%;
+  }
+
+  .btn-navigation .nav-video-name {
+    max-width: 200px;
+  }
+}

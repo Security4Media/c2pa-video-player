@@ -1,8 +1,10 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { type VideoJSOptions } from '../components/VideoJS';
 import { VideoLoader, type VideoItem } from '../components/VideoLoader';
 import { PlayerStats } from '../components/PlayerStats';
 import { VideoPlayerSection } from '../components/VideoPlayerSection';
+import { VideoNavigationControls } from '../components/VideoNavigationControls';
+import { VideoModeSwitcher } from '../components/VideoModeSwitcher';
 import '../styles/design-tokens.css';
 import './StandalonePlayerPage.css';
 
@@ -17,6 +19,7 @@ export function StandalonePlayerPage() {
   const [mp4Url, setMp4Url] = useState('');
   const [selectedVideo, setSelectedVideo] = useState('');
   const [availableVideos, setAvailableVideos] = useState<VideoItem[]>([]);
+  const [videoMode, setVideoMode] = useState<'server' | 'local'>('server');
   const [playerStatus, setPlayerStatus] = useState<PlayerStatus>('ready');
   const [statusMessage, setStatusMessage] = useState('Player Ready');
   const [streamInfos, setStreamInfos] = useState<StreamInfo[]>([]);
@@ -47,6 +50,11 @@ export function StandalonePlayerPage() {
       ],
     },
   });
+
+  // Store navigation function from VideoLoader
+  const [navigateToVideo, setNavigateToVideo] = useState<((videoKey: string) => void) | null>(
+    null
+  );
 
   const updateStatus = useCallback((type: PlayerStatus, message: string) => {
     setPlayerStatus(type);
@@ -97,13 +105,93 @@ export function StandalonePlayerPage() {
 
   /**
    * Handles video list updates from VideoLoader
+   * Merges new videos with existing ones instead of replacing
    */
   const handleVideoListLoad = useCallback((videos: VideoItem[]) => {
-    setAvailableVideos(videos);
-    if (videos.length > 0) {
+    if (videos.length === 0) return;
+
+    setAvailableVideos((prev) => {
+      // Determine source of incoming videos
+      const incomingSource = videos[0]?.source;
+      
+      if (!incomingSource) return prev;
+      
+      // Keep videos from other sources, replace videos from same source
+      const otherSourceVideos = prev.filter((v) => v.source !== incomingSource);
+      const mergedVideos = [...otherSourceVideos, ...videos];
+      
+      return mergedVideos;
+    });
+
+    // Auto-switch to local mode if local videos are loaded
+    const hasLocal = videos.some((v) => v.source === 'local');
+    if (hasLocal) {
+      setVideoMode('local');
       setSelectedVideo(`${videos[0].name}|${videos[0].source}`);
     }
   }, []);
+
+  /**
+   * Filter videos based on current mode (server/local)
+   */
+  const filteredVideos = useMemo(() => {
+    return availableVideos.filter((video) => video.source === videoMode);
+  }, [availableVideos, videoMode]);
+
+  /**
+   * Checks if local videos are available
+   */
+  const hasLocalVideos = useMemo(() => {
+    return availableVideos.some((video) => video.source === 'local');
+  }, [availableVideos]);
+
+  /**
+   * Checks if server videos are available
+   */
+  const hasServerVideos = useMemo(() => {
+    return availableVideos.some((video) => video.source === 'server');
+  }, [availableVideos]);
+
+  /**
+   * Toggles between server and local video modes
+   */
+  const handleToggleMode = useCallback(() => {
+    const newMode = videoMode === 'server' ? 'local' : 'server';
+    setVideoMode(newMode);
+    
+    // Update selected video to first video in new mode
+    const videosInMode = availableVideos.filter((v) => v.source === newMode);
+    if (videosInMode.length > 0) {
+      const firstVideo = videosInMode[0];
+      const videoKey = `${firstVideo.name}|${firstVideo.source}`;
+      setSelectedVideo(videoKey);
+      if (navigateToVideo) {
+        navigateToVideo(videoKey);
+      }
+    }
+    
+    updateStreamInfo(`Switched to ${newMode} video mode`);
+  }, [videoMode, availableVideos, navigateToVideo, updateStreamInfo]);
+
+  /**
+   * Exposes navigation function from VideoLoader
+   */
+  const handleExposeNavigate = useCallback((navigateFn: (videoKey: string) => void) => {
+    setNavigateToVideo(() => navigateFn);
+  }, []);
+
+  /**
+   * Handles video navigation from navigation controls
+   */
+  const handleVideoNavigate = useCallback(
+    (videoKey: string) => {
+      if (navigateToVideo) {
+        navigateToVideo(videoKey);
+        setSelectedVideo(videoKey);
+      }
+    },
+    [navigateToVideo]
+  );
 
   // Load video list from local directory using Vite's glob import
   const loadVideoList = useCallback(async () => {
@@ -222,7 +310,7 @@ export function StandalonePlayerPage() {
         <VideoLoader
           mp4Url={mp4Url}
           selectedVideo={selectedVideo}
-          availableVideos={availableVideos}
+          availableVideos={filteredVideos}
           onMp4UrlChange={setMp4Url}
           onVideoLoad={loadVideo}
           onError={handleError}
@@ -230,6 +318,14 @@ export function StandalonePlayerPage() {
           onVideoListLoad={handleVideoListLoad}
           onLoadVideoList={loadVideoList}
           onClearPlayer={clearPlayer}
+          onExposeNavigate={handleExposeNavigate}
+        />
+
+        <VideoModeSwitcher
+          currentMode={videoMode}
+          onToggle={handleToggleMode}
+          hasServerVideos={hasServerVideos}
+          hasLocalVideos={hasLocalVideos}
         />
 
         <VideoPlayerSection
@@ -239,7 +335,13 @@ export function StandalonePlayerPage() {
           onDurationChange={handleDurationChange}
           onStatusUpdate={updateStatus}
           onStreamInfo={updateStreamInfo}
-        />
+        >
+          <VideoNavigationControls
+            availableVideos={filteredVideos}
+            selectedVideo={selectedVideo}
+            onNavigate={handleVideoNavigate}
+          />
+        </VideoPlayerSection>
 
         <PlayerStats
           playerStatus={playerStatus}
