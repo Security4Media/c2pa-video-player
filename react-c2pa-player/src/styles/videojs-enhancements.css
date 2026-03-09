@@ -12,8 +12,8 @@
   width: 4em !important;
 }
 
-/* Button icons sizing */
-.video-js .vjs-button > .vjs-icon-placeholder:before {
+/* Button icons sizing - exclude C2PA button */
+.video-js .vjs-button:not(.c2pa-menu-button) > .vjs-icon-placeholder:before {
   font-size: 2em;
   line-height: 2.25;
 }
@@ -69,8 +69,14 @@
     width: 3em !important;
   }
 
-  .video-js .vjs-button > .vjs-icon-placeholder:before {
+  .video-js .vjs-button:not(.c2pa-menu-button) > .vjs-icon-placeholder:before {
     font-size: 1.5em;
+  }
+
+  /* Keep C2PA button size consistent on mobile */
+  .video-js .vjs-chapters-button.c2pa-menu-button {
+    width: 4em !important;
+    min-width: 4em !important;
   }
 
   .video-js {
