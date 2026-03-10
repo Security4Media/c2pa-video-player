@@ -4,7 +4,9 @@
 .video-js .vjs-control-bar {
   height: 4.5em !important;
   font-size: 1.2em;
-  background-color: rgba(0, 0, 0, 0.85) !important;
+  background: linear-gradient(180deg, rgba(10, 46, 106, 0.92) 0%, rgba(14, 65, 148, 0.88) 100%) !important;
+  backdrop-filter: blur(8px);
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 /* Standard controls sizing */
