@@ -1,0 +1,28 @@
+version: '3.8'
+
+services:
+  react-c2pa-player:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        PLAYLISTS_DIR: ${PLAYLISTS_DIR:-playlists}
+        TRUST_DIR: ${TRUST_DIR:-trust}
+    container_name: react-c2pa-player
+    ports:
+      - "8080:80"
+    environment:
+      - NODE_ENV=production
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - c2pa-network
+
+networks:
+  # c2pa-network:
+    driver: bridge
