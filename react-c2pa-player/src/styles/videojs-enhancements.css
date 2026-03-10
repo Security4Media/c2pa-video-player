@@ -49,9 +49,75 @@
   order: 0;
 }
 
-/* Volume panel adjustments */
+/* Volume panel adjustments - fixed layout */
 .video-js .vjs-volume-panel {
   width: auto !important;
+  display: flex !important;
+  align-items: center !important;
+}
+
+/* Always use horizontal layout */
+.video-js.vjs-has-started .vjs-volume-panel {
+  width: auto !important;
+}
+
+/* Volume control button */
+.video-js .vjs-volume-panel .vjs-mute-control {
+  width: 4em !important;
+}
+
+/* Volume bar container - always visible and fixed position */
+.video-js .vjs-volume-panel .vjs-volume-control {
+  width: 5em !important;
+  display: flex !important;
+  align-items: center !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  position: relative !important;
+  transition: none !important;
+  pointer-events: auto !important;
+}
+
+/* Force horizontal volume control to always show with fixed dimensions */
+.video-js .vjs-volume-panel.vjs-volume-panel-horizontal .vjs-volume-control {
+  opacity: 1 !important;
+  width: 5em !important;
+  height: auto !important;
+  transition: none !important;
+}
+
+/* Disable vertical volume control */
+.video-js .vjs-volume-panel.vjs-volume-panel-vertical {
+  display: none !important;
+}
+
+/* Override all hover and active states to maintain fixed position */
+.video-js .vjs-volume-panel .vjs-volume-control.vjs-slider-active,
+.video-js .vjs-volume-panel:hover .vjs-volume-control,
+.video-js .vjs-volume-panel:focus .vjs-volume-control,
+.video-js .vjs-volume-panel.vjs-slider-active .vjs-volume-control,
+.video-js .vjs-volume-panel.vjs-hover .vjs-volume-control,
+.video-js .vjs-volume-panel .vjs-volume-control:hover,
+.video-js.vjs-user-inactive .vjs-volume-panel .vjs-volume-control {
+  opacity: 1 !important;
+  width: 5em !important;
+  transition: none !important;
+}
+
+/* Volume slider - fixed dimensions */
+.video-js .vjs-volume-bar {
+  height: 0.5em !important;
+  margin: 0 0.5em !important;
+}
+
+/* Volume level indicator */
+.video-js .vjs-volume-level {
+  height: 0.5em !important;
+}
+
+/* Hide volume level handle/knob for cleaner display */
+.video-js .vjs-volume-level::before {
+  display: none !important;
 }
 
 /* Make video player container larger */
