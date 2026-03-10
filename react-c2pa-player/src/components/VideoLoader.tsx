@@ -262,7 +262,7 @@ export const VideoLoader = memo(function VideoLoader({
           🔄 Refresh List
         </button>
         <button
-          className="btn btn-secondary"
+          className="btn btn-primary"
           onClick={() => document.getElementById('folderInput')?.click()}
           disabled={uploadProgress.isLoading}
         >
@@ -291,7 +291,7 @@ export const VideoLoader = memo(function VideoLoader({
 
       <div className="input-group">
         <button className="btn btn-primary" onClick={handleLoadStream}>
-          Load Stream
+          Load Video
         </button>
         <button className="btn btn-secondary" onClick={onClearPlayer}>
           Clear

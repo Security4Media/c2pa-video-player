@@ -3,3 +3,5 @@ node_modules/
 node_modules/
 playlists/
 .github/agents/
+react-c2pa-player/public/trust/
+react-c2pa-player/public/playlists/mp4s/

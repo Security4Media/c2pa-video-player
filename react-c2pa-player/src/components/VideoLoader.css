@@ -20,6 +20,13 @@
   margin-bottom: 0;
 }
 
+
+.input-group .btn,
+.input-group .btn-primary,
+.input-group .btn-secondary {
+  border-radius: 10px !important;
+}
+
 /* Form Controls */
 .input-section input[type='text'],
 .input-section input[type='file'],
@@ -96,13 +103,14 @@
 }
 
 .input-section .btn-secondary {
-  background: var(--color-secondary);
-  color: var(--color-secondary-foreground);
+  background: #2B2A29;
+  color: #ffffff;
   box-shadow: var(--shadow-sm);
+  border-radius: var(--radius-lg);
 }
 
 .input-section .btn-secondary:hover:not(:disabled) {
-  background: var(--color-secondary-hover);
+  background: #3d3c3a;
   box-shadow: var(--shadow-md);
 }
 

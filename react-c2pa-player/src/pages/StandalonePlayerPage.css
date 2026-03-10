@@ -26,24 +26,30 @@
   gap: var(--space-lg);
 }
 
-.standalone-player-page .ebu-logo {
-  width: 100%;
-  max-width: 750px;
-  height: auto;
-  padding: var(--space-lg);
-  border-radius: var(--radius-lg);
-  background: var(--color-background);
+.standalone-player-page .logos {
   display: flex;
   align-items: center;
   justify-content: center;
+  gap: var(--space-2xl);
+  width: 100%;
+  max-width: 900px;
+  padding: var(--space-xl);
+  border-radius: var(--radius-lg);
+  background: var(--color-background);
   box-shadow: var(--shadow-lg);
-  overflow: hidden;
 }
 
-.standalone-player-page .ebu-logo img {
-  width: 100%;
-  height: auto;
+.standalone-player-page .logos .ebu-logo {
+  height: 80px;
+  width: auto;
   object-fit: contain;
+}
+
+.standalone-player-page .logos .nab-logo {
+  height: 110px;
+  width: auto;
+  object-fit: contain;
+  padding-top: var(--space-lg);
 }
 
 .standalone-player-page h1 {

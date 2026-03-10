@@ -302,10 +302,11 @@ export function StandalonePlayerPage() {
     <div className="standalone-player-page">
       <div className="container">
         <div className="header">
-          <div className="ebu-logo">
-            <img src="/ebu-logo-blue.png" alt="EBU Logo" />
+          <div className="logos">
+            <img src="/ebu-logo-dark.svg" alt="EBU Logo" className="ebu-logo" />
+            <img src="/nab-logo.png" alt="NAB Show Logo" className="nab-logo" />
           </div>
-          <h2>EBU C2PA & CAWG Verifier for Monolithic Player</h2>
+          <h2>C2PA & CAWG validation player</h2>
           <h2>NAB SHOW 2026</h2>
         </div>
 
