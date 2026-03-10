@@ -22,9 +22,10 @@ const C2paSupportedMediaTypes = ['video'];
 export async function c2pa_init(player: HTMLVideoElement, onPlaybackTimeUpdated: (e: any) => void) {
   try {
     // Fetch trust configuration files
-    const [cawg_anchors, cawg_store] = await Promise.all([
+    const [cawg_anchors, cawg_store, cawg_allowed] = await Promise.all([
       fetch('/trust/cawg_anchors.pem').then((res) => res.text()),
       fetch('/trust/cawg_store.cfg').then((res) => res.text()),
+      fetch('/trust/cawg_allowed_extended.pem').then((res) => res.text()),
     ]);
 
     console.log('[C2PA Init] Trust configuration loaded');
@@ -36,6 +37,7 @@ export async function c2pa_init(player: HTMLVideoElement, onPlaybackTimeUpdated:
         cawgTrust: {
           trustAnchors: cawg_anchors,
           trustConfig: cawg_store,
+          allowedList: cawg_allowed
         },
         trust: {
           trustAnchors: [
