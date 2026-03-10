@@ -42,6 +42,12 @@ import { providerInfoFromSocialId } from './Providers.js';
 let c2paMenuInstance = new C2PAMenu();
 // Store the state of collapsible sections
 let cawgIdentityExpanded = false;
+let ingredientsExpanded = {}; // Store expanded state for each ingredient by index
+let ingredientsRendered = false; // Track if ingredients have been rendered
+let lastIngredientsData = null; // Cache the last ingredient data to detect changes
+let lastManifestId = null; // Track the active manifest ID to detect video changes
+let lastValidationStatus = null; // Track the last validation status
+let menuRendered = false; // Track if menu has been rendered for current manifest
 
 // ============================================
 // MENU ITEM RENDERERS
@@ -59,6 +65,7 @@ let cawgIdentityExpanded = false;
 const menuItemRenderers = {
   SOCIAL: renderSocialMediaItem,
   CAWG_IDENTITY: renderCawgIdentityItem,
+  INGREDIENTS: renderIngredientsItem,
   WEBSITE: renderWebsiteItem,
   ALERT: renderAlertItem,
   C2PA_VALIDATION_STATUS: renderValidationStatusItem,
@@ -110,6 +117,12 @@ function renderCawgIdentityItem({ itemName, itemValue, menuItem }) {
     if (itemValue.referenced_assertions) {
       cawgHtml += `<div><span class="itemName">Referenced Assertions:</span> ${itemValue.referenced_assertions}</div>`;
     }
+
+    // Display validation status
+    if (itemValue.validation_status) {
+      const statusClass = itemValue.validation_status.toLowerCase();
+      cawgHtml += `<div><span class="itemName">Validation Status:</span> <span class="validation-${statusClass}">${itemValue.validation_status}</span></div>`;
+    }
     cawgHtml += '</div>';
 
     const html = `<div class="cawg-header"><span class="itemName">${itemName}</span><span class="cawg-toggle ${cawgIdentityExpanded ? 'expanded' : ''}">›</span></div>${cawgHtml}`;
@@ -140,6 +153,166 @@ function renderCawgIdentityItem({ itemName, itemValue, menuItem }) {
   } else {
     return `<span class="itemName"> ${itemName}</span> ${itemValue}`;
   }
+}
+
+/**
+ * Render ingredients with collapsible content for each ingredient
+ */
+function renderIngredientsItem({ itemName, itemValue, menuItem }) {
+  if (!itemValue || !Array.isArray(itemValue) || itemValue.length === 0) {
+    return `<span class="itemName">${itemName}</span>: None`;
+  }
+
+  // Check if ingredients have already been rendered and data hasn't changed
+  const currentDataSignature = JSON.stringify(itemValue.map(i => ({
+    index: i.index,
+    title: i.title,
+    issuer: i.issuer,
+    ingredientCount: i.ingredientCount
+  })));
+
+  if (ingredientsRendered && lastIngredientsData === currentDataSignature) {
+    // Data hasn't changed, just reattach handlers (they may have been lost)
+    const existingContainer = menuItem.el().querySelector('.ingredients-container');
+    if (existingContainer) {
+      console.log('[C2PA] Ingredients already rendered, skipping re-render');
+      // Return a flag to skip rendering entirely
+      return {
+        html: menuItem.el().innerHTML,
+        skipRender: true,
+        postRender: () => {
+          // Handlers are preserved in DOM via data-handler-attached check
+        }
+      };
+    }
+  }
+
+  // Mark as rendering and cache the data
+  ingredientsRendered = true;
+  lastIngredientsData = currentDataSignature;
+  console.log('[C2PA] Rendering ingredients for the first time or data changed');
+
+  let html = `<div class="ingredients-container">`;
+  html += `<div class="ingredients-main-header"><span class="itemName">${itemName}</span></div>`;
+
+  itemValue.forEach((ingredient) => {
+    html += renderSingleIngredient(ingredient, menuItem);
+  });
+
+  html += `</div>`;
+
+  // Return HTML and post-render callback for interactivity
+  return {
+    html,
+    postRender: () => {
+      attachIngredientHandlers(itemValue, menuItem);
+    }
+  };
+}
+
+/**
+ * Render a single ingredient (can be called recursively for nested ingredients)
+ */
+function renderSingleIngredient(ingredient, menuItem, parentId = '') {
+  const ingredientIndex = ingredient.index;
+  const ingredientId = parentId ? `${parentId}-ingredient-${ingredientIndex}` : `ingredient-${ingredientIndex}`;
+  const stateKey = ingredientId;
+
+  // Check if there's an existing state before rebuilding
+  const existingContent = menuItem.el().querySelector(`#${ingredientId}`);
+  const isExpanded = existingContent
+    ? existingContent.style.display === 'flex'
+    : ingredientsExpanded[stateKey] || false;
+
+  let html = '';
+
+  // Build ingredient header with optional ingredient count badge
+  html += `<div class="ingredient-item">`;
+  html += `<div class="ingredient-header" data-id="${ingredientId}">`;
+  html += `<span class="itemName">Ingredient ${ingredientIndex}</span>`;
+  if (ingredient.ingredientCount && ingredient.ingredientCount > 0) {
+    html += `<span class="ingredient-count">(${ingredient.ingredientCount} ingredient${ingredient.ingredientCount > 1 ? 's' : ''})</span>`;
+  }
+  html += `<span class="ingredient-toggle ${isExpanded ? 'expanded' : ''}">›</span>`;
+  html += `</div>`;
+
+  // Build ingredient content
+  html += `<div id="${ingredientId}" class="ingredient-content" style="display: ${isExpanded ? 'flex' : 'none'};">`;
+
+  if (ingredient.title) {
+    html += `<div><span class="itemName">Title:</span> ${ingredient.title}</div>`;
+  }
+
+  if (ingredient.issuer) {
+    html += `<div><span class="itemName">Issuer:</span> ${ingredient.issuer}</div>`;
+  }
+
+  if (ingredient.claimGenerator) {
+    html += `<div><span class="itemName">Claim Generator:</span> ${ingredient.claimGenerator}</div>`;
+  }
+
+  if (ingredient.date) {
+    html += `<div><span class="itemName">Date:</span> ${ingredient.date}</div>`;
+  }
+
+  // Render nested ingredients if they exist
+  if (ingredient.ingredients && Array.isArray(ingredient.ingredients) && ingredient.ingredients.length > 0) {
+    html += `<div class="nested-ingredients">`;
+    html += `<div class="nested-ingredients-header"><span class="itemName">Sub-Ingredients:</span></div>`;
+    ingredient.ingredients.forEach((nestedIngredient) => {
+      html += renderSingleIngredient(nestedIngredient, menuItem, ingredientId);
+    });
+    html += `</div>`;
+  }
+
+  html += '</div>'; // ingredient-content
+  html += `</div>`; // ingredient-item
+
+  return html;
+}
+
+/**
+ * Attach click handlers to all ingredients (including nested ones)
+ */
+function attachIngredientHandlers(ingredients, menuItem, parentId = '') {
+  ingredients.forEach((ingredient) => {
+    const ingredientId = parentId ? `${parentId}-ingredient-${ingredient.index}` : `ingredient-${ingredient.index}`;
+    const stateKey = ingredientId;
+
+    const header = menuItem.el().querySelector(`.ingredient-header[data-id="${ingredientId}"]`);
+    const toggle = header?.querySelector('.ingredient-toggle');
+    const content = menuItem.el().querySelector(`#${ingredientId}`);
+
+    if (header && toggle && content) {
+      // Check if handler is already attached
+      if (header.hasAttribute('data-handler-attached')) {
+        // Handler already attached, skip
+        console.log(`[C2PA] Handler already attached for ${ingredientId}, skipping`);
+      } else {
+        // Mark as handler attached
+        header.setAttribute('data-handler-attached', 'true');
+
+        header.style.cursor = 'pointer';
+        header.onclick = function (e) {
+          e.stopPropagation();
+          if (content.style.display === 'none') {
+            content.style.display = 'flex';
+            toggle.classList.add('expanded');
+            ingredientsExpanded[stateKey] = true;
+          } else {
+            content.style.display = 'none';
+            toggle.classList.remove('expanded');
+            ingredientsExpanded[stateKey] = false;
+          }
+        };
+      }
+    }
+
+    // Recursively attach handlers for nested ingredients
+    if (ingredient.ingredients && Array.isArray(ingredient.ingredients)) {
+      attachIngredientHandlers(ingredient.ingredients, menuItem, ingredientId);
+    }
+  });
 }
 
 /**
@@ -272,12 +445,27 @@ function renderMenuItem(menuItem, itemName, itemKey, itemValue) {
 
   // Handle renderer returning object with html and postRender callback
   if (typeof result === 'object' && result.html) {
-    menuItem.el().innerHTML = result.html;
-    if (result.postRender) {
-      result.postRender();
+    // Check if this is a cached result (html matches current innerHTML)
+    const currentHTML = menuItem.el().innerHTML;
+    if (result.skipRender || currentHTML === result.html) {
+      // Skip DOM update if content hasn't changed
+      console.log(`[C2PA] Skipping DOM update for ${itemKey} - content unchanged`);
+      if (result.postRender) {
+        result.postRender();
+      }
+    } else {
+      // Update DOM only if content has changed
+      menuItem.el().innerHTML = result.html;
+      if (result.postRender) {
+        result.postRender();
+      }
     }
   } else {
-    menuItem.el().innerHTML = result;
+    // Simple string result - check before updating
+    const currentHTML = menuItem.el().innerHTML;
+    if (currentHTML !== result) {
+      menuItem.el().innerHTML = result;
+    }
   }
 }
 
@@ -319,6 +507,16 @@ export let initializeC2PAMenu = function (videoPlayer) {
       } else {
         this.pressButton();
       }
+    }
+
+    // Override to disable hover behavior
+    handleMouseOver() {
+      // Do nothing - completely disable hover
+    }
+
+    // Override to disable hover out behavior
+    handleMouseOut() {
+      // Do nothing
     }
 
     unpressButton() {
@@ -397,7 +595,6 @@ export let adjustC2PAMenu = function (
   menuContent.style.height = `${playerHeight}px`;
   menuContent.style.maxHeight = `${playerHeight}px`;
 
-  console.log('[C2PA] Menu adjusted to cover video area:', { playerWidth, playerHeight });
 };
 
 /**
@@ -425,12 +622,45 @@ export let updateC2PAMenu = function (
 
   if (!hasManifest) {
     console.log('[C2PA] No manifest found, displaying info message');
+    // Reset all caches when no manifest
+    ingredientsRendered = false;
+    lastIngredientsData = null;
+    lastManifestId = null;
+    lastValidationStatus = null;
+    menuRendered = false;
     handleNoManifest(c2paMenuItems, videoPlayer);
     return;
   }
 
-  // Check validation status
+  // Check if we have a new manifest (new video)
+  const currentManifestId = c2paStatus?.details?.video?.manifestStore?.active_manifest;
   const validationStatus = c2paStatus?.validation_state;
+
+  // Check if menu needs to be recomputed
+  const manifestChanged = currentManifestId !== lastManifestId;
+  const validationChanged = validationStatus !== lastValidationStatus;
+
+  if (!manifestChanged && !validationChanged && menuRendered) {
+    console.log('[C2PA] Menu already rendered for this manifest and validation status, skipping update');
+    return;
+  }
+
+  if (manifestChanged) {
+    console.log('[C2PA] New manifest detected, resetting caches');
+    ingredientsRendered = false;
+    lastIngredientsData = null;
+    ingredientsExpanded = {};
+    lastManifestId = currentManifestId;
+    menuRendered = false;
+  }
+
+  if (validationChanged) {
+    console.log('[C2PA] Validation status changed from', lastValidationStatus, 'to', validationStatus);
+    lastValidationStatus = validationStatus;
+    menuRendered = false;
+  }
+
+  // Check validation status
   const isInvalid = validationStatus === 'Invalid';
 
   console.log('[C2PA] Validation status:', validationStatus, 'Is Invalid:', isInvalid);
@@ -467,7 +697,28 @@ export let updateC2PAMenu = function (
       c2paItem.el().style.display = 'none';
     }
   }
+
+  // Mark menu as rendered for this manifest/validation state
+  menuRendered = true;
+  console.log('[C2PA] Menu rendering complete');
 };
+
+/**
+ * Reset the C2PA menu cache
+ * Forces the menu to be recomputed on the next update
+ * Useful when you need to manually trigger a menu refresh
+ */
+export function resetC2PAMenuCache() {
+  console.log('[C2PA] Manually resetting menu cache');
+  ingredientsRendered = false;
+  lastIngredientsData = null;
+  lastManifestId = null;
+  lastValidationStatus = null;
+  menuRendered = false;
+  ingredientsExpanded = {};
+  cawgIdentityExpanded = false;
+}
+
 //Hide the c2pa menu
 let hideC2PAMenu = function () {
   c2paMenu.hide();

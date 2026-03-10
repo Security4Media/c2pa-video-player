@@ -8,8 +8,9 @@ export var C2PAMenu = function () {
     LOCATION: 'Location',
     WEBSITE: 'Website',
     CAWG_IDENTITY: 'Publisher Identity (CAWG)',
-    C2PA_VALIDATION_STATUS: 'Current C2PA Validation Status',
-    CAWG_VALIDATION_STATUS: 'Current CAWG Validation Status',
+    CAWG_VALIDATION_STATUS: 'CAWG Validation Status',
+    INGREDIENTS: 'Ingredients',
+    C2PA_VALIDATION_STATUS: 'Validation Status',
     ALERT: 'Alert',
   };
 
@@ -118,17 +119,22 @@ export var C2PAMenu = function () {
       }
 
       if (itemName == 'CAWG_IDENTITY') {
-        let cawgId = selectCawgIdentity(activeManifest);
+        let cawgId = selectCawgIdentity(activeManifest, manifestStore);
         if (!cawgId) {
-          return "Not Present";
+          return null;
         }
         const [cawgIdentityStr, cawgIdentityObj] = cawgId;
         return cawgIdentityObj ?? null;
       }
 
+      if (itemName == 'INGREDIENTS') {
+        let ingredients = selectIngredients(activeManifest, manifestStore);
+        return ingredients && ingredients.length > 0 ? ingredients : null;
+      }
+
       if (itemName == 'CAWG_VALIDATION_STATUS') {
-        const cawgValidationStatus = getCAWGValidationStatus(manifestStore);
-        return cawgValidationStatus;
+        // CAWG validation status is now displayed within CAWG_IDENTITY dropdown
+        return null;
       }
 
       if (itemName == 'ALERT') {
@@ -151,7 +157,7 @@ function selectCreativeWorkAuthors(manifest) {
 function selectFormattedClaimGenerator(manifest) {
   const claim_generators = manifest.claim_generator_info;
   const generatorString = claim_generators
-    ?.map((gen) => `${gen.name} ${gen.version}`)
+    ?.map((gen) => gen.version ? `${gen.name} ${gen.version}` : gen.name)
     .join(', ');
 
   return generatorString ?? null;
@@ -198,7 +204,7 @@ function selectLocation(manifest) {
   return location || null;
 }
 
-function selectCawgIdentity(manifest) {
+function selectCawgIdentity(manifest, manifestStore) {
   const cawgAssertion = manifest.assertions.find(
     assertion => assertion.label === 'cawg.identity'
   );
@@ -235,9 +241,121 @@ function selectCawgIdentity(manifest) {
     }
   }
 
+  // Add validation status
+  if (manifestStore) {
+    const validationStatus = getCAWGValidationStatus(manifestStore);
+    if (validationStatus) {
+      cawgObj['validation_status'] = validationStatus;
+    }
+  }
+
   return [cawgString, cawgObj];
 }
 
+/**
+ * Extract detailed information from a single ingredient
+ * @param {Object} ingredientData - The ingredient data from manifest.ingredients
+ * @param {Object} manifestStore - The manifest store containing all manifests
+ * @param {number} index - The ingredient index (1-based)
+ * @returns {Object} Ingredient details object
+ */
+function extractIngredientDetails(ingredientData, manifestStore, index) {
+  const ingredient = {
+    index: index,
+  };
+
+  // Extract title from ingredient data
+  if (ingredientData.title) {
+    ingredient.title = ingredientData.title;
+  } else if (ingredientData.dc_title) {
+    ingredient.title = ingredientData.dc_title;
+  }
+
+  // Get the ingredient manifest reference
+  const manifestRef = ingredientData.active_manifest;
+  let ingredientManifest = null;
+
+  // Try to find the ingredient manifest in the manifest store
+  if (manifestRef && manifestStore && manifestStore.manifests) {
+    ingredientManifest = manifestStore.manifests[manifestRef];
+    console.log(`[C2PA] Found ingredient manifest for ingredient ${index}:`, ingredientManifest);
+  }
+
+  // If we have the ingredient manifest, extract more details
+  if (ingredientManifest) {
+    // Extract issuer
+    if (ingredientManifest.signature_info?.issuer) {
+      ingredient.issuer = ingredientManifest.signature_info.issuer;
+    }
+
+    // Extract date and time
+    if (ingredientManifest.signature_info?.time) {
+      const date = new Date(ingredientManifest.signature_info.time);
+      ingredient.date = new Intl.DateTimeFormat('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+      }).format(date);
+    }
+
+    // Extract claim generator
+    const claimGenerators = ingredientManifest.claim_generator_info;
+    if (claimGenerators && claimGenerators.length > 0) {
+      ingredient.claimGenerator = claimGenerators
+        .map((gen) => `${gen.name} ${gen.version}`)
+        .join(', ');
+    }
+
+    // Store the manifest reference for potential nested ingredient extraction
+    ingredient.manifestRef = manifestRef;
+    ingredient.manifest = ingredientManifest;
+  }
+
+  return ingredient;
+}
+
+/**
+ * Select ingredients from a manifest
+ * This function can be reused to extract ingredients from any manifest,
+ * including nested ingredients from an ingredient's manifest
+ * @param {Object} manifest - The manifest to extract ingredients from
+ * @param {Object} manifestStore - The manifest store containing all manifests
+ * @returns {Array|null} Array of ingredient objects or null if no ingredients
+ */
+function selectIngredients(manifest, manifestStore) {
+  // Get ingredients from the manifest
+  const ingredientAssertions = manifest.ingredients;
+
+  if (!ingredientAssertions || ingredientAssertions.length === 0) {
+    return null;
+  }
+
+  console.log(`[C2PA] Found ${ingredientAssertions.length} ingredient(s) in manifest`);
+
+  const ingredients = [];
+
+  ingredientAssertions.forEach((ingredientData, index) => {
+    if (!ingredientData) return;
+
+    // Extract ingredient details using the helper function
+    const ingredient = extractIngredientDetails(ingredientData, manifestStore, index + 1);
+
+    // Optionally, extract nested ingredients if this ingredient has its own manifest
+    if (ingredient.manifest) {
+      const nestedIngredients = selectIngredients(ingredient.manifest, manifestStore);
+      if (nestedIngredients && nestedIngredients.length > 0) {
+        ingredient.ingredients = nestedIngredients;
+        ingredient.ingredientCount = nestedIngredients.length;
+      }
+    }
+
+    ingredients.push(ingredient);
+  });
+
+  return ingredients.length > 0 ? ingredients : null;
+}
 
 
 function getCAWGValidationStatus(manifestStore) {
@@ -248,7 +366,7 @@ function getCAWGValidationStatus(manifestStore) {
   );
 
   if (!cawgAssertion) {
-    return 'Not Present';
+    return null; // Hide menu item if CAWG assertion is not present
   }
 
   // Evaluate validation results for CAWG identity
