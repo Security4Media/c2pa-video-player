@@ -390,7 +390,7 @@
 .vjs-menu li.vjs-menu-item .itemName {
   font-weight: 600;
   padding-bottom: 0.4rem;
-  color: rgba(255, 255, 255, 1);
+  color: #ff9800 !important;
   font-size: 1rem;
   letter-spacing: -0.01em;
 }

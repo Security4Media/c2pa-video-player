@@ -225,15 +225,15 @@ function renderSingleIngredient(ingredient, menuItem, parentId = '') {
   }
 
   if (ingredient.issuer) {
-    html += `<div><span class="itemName">Issuer:</span> ${ingredient.issuer}</div>`;
+    html += `<div><span class="itemName">Issued by:</span> ${ingredient.issuer}</div>`;
   }
 
   if (ingredient.claimGenerator) {
-    html += `<div><span class="itemName">Claim Generator:</span> ${ingredient.claimGenerator}</div>`;
+    html += `<div><span class="itemName">App or device:</span> ${ingredient.claimGenerator}</div>`;
   }
 
   if (ingredient.date) {
-    html += `<div><span class="itemName">Date:</span> ${ingredient.date}</div>`;
+    html += `<div><span class="itemName">Issued on:</span> ${ingredient.date}</div>`;
   }
 
   // Display validation status
