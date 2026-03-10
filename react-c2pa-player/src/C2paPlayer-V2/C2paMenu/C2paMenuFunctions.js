@@ -168,7 +168,8 @@ function renderIngredientsItem({ itemName, itemValue, menuItem }) {
     index: i.index,
     title: i.title,
     issuer: i.issuer,
-    ingredientCount: i.ingredientCount
+    ingredientCount: i.ingredientCount,
+    validationStatus: i.validationStatus
   })));
 
   if (ingredientsRendered && lastIngredientsData === currentDataSignature) {
@@ -253,6 +254,12 @@ function renderSingleIngredient(ingredient, menuItem, parentId = '') {
 
   if (ingredient.date) {
     html += `<div><span class="itemName">Date:</span> ${ingredient.date}</div>`;
+  }
+
+  // Display validation status
+  if (ingredient.validationStatus) {
+    const statusClass = ingredient.validationStatus.toLowerCase();
+    html += `<div><span class="itemName">Validation Status:</span> <span class="validation-${statusClass}">${ingredient.validationStatus}</span></div>`;
   }
 
   // Render nested ingredients if they exist

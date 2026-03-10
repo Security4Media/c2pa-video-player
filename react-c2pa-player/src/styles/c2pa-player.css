@@ -558,6 +558,27 @@
   margin-bottom: 0.25rem;
 }
 
+/* Validation status styling */
+.vjs-menu li.vjs-menu-item .validation-trusted {
+  color: var(--c2pa-trusted);
+  font-weight: 600;
+}
+
+.vjs-menu li.vjs-menu-item .validation-valid {
+  color: var(--c2pa-passed);
+  font-weight: 600;
+}
+
+.vjs-menu li.vjs-menu-item .validation-invalid {
+  color: var(--c2pa-failed);
+  font-weight: 600;
+}
+
+.vjs-menu li.vjs-menu-item .validation-unknown {
+  color: var(--c2pa-unknown);
+  font-weight: 600;
+}
+
 .vjs-menu li.vjs-menu-item .nested-ingredients .ingredient-item {
   margin-left: 0.5rem;
   border-left-color: rgba(125, 180, 255, 0.2);

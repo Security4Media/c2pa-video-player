@@ -304,8 +304,14 @@ function extractIngredientDetails(ingredientData, manifestStore, index) {
     const claimGenerators = ingredientManifest.claim_generator_info;
     if (claimGenerators && claimGenerators.length > 0) {
       ingredient.claimGenerator = claimGenerators
-        .map((gen) => `${gen.name} ${gen.version}`)
+        .map((gen) => gen.version ? `${gen.name} ${gen.version}` : gen.name)
         .join(', ');
+    }
+
+    // Extract validation status for this ingredient
+    const validationStatus = getIngredientValidationStatus(manifestRef, manifestStore);
+    if (validationStatus) {
+      ingredient.validationStatus = validationStatus;
     }
 
     // Store the manifest reference for potential nested ingredient extraction
@@ -399,4 +405,83 @@ function getCAWGValidationStatus(manifestStore) {
   }
 
   return 'Invalid';
+}
+
+/**
+ * Get validation status for a specific ingredient manifest
+ * @param {string} manifestRef - The manifest reference ID (e.g., 'urn:c2pa:0513dfb9-a76d-4ae1-aa1c-95f016dd58d7')
+ * @param {Object} manifestStore - The manifest store containing validation results
+ * @returns {string} Validation status: 'Trusted', 'Valid', 'Invalid', or 'Unknown'
+ */
+function getIngredientValidationStatus(manifestRef, manifestStore) {
+  if (!manifestRef || !manifestStore || !manifestStore.validation_results) {
+    return 'Unknown';
+  }
+
+  const ingredientDeltas = manifestStore.validation_results.ingredientDeltas;
+
+  if (!ingredientDeltas || !Array.isArray(ingredientDeltas) || ingredientDeltas.length === 0) {
+    return 'Unknown';
+  }
+
+  // Find the ingredient delta that matches this manifestRef
+  // The URL format is: "self#jumbf=/c2pa/{manifestRef}/..."
+  const ingredientDelta = ingredientDeltas.find(delta => {
+    const validationDeltas = delta.validationDeltas;
+    if (!validationDeltas) return false;
+
+    // Check both success and failure arrays for URL matches
+    const allResults = [
+      ...(validationDeltas.success || []),
+      ...(validationDeltas.failure || [])
+    ];
+
+    return allResults.some(result =>
+      result.url && result.url.includes(`/c2pa/${manifestRef}`)
+    );
+  });
+
+  if (!ingredientDelta || !ingredientDelta.validationDeltas) {
+    console.log(`[C2PA] No validation delta found for ingredient ${manifestRef}`);
+    return 'Unknown';
+  }
+
+  const validationDeltas = ingredientDelta.validationDeltas;
+  const success = validationDeltas.success || [];
+  const failure = validationDeltas.failure || [];
+
+  console.log(`[C2PA] Ingredient ${manifestRef} validation:`, {
+    successCount: success.length,
+    failureCount: failure.length,
+    successCodes: success.map(s => s.code)
+  });
+
+  // If failure is not empty → Invalid
+  if (failure.length > 0) {
+    return 'Invalid';
+  }
+
+  // If success is not empty AND failure is empty
+  if (success.length > 0) {
+    const hasTimeStampTrusted = success.some(result => result.code === 'timeStamp.trusted');
+    const hasSigningCredentialTrusted = success.some(result => result.code === 'signingCredential.trusted');
+    const hasIngredientManifestValidated = success.some(result => result.code === 'ingredient.manifest.validated');
+
+    // If success has BOTH timeStamp.trusted AND signingCredential.trusted → Trusted
+    if (hasTimeStampTrusted && hasSigningCredentialTrusted) {
+      return 'Trusted';
+    }
+
+    // If success does NOT have timeStamp.trusted OR does NOT have signingCredential.trusted
+    // BUT has ingredient.manifest.validated → Valid
+    if ((!hasTimeStampTrusted || !hasSigningCredentialTrusted) && hasIngredientManifestValidated) {
+      return 'Valid';
+    }
+
+    // Has some success but doesn't match Trusted or Valid criteria
+    // This could be partial success, treat as Valid
+    return 'Valid';
+  }
+
+  return 'Unknown';
 }
