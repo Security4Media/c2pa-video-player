@@ -569,7 +569,8 @@
   font-weight: 600;
 }
 
-.vjs-menu li.vjs-menu-item .validation-invalid {
+.vjs-menu li.vjs-menu-item .validation-invalid,
+.vjs-menu li.vjs-menu-item .validation-failed {
   color: var(--c2pa-failed);
   font-weight: 600;
 }

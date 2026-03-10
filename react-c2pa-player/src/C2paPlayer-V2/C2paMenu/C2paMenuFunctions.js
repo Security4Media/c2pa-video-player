@@ -339,13 +339,14 @@ function renderAlertItem({ itemValue }) {
 /**
  * Render validation status (special handling for "Failed")
  */
-function renderValidationStatusItem({ itemName, itemValue, menuItem }) {
+function renderValidationStatusItem({ itemName, itemValue, delimiter, menuItem }) {
   if (itemValue === 'Failed') {
     menuItem.el().classList.add('validation-padding');
     return `<span class="itemName nextLine">${itemName}</span>`;
   }
-  // Use default renderer for other validation statuses
-  return null;
+  // Apply color styling for all validation statuses
+  const statusClass = itemValue.toLowerCase();
+  return `<span class="itemName">${itemName}</span>${delimiter}<span class="validation-${statusClass}">${itemValue}</span>`;
 }
 
 /**
@@ -512,6 +513,7 @@ export let initializeC2PAMenu = function (videoPlayer) {
         this.closeC2paMenu = true;
         this.unpressButton();
       } else {
+        console.log('[C2PA] Menu opened');
         this.pressButton();
       }
     }
@@ -529,6 +531,15 @@ export let initializeC2PAMenu = function (videoPlayer) {
     unpressButton() {
       if (this.closeC2paMenu) {
         this.closeC2paMenu = false;
+        // Reset menu cache when menu is closed to force complete re-render on next open
+        console.log('[C2PA] Menu closed, resetting all cache for fresh render on next open');
+        menuRendered = false;
+        // Reset ingredient cache to ensure fresh ingredient rendering
+        ingredientsRendered = false;
+        lastIngredientsData = null;
+        // Reset expanded states for fresh display
+        ingredientsExpanded = {};
+        cawgIdentityExpanded = false;
         super.unpressButton();
       }
     }
@@ -622,33 +633,64 @@ export let updateC2PAMenu = function (
   const c2paMenuItems = c2paMenu.items;
   const compromisedRegions = getCompromisedRegions(isMonolithic, videoPlayer);
 
-  // Check if manifest exists
-  const hasManifest = c2paStatus?.details?.video?.manifestStore != null;
+  // Check if manifest exists and has complete content
+  const manifestStore = c2paStatus?.details?.video?.manifestStore;
+  const hasValidManifestStore = manifestStore != null &&
+    manifestStore.manifests != null &&
+    Object.keys(manifestStore.manifests).length > 0 &&
+    manifestStore.active_manifest != null;
 
-  console.log('[C2PA] Manifest exists:', hasManifest);
+  // Additionally check if the active manifest actually exists and has meaningful metadata
+  const activeManifest = hasValidManifestStore ?
+    manifestStore.manifests[manifestStore.active_manifest] : null;
 
-  if (!hasManifest) {
-    console.log('[C2PA] No manifest found, displaying info message');
-    // Reset all caches when no manifest
+  // Require at least signature_info AND assertions to consider manifest ready for rendering
+  const hasRequiredMetadata = activeManifest != null &&
+    activeManifest.signature_info != null &&
+    activeManifest.signature_info.issuer != null &&
+    activeManifest.assertions != null &&
+    Array.isArray(activeManifest.assertions) &&
+    activeManifest.assertions.length > 0;
+
+  console.log('[C2PA] Manifest validation:', {
+    hasValidManifestStore,
+    hasRequiredMetadata,
+    activeManifest: manifestStore?.active_manifest,
+    manifestCount: manifestStore?.manifests ? Object.keys(manifestStore.manifests).length : 0,
+    hasSignatureInfo: activeManifest?.signature_info != null,
+    hasIssuer: activeManifest?.signature_info?.issuer != null,
+    hasAssertions: activeManifest?.assertions != null,
+    assertionCount: activeManifest?.assertions?.length || 0
+  });
+
+  // Keep waiting and don't render until we have required metadata
+  if (!hasValidManifestStore || !hasRequiredMetadata) {
+    console.log('[C2PA] Manifest metadata not available yet, waiting before rendering menu');
+    // Don't display anything - keep menu hidden until metadata is ready
+    // Reset all caches to ensure we keep checking
     ingredientsRendered = false;
     lastIngredientsData = null;
     lastManifestId = null;
     lastValidationStatus = null;
     menuRendered = false;
+    // Show "no manifest" message while waiting
     handleNoManifest(c2paMenuItems, videoPlayer);
     return;
   }
 
+  console.log('[C2PA] Manifest metadata available, proceeding with menu rendering');
+
   // Check if we have a new manifest (new video)
-  const currentManifestId = c2paStatus?.details?.video?.manifestStore?.active_manifest;
+  const currentManifestId = manifestStore.active_manifest;
   const validationStatus = c2paStatus?.validation_state;
 
   // Check if menu needs to be recomputed
   const manifestChanged = currentManifestId !== lastManifestId;
   const validationChanged = validationStatus !== lastValidationStatus;
 
+  // Only skip update if we have a complete, valid manifest AND it's already been rendered
   if (!manifestChanged && !validationChanged && menuRendered) {
-    console.log('[C2PA] Menu already rendered for this manifest and validation status, skipping update');
+    console.log('[C2PA] Menu already rendered for this complete manifest and validation status, skipping update');
     return;
   }
 
@@ -675,13 +717,18 @@ export let updateC2PAMenu = function (
   // Handle invalid validation state
   if (isInvalid) {
     handleInvalidValidation(c2paMenuItems, videoPlayer);
+    // Mark as rendered to avoid re-rendering the same invalid message
+    menuRendered = true;
+    console.log('[C2PA] Invalid validation message displayed');
     return;
   }
 
   // Update button state for valid content
   updateButtonValidationState(videoPlayer, false);
 
-  // Render all menu items
+  // Render all menu items and track if we have any content
+  let hasAnyContent = false;
+
   for (let i = 0; i < c2paMenuItems.length; i++) {
     const c2paItem = c2paMenuItems[i];
     const c2paItemName = c2paItem.options_.label;
@@ -699,15 +746,28 @@ export let updateC2PAMenu = function (
     if (c2paItemValue != null) {
       renderMenuItem(c2paItem, c2paItemName, c2paItemKey, c2paItemValue);
       c2paItem.el().style.display = 'block';
+      hasAnyContent = true;
     } else {
       // Hide menu items with no value
       c2paItem.el().style.display = 'none';
     }
   }
 
-  // Mark menu as rendered for this manifest/validation state
-  menuRendered = true;
-  console.log('[C2PA] Menu rendering complete');
+  // Only mark as rendered if we actually have content
+  // This prevents caching empty menus and allows retries
+  if (hasAnyContent) {
+    menuRendered = true;
+    console.log('[C2PA] Menu rendering complete with content for manifest:', currentManifestId);
+  } else {
+    console.log('[C2PA] Warning: Metadata was available but no menu items could be rendered. Resetting to retry.');
+    // This should rarely happen now with strict metadata validation
+    // But if it does, reset everything to retry
+    menuRendered = false;
+    lastManifestId = null;
+    lastValidationStatus = null;
+    ingredientsRendered = false;
+    lastIngredientsData = null;
+  }
 };
 
 /**
