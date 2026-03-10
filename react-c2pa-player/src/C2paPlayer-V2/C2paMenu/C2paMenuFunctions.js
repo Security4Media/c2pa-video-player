@@ -183,7 +183,7 @@ function renderDefaultItem({ itemName, itemValue, delimiter }) {
  * Render invalid validation error message
  */
 function renderInvalidValidationError() {
-  return `<div class="alert-div"><img class="alert-icon"></img><div><strong>Content Credentials are Invalid</strong><br/>The content credentials for this video could not be verified and may have been tampered with.</div></div>`;
+  return `<div class="alert-div"><div><strong>❌ Content Credentials are Invalid</strong><br/>The content credentials for this video could not be verified </br>and may have been tampered with.</div></div>`;
 }
 
 /**
