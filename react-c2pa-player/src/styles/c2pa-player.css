@@ -286,28 +286,21 @@
   }
 }
 
-/* Custom scrollbar for menu - EBU styled */
+/* Hide scrollbar while keeping scroll functionality */
+.vjs-menu-button-popup .vjs-menu .vjs-menu-content,
+.vjs-menu-button-popup .vjs-menu ul.vjs-menu-content {
+  /* Firefox */
+  scrollbar-width: none;
+  /* IE and Edge */
+  -ms-overflow-style: none;
+}
+
+/* Webkit browsers (Chrome, Safari, Edge) */
 .vjs-menu-button-popup .vjs-menu .vjs-menu-content::-webkit-scrollbar,
 .vjs-menu-button-popup .vjs-menu ul.vjs-menu-content::-webkit-scrollbar {
-  width: 0.6rem;
-}
-
-.vjs-menu-button-popup .vjs-menu .vjs-menu-content::-webkit-scrollbar-track,
-.vjs-menu-button-popup .vjs-menu ul.vjs-menu-content::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.08);
-  border-radius: 0.3rem;
-}
-
-.vjs-menu-button-popup .vjs-menu .vjs-menu-content::-webkit-scrollbar-thumb,
-.vjs-menu-button-popup .vjs-menu ul.vjs-menu-content::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.4);
-  border-radius: 0.3rem;
-  border: 0.15rem solid rgba(14, 65, 148, 0.8);
-}
-
-.vjs-menu-button-popup .vjs-menu .vjs-menu-content::-webkit-scrollbar-thumb:hover,
-.vjs-menu-button-popup .vjs-menu ul.vjs-menu-content::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.6);
+  display: none;
+  width: 0;
+  height: 0;
 }
 
 /* Style of the c2pa menu items - Title as prominent section header */

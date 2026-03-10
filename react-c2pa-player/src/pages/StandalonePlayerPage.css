@@ -28,7 +28,7 @@
 
 .standalone-player-page .ebu-logo {
   width: 100%;
-  max-width: 600px;
+  max-width: 750px;
   height: auto;
   padding: var(--space-lg);
   border-radius: var(--radius-lg);
@@ -61,7 +61,7 @@
 
 /* Main Container */
 .standalone-player-page .container {
-  max-width: 1200px;
+  max-width: 1500px;
   margin: 0 auto;
   background: var(--color-surface);
   border-radius: var(--radius-xl);
