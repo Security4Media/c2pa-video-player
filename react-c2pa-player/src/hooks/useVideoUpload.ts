@@ -17,7 +17,7 @@ interface UploadProgress {
 }
 
 interface UseVideoUploadProps {
-  onVideoLoad: (url: string, displayName: string) => void;
+  onVideoLoad: (url: string, displayName: string, videoKey?: string) => void;
   onError: (message: string) => void;
   onStatusUpdate: (message: string) => void;
 }
@@ -196,11 +196,11 @@ export function useVideoUpload({
 
         const blobUrl = createBlobUrl(file);
         const displayName = getVideoDisplayLabel(file);
-        onVideoLoad(blobUrl, displayName);
+        onVideoLoad(blobUrl, displayName, videoKey);
       } else {
         // Load from server
         const serverPath = `/playlists/mp4s/${filename}`;
-        onVideoLoad(serverPath, serverPath);
+        onVideoLoad(serverPath, serverPath, videoKey);
       }
     },
     [localVideoFiles, onVideoLoad, onError]

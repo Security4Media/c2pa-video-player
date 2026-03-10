@@ -9,7 +9,7 @@ export interface VideoItem {
 
 interface VideoLoaderProps {
   // Simple callbacks - parent doesn't need to know implementation details
-  onVideoLoad: (url: string, displayName: string) => void;
+  onVideoLoad: (url: string, displayName: string, videoKey?: string) => void;
   onError: (message: string) => void;
   onStatusUpdate: (message: string) => void;
   onVideoListLoad: (videos: VideoItem[]) => void;

@@ -70,12 +70,14 @@ export function StandalonePlayerPage() {
    * Loads video from URL and updates player state
    */
   const loadVideo = useCallback(
-    (url: string, displayName: string) => {
+    (url: string, displayName: string, videoKey?: string) => {
       updateStatus('loading', 'Loading Stream...');
       updateStreamInfo(`Loading video from: ${displayName}`);
 
       setMp4Url(displayName);
-      setSelectedVideo('');
+      // Only clear selectedVideo if no videoKey is provided (e.g., manual URL entry)
+      // If videoKey is provided (from dropdown selection), update it
+      setSelectedVideo(videoKey || '');
 
       setVideoJsOptions((prev) => ({
         ...prev,
