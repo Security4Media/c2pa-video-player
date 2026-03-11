@@ -10,7 +10,7 @@
         "preview": "vite preview",
         "start": "http-server -p 9000 -c-1 -d false -g",
         "predeploy": "npm run build",
-        "deploy": "gh-pages -d build"
+        "deploy": "gh-pages -d ./react-c2pa-player/dist"
     },
     "dependencies": {
         "@contentauth/c2pa-web": "^0.5.6",
