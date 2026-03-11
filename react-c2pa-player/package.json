@@ -7,7 +7,7 @@
     "homepage": "https://Security4Media.github.io/c2pa-player/",
     "scripts": {
         "dev-server": "concurrently -n http,vite -c blue,green vite",
-        "dev" : "tsc && vite build && vite preview",
+        "dev" : "vite --",
         "build": "tsc && vite build",
         "build-deploy": "tsc && vite build --config vite.config.deploy.ts",
         "preview": "vite preview",

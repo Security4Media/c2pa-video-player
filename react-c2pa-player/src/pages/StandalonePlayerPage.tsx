@@ -229,6 +229,7 @@ export function StandalonePlayerPage() {
     updateStatus('ready', 'Player Ready');
     updateStreamInfo('Player cleared');
     setPlayerStats({ currentTime: 0, duration: 0, buffered: 0 });
+    window.history.replaceState({}, document.title, window.location.pathname); // Clear query parameters from URL bar
 
     // Clear video source
     setVideoJsOptions((prev) => ({

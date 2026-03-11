@@ -2,6 +2,7 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
 export default defineConfig({
+  base: './',
   plugins: [react()],
   resolve: {
     alias: {
@@ -10,7 +11,7 @@ export default defineConfig({
   },
   server: {
     proxy: {
-      '/playlists': {
+      '/mp4s': {
         target: 'http://localhost:9000',
         changeOrigin: true,
         bypass: (req, res, options) => {
@@ -19,8 +20,15 @@ export default defineConfig({
             return req.url;
           }
         },
+      },   
+      '/trust': {
+        target: 'http://localhost:9000',
+        changeOrigin: true,
+        bypass: (req, res, options) => {
+            return req.url;
+          }
+        }
       },
-    },
   },
   build: {
     emptyOutDir: true,

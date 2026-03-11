@@ -38,6 +38,17 @@ export const VideoLoader = memo(function VideoLoader({
   onMp4UrlChange,
 }: VideoLoaderProps) {
   // VideoLoader now manages its own upload/selection logic
+
+  // Load video from URL param on mount
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const videoUrl = params.get('video');
+    if (videoUrl && videoUrl !== mp4Url) {
+      console.log('📥 Loading video from URL parameter:', videoUrl);
+      onMp4UrlChange(videoUrl);
+      validateAndLoadVideo(videoUrl);
+    }
+  }, []); // Only run once on mount
   const {
     uploadProgress,
     handleFileSelect: handleFileSelectRaw,
