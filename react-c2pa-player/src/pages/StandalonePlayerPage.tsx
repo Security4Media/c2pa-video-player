@@ -201,8 +201,7 @@ export function StandalonePlayerPage() {
   const loadVideoList = useCallback(async () => {
     try {
       // Use Vite's import.meta.glob to get all MP4 files from the public directory
-      const videoModules = import.meta.glob('/public/playlists/mp4s/*.mp4', {
-        eager: false,
+      const videoModules = import.meta.glob('/src/assets/playlists/mp4s/*.mp4', {
         query: '?url',
         import: 'default',
       });
