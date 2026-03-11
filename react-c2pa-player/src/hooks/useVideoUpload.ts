@@ -199,7 +199,7 @@ export function useVideoUpload({
         onVideoLoad(blobUrl, displayName, videoKey);
       } else {
         // Load from server
-        const serverPath = `/playlists/mp4s/${filename}`;
+        const serverPath = `/mp4s/${filename}`;
         onVideoLoad(serverPath, serverPath, videoKey);
       }
     },

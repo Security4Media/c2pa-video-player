@@ -23,6 +23,7 @@ export default defineConfig({
     },
   },
   build: {
+    emptyOutDir: true,
     rollupOptions: {
       output: {
         entryFileNames: 'assets/[name].js',
