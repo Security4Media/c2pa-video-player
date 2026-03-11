@@ -1,1 +1,1 @@
-const t="/react-c2pa-player/assets/input.mp4";export{t as default};
+const p="/c2pa-video-player/assets/input.mp4";export{p as default};

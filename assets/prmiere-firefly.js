@@ -1,1 +1,1 @@
-const e="/react-c2pa-player/assets/prmiere-firefly.mp4";export{e as default};
+const e="/c2pa-video-player/assets/prmiere-firefly.mp4";export{e as default};
