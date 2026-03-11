@@ -2,6 +2,7 @@
     "name": "react-c2pa-player",
     "version": "1.0.0",
     "private": true,
+    "type": "module",
     "description": "EBU C2PA Monolithic player",
     "homepage": "https://Security4Media.github.io/c2pa-player/",
     "scripts": {
