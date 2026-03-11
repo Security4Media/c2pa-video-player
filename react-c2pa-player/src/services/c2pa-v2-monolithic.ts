@@ -10,6 +10,13 @@ import { createC2pa } from '@contentauth/c2pa-web';
 import wasmSrc from '@contentauth/c2pa-web/resources/c2pa.wasm?url';
 import type { ManifestStore } from '@contentauth/c2pa-web';
 
+import cawg_anchors from '../assets/trust/cawg_anchors.pem?raw';
+import cawg_store from '../assets/trust/cawg_store.cfg?raw';
+import cawg_allowed from '../assets/trust/cawg_allowed_extended.pem?raw';
+
+import c2pa_anchors from '../assets/trust/c2pa_anchors.pem?url';
+import c2pa_store from '../assets/trust/c2pa_store.cfg?url';
+
 const C2paSupportedMediaTypes = ['video'];
 
 /**
@@ -22,13 +29,8 @@ const C2paSupportedMediaTypes = ['video'];
 export async function c2pa_init(player: HTMLVideoElement, onPlaybackTimeUpdated: (e: any) => void) {
   try {
     // Fetch trust configuration files
-    const [cawg_anchors, cawg_store, cawg_allowed] = await Promise.all([
-      fetch('/trust/cawg_anchors.pem').then((res) => res.text()),
-      fetch('/trust/cawg_store.cfg').then((res) => res.text()),
-      fetch('/trust/cawg_allowed_extended.pem').then((res) => res.text()),
-    ]);
-
     console.log('[C2PA Init] Trust configuration loaded');
+    console.log('CAWG Anchors:', cawg_anchors);
 
     // Create C2PA instance with trust configuration
     const c2pa = await createC2pa({
@@ -41,11 +43,11 @@ export async function c2pa_init(player: HTMLVideoElement, onPlaybackTimeUpdated:
         },
         trust: {
           trustAnchors: [
-            '/trust/c2pa_anchors.pem',
+            c2pa_anchors,
             'https://raw.githubusercontent.com/contentauth/verify-site/refs/heads/main/static/trust/anchors.pem',
           ],
           allowedList: 'https://raw.githubusercontent.com/contentauth/verify-site/refs/heads/main/static/trust/allowed.pem',
-          trustConfig: '/trust/c2pa_store.cfg',
+          trustConfig: c2pa_store
         },
       },
     });
