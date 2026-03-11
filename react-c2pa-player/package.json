@@ -7,10 +7,11 @@
     "scripts": {
         "dev": "concurrently -n http,vite -c blue,green vite",
         "build": "tsc && vite build",
+        "build-deploy": "tsc && vite build --config vite.config.deploy.ts",
         "preview": "vite preview",
         "start": "http-server -p 9000 -c-1 -d false -g",
-        "predeploy": "npm run build",
-        "deploy": "gh-pages -d ./react-c2pa-player/dist"
+        "predeploy": "npm run build-deploy",
+        "deploy": "gh-pages -d ../docs"
     },
     "dependencies": {
         "@contentauth/c2pa-web": "^0.5.6",
