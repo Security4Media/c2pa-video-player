@@ -3,10 +3,11 @@ import react from '@vitejs/plugin-react';
 
 // Deployment config for GitHub Pages
 export default defineConfig({
+  base: '/c2pa-video-player/',
   plugins: [react()],
   resolve: {
     alias: {
-      '@': '/src',
+      '@': '/src/',
     },
   },
   server: {
@@ -24,7 +25,6 @@ export default defineConfig({
     },
   },
   build: {
-    outDir: '../docs', // Output to /docs for GitHub Pages
     emptyOutDir: true,
     rollupOptions: {
       output: {

@@ -5,8 +5,10 @@ import { PlayerStats } from '../components/PlayerStats';
 import { VideoPlayerSection } from '../components/VideoPlayerSection';
 import { VideoNavigationControls } from '../components/VideoNavigationControls';
 import { VideoModeSwitcher } from '../components/VideoModeSwitcher';
-import '../styles/design-tokens.css';
+import '@/styles/design-tokens.css';
 import './StandalonePlayerPage.css';
+import ebuLogo from '@/assets/logos/ebu-logo-dark.svg';
+import nabLogo from '@/assets/logos/nab-logo.png';
 
 type PlayerStatus = 'ready' | 'loading' | 'error';
 
@@ -303,8 +305,8 @@ export function StandalonePlayerPage() {
       <div className="container">
         <div className="header">
           <div className="logos">
-            <img src="/ebu-logo-dark.svg" alt="EBU Logo" className="ebu-logo" />
-            <img src="/nab-logo.png" alt="NAB Show Logo" className="nab-logo" />
+            <img src={ebuLogo} alt="EBU Logo" className="ebu-logo" />
+            <img src={nabLogo} alt="NAB Show Logo" className="nab-logo" />
           </div>
           <h2>C2PA & CAWG validation player</h2>
           <h2>NAB SHOW 2026</h2>

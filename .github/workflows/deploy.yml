@@ -36,9 +36,11 @@ jobs:
           node-version: lts/*
           cache: 'npm'
       - name: Install dependencies
-        run: npm --prefix ./react-c2pa-player ci
+        run: npm ci
       - name: Build
-        run: npm --prefix ./react-c2pa-player run build
+        run: npm run build-deploy --workspace=react-c2pa-player
+      - name: Copy assets
+        run: cp -r react-c2pa-player/public/* -t dist/
       - name: Setup Pages
         uses: actions/configure-pages@v5
       - name: Upload artifact

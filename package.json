@@ -1,0 +1,7 @@
+{
+    "name": "EBU C2PA Player",
+    "private": true,
+    "workspaces": [
+        "react-c2pa-player"
+    ]
+}

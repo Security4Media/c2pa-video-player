@@ -10,13 +10,12 @@
         "build": "tsc && vite build",
         "build-deploy": "tsc && vite build --config vite.config.deploy.ts",
         "preview": "vite preview",
-        "start": "http-server -p 9000 -c-1 -d false -g",
-        "predeploy": "npm run build-deploy",
-        "deploy": "gh-pages -d ../docs"
+        "start": "http-server -p 9000 -c-1 -d false -g"
     },
     "dependencies": {
         "@contentauth/c2pa-web": "^0.5.6",
         "http-server": "^14.1.1",
+        "jsx-runtime": "^1.2.0",
         "react": "^19.0.0",
         "react-dom": "^19.0.0",
         "video.js": "^8.3.0"
@@ -27,7 +26,6 @@
         "@types/video.js": "^7.3.58",
         "@vitejs/plugin-react": "^4.2.1",
         "concurrently": "^9.1.2",
-        "gh-pages": "^6.3.0",
         "typescript": "^5.3.3",
         "vite": "^5.1.0"
     }
