@@ -2,7 +2,7 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
 export default defineConfig({
-  base: './',
+  base: '/server/',
   plugins: [react()],
   resolve: {
     alias: {
@@ -10,6 +10,9 @@ export default defineConfig({
     },
   },
   server: {
+    fs: {
+      strict: false,
+    },
     proxy: {
       '/mp4s': {
         target: 'http://localhost:9000',

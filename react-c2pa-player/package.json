@@ -14,7 +14,7 @@
         "start": "http-server -p 9000 -c-1 -d false -g"
     },
     "dependencies": {
-        "@contentauth/c2pa-web": "^0.5.6",
+        "@contentauth/c2pa-web": "^0.6.1",
         "http-server": "^14.1.1",
         "jsx-runtime": "^1.2.0",
         "react": "^19.0.0",

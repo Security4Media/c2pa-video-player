@@ -10,10 +10,10 @@ import { createC2pa } from '@contentauth/c2pa-web';
 import wasmSrc from '@contentauth/c2pa-web/resources/c2pa.wasm?url';
 import type { ManifestStore } from '@contentauth/c2pa-web';
 
-import cawg_anchors from '/trust/cawg_anchors.pem?raw'
-import cawg_store   from '/trust/cawg_store.cfg?raw';
-import cawg_allowed from '/trust/cawg_allowed_extended.pem?raw';
-import c2pa_anchors from '/trust/c2pa_anchors.pem?url';
+import cawg_anchors from '/trust/cawg_anchors.pem?url';
+import cawg_store   from '/trust/cawg_store.cfg?url';
+import cawg_allowed from '/trust/cawg_allowed_extended.pem?url';
+import c2pa_anchors from '/trust/c2pa_anchors_extended.pem?url';
 import c2pa_store   from '/trust/c2pa_store.cfg?url';
 
 const C2paSupportedMediaTypes = ['video'];
@@ -41,9 +41,9 @@ export async function c2pa_init(player: HTMLVideoElement, onPlaybackTimeUpdated:
       wasmSrc,
       settings: {
         cawgTrust: {
-          trustAnchors: cawg_anchors,
-          trustConfig: cawg_store,
-          allowedList: cawg_allowed
+          trustAnchors: [c2pa_anchors],
+          allowedList: [cawg_allowed, 'https://raw.githubusercontent.com/contentauth/verify-site/refs/heads/main/static/trust/allowed.pem'],
+          trustConfig: c2pa_store,
         },
         trust: {
           trustAnchors: [
