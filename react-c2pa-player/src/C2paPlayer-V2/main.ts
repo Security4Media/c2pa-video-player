@@ -3,6 +3,7 @@
  */
 
 import type { C2PAPlayerProps, C2PAStatus } from '../types/c2pa.types';
+import type { C2PAPlayerRootController } from './C2PAPlayerRoot.types';
 import type {
     GetCompromisedRegions,
     VideoJsPlayerLike,
@@ -17,6 +18,7 @@ import {
     adjustC2PAMenu,
     disposeC2PAMenu,
     initializeC2PAMenu,
+    setPlayerRootController,
     updateC2PAMenu,
 } from './C2paMenu/C2paMenuFunctions';
 import { getTimelineFunctions } from './C2paTimeline/C2paTimelineFunctions';
@@ -108,7 +110,7 @@ export const C2PAPlayer = function (
         updateC2PATimeline,
     } = getTimelineFunctions() as TimelineFunctions;
 
-    let playerRoot: import('./C2paFrictionModal/C2paFrictionModalFunctions').C2PAPlayerRootController | null = null;
+    let playerRoot: C2PAPlayerRootController | null = null;
     let isManifestInvalid = false;
 
     let seeking = false;
@@ -132,6 +134,7 @@ export const C2PAPlayer = function (
             initializeC2PAControlBar(videoPlayer);
             initializeC2PAMenu(videoPlayer);
             playerRoot = initializeFrictionOverlay(videoPlayer, setPlaybackStarted);
+            setPlayerRootController(playerRoot);
 
             c2paMenu = videoPlayer.controlBar.getChild('C2PAMenuButton');
             c2paControlBar = videoPlayer.controlBar.progressControl.seekBar.getChild('C2PALoadProgressBar');

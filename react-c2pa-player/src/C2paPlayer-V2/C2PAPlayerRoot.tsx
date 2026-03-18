@@ -1,7 +1,11 @@
+import { useSyncExternalStore } from 'react';
+import { createPortal } from 'react-dom';
+import type { C2PAPlayerRootController } from './C2PAPlayerRoot.types';
 import { C2paFrictionOverlay } from './C2paFrictionModal/C2paFrictionOverlay';
+import { C2paMenuRoot } from './C2paMenu/C2paMenuRoot';
 
 interface C2PAPlayerRootProps {
-    isFrictionOverlayVisible: boolean;
+    controller: C2PAPlayerRootController;
     onWatchAnyway: () => void;
 }
 
@@ -15,13 +19,31 @@ interface C2PAPlayerRootProps {
  * @returns Player overlay React tree
  */
 export function C2PAPlayerRoot({
-    isFrictionOverlayVisible,
+    controller,
     onWatchAnyway,
 }: C2PAPlayerRootProps) {
+    const state = useSyncExternalStore(
+        controller.subscribe,
+        controller.getState,
+        controller.getState,
+    );
+
     return (
-        <C2paFrictionOverlay
-            isVisible={isFrictionOverlayVisible}
-            onWatchAnyway={onWatchAnyway}
-        />
+        <>
+            <C2paFrictionOverlay
+                isVisible={state.isFrictionOverlayVisible}
+                onWatchAnyway={onWatchAnyway}
+            />
+            {state.menuContentTarget
+                ? createPortal(
+                    <C2paMenuRoot
+                        c2paStatus={state.menuC2paStatus}
+                        compromisedRegions={state.menuCompromisedRegions}
+                        resetKey={state.menuResetKey}
+                    />,
+                    state.menuContentTarget,
+                )
+                : null}
+        </>
     );
 }

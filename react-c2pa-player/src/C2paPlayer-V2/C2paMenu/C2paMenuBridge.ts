@@ -1,7 +1,5 @@
 import type { C2PAStatus } from '@/types/c2pa.types';
-import { createElement } from 'react';
-import { createRoot, type Root } from 'react-dom/client';
-import { C2paMenuRoot } from './C2paMenuRoot';
+import type { C2PAPlayerRootController } from '../C2PAPlayerRoot.types';
 import type {
     C2paMenuBridgeState,
     GetCompromisedRegions,
@@ -23,6 +21,7 @@ function createInitialMenuState(): C2paMenuBridgeState {
 }
 
 const menuState: C2paMenuBridgeState = createInitialMenuState();
+let playerRootController: C2PAPlayerRootController | null = null;
 
 function resetMenuState() {
     menuState.lastManifestId = null;
@@ -61,50 +60,21 @@ function getMenuContentTarget(c2paMenu: VideoJsMenuComponentLike | null): Elemen
     return c2paMenu?.el()?.querySelector('.vjs-menu-button-popup .vjs-menu .vjs-menu-content') ?? null;
 }
 
-function scheduleRootUnmount(root: Root | null) {
-    if (!root) {
-        return;
-    }
-
-    setTimeout(() => {
-        root.unmount();
-    }, 0);
-}
-
-function ensureMenuReactRoot(): Root | null {
-    const target = getMenuContentTarget(menuState.menuReference);
-    if (!target) {
-        return null;
-    }
-
-    if (menuState.reactRoot && menuState.reactTarget === target) {
-        return menuState.reactRoot;
-    }
-
-    if (menuState.reactRoot) {
-        scheduleRootUnmount(menuState.reactRoot);
-    }
-
-    menuState.reactTarget = target;
-    menuState.reactRoot = createRoot(target);
-    return menuState.reactRoot;
-}
-
-function renderReactMenu(
+function syncMenuStateToPlayerRoot(
     c2paStatus: C2PAStatus | null,
     compromisedRegions: string[],
 ) {
-    const reactRoot = ensureMenuReactRoot();
-    if (!reactRoot) {
-        console.warn('[C2PA] React menu root could not be created');
+    if (!playerRootController) {
         return;
     }
 
-    reactRoot.render(createElement(C2paMenuRoot, {
-        c2paStatus,
-        compromisedRegions,
-        resetKey: `${menuState.resetVersion}:${menuState.lastManifestId ?? 'none'}`,
-    }));
+    playerRootController.setState({
+        isMenuOpen: menuState.isMenuOpen,
+        menuC2paStatus: c2paStatus,
+        menuCompromisedRegions: compromisedRegions,
+        menuResetKey: `${menuState.resetVersion}:${menuState.lastManifestId ?? 'none'}`,
+        menuContentTarget: getMenuContentTarget(menuState.menuReference),
+    });
 }
 
 /**
@@ -120,7 +90,28 @@ export function setMenuReference(c2paMenu: VideoJsMenuComponentLike | null) {
     }
 
     menuState.menuReference = c2paMenu;
-    ensureMenuReactRoot();
+    syncMenuStateToPlayerRoot(
+        playerRootController?.getState().menuC2paStatus ?? null,
+        playerRootController?.getState().menuCompromisedRegions ?? [],
+    );
+}
+
+/**
+ * Register the shared player root controller so the menu bridge can update
+ * the single React state store instead of managing its own render root.
+ *
+ * @param controller - Player root controller mounted in the player container
+ */
+export function setPlayerRootController(controller: C2PAPlayerRootController | null) {
+    playerRootController = controller;
+    if (!playerRootController) {
+        return;
+    }
+
+    syncMenuStateToPlayerRoot(
+        playerRootController.getState().menuC2paStatus,
+        playerRootController.getState().menuCompromisedRegions,
+    );
 }
 
 /**
@@ -129,6 +120,9 @@ export function setMenuReference(c2paMenu: VideoJsMenuComponentLike | null) {
  */
 export function handleMenuOpened() {
     menuState.isMenuOpen = true;
+    playerRootController?.setState({
+        isMenuOpen: true,
+    });
 }
 
 /**
@@ -138,6 +132,10 @@ export function handleMenuOpened() {
 export function handleMenuClosed() {
     menuState.isMenuOpen = false;
     menuState.resetVersion += 1;
+    playerRootController?.setState({
+        isMenuOpen: false,
+        menuResetKey: `${menuState.resetVersion}:${menuState.lastManifestId ?? 'none'}`,
+    });
 }
 
 /**
@@ -166,33 +164,16 @@ export function updateC2PAMenu(
     const currentManifestId = c2paStatus?.manifestStore?.active_manifest ?? null;
     const manifestChanged = currentManifestId !== menuState.lastManifestId;
 
-    const now = Date.now();
-    const timeSinceLastUpdate = now - menuState.lastUpdateTime;
-    const shouldForceUpdate = menuState.isMenuOpen && timeSinceLastUpdate > 2000;
-
     if (menuState.isInvalid) {
         console.log('[C2PA] Maintaining invalid button state (persists across all video states)');
         updateButtonValidationState(videoPlayer, true);
-        if (menuState.isMenuOpen) {
-            renderReactMenu(c2paStatus, compromisedRegions);
-        }
     }
-
-    if (!menuState.isMenuOpen && !manifestChanged) {
-        return;
-    }
-
-    if (!shouldForceUpdate && !manifestChanged && menuState.lastManifestId !== null) {
-        return;
-    }
-
-    menuState.lastUpdateTime = now;
 
     console.log('[C2PA] Rendering menu', {
         manifestId: currentManifestId,
         previousManifestId: menuState.lastManifestId,
         manifestChanged,
-        forcedUpdate: shouldForceUpdate,
+        menuOpen: menuState.isMenuOpen,
     });
 
     if (manifestChanged) {
@@ -202,7 +183,7 @@ export function updateC2PAMenu(
 
     menuState.isInvalid = c2paStatus?.manifestStore?.validation_state === 'Invalid';
     updateButtonValidationState(videoPlayer, menuState.isInvalid);
-    renderReactMenu(c2paStatus, compromisedRegions);
+    syncMenuStateToPlayerRoot(c2paStatus, compromisedRegions);
 }
 
 /**
@@ -213,6 +194,12 @@ export function resetC2PAMenuCache() {
     console.log('[C2PA] Manually resetting menu state');
     resetMenuState();
     menuState.resetVersion += 1;
+    playerRootController?.setState({
+        isMenuOpen: false,
+        menuC2paStatus: null,
+        menuCompromisedRegions: [],
+        menuResetKey: `${menuState.resetVersion}:none`,
+    });
 }
 
 /**
@@ -220,12 +207,14 @@ export function resetC2PAMenuCache() {
  * current Video.js menu instance.
  */
 export function disposeC2PAMenu() {
-    if (menuState.reactRoot) {
-        scheduleRootUnmount(menuState.reactRoot);
-    }
-
-    menuState.reactRoot = null;
-    menuState.reactTarget = null;
+    playerRootController?.setState({
+        isMenuOpen: false,
+        menuC2paStatus: null,
+        menuCompromisedRegions: [],
+        menuContentTarget: null,
+        menuResetKey: `${menuState.resetVersion}:none`,
+    });
     menuState.menuReference = null;
+    playerRootController = null;
     resetMenuState();
 }

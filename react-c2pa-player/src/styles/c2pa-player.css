@@ -314,6 +314,10 @@
 }
 
 /* Style of the c2pa menu items - Title as prominent section header */
+.vjs-menu li.vjs-menu-title:not(.c2pa-react-menu-title) {
+  display: none !important;
+}
+
 .vjs-menu li.vjs-menu-title {
   display: inline-flex !important;
   justify-content: left !important;

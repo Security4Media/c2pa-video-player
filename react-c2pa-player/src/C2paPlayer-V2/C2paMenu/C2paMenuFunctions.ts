@@ -8,5 +8,6 @@ export {
     disposeC2PAMenu,
     registerMenuItemRenderer,
     resetC2PAMenuCache,
+    setPlayerRootController,
     updateC2PAMenu,
 } from './C2paMenuBridge';

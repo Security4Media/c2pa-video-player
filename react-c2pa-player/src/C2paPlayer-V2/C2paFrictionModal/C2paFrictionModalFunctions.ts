@@ -2,27 +2,14 @@ import { createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import type { VideoJsPlayerLike } from '../C2paMenu/C2paMenu.types';
 import { C2PAPlayerRoot } from '../C2PAPlayerRoot';
+import type {
+    C2PAPlayerRootController,
+    C2PAPlayerRootState,
+} from '../C2PAPlayerRoot.types';
 
 interface FrictionOverlayPlayer extends VideoJsPlayerLike {
     play(): void;
     pause(): void;
-}
-
-export interface C2PAPlayerRootController {
-    container: HTMLDivElement;
-    root: Root;
-    isFrictionOverlayVisible: boolean;
-    onWatchAnyway: () => void;
-}
-
-function renderPlayerRoot(
-    playerRoot: C2PAPlayerRootController,
-    onWatchAnyway: () => void,
-) {
-    playerRoot.root.render(createElement(C2PAPlayerRoot, {
-        isFrictionOverlayVisible: playerRoot.isFrictionOverlayVisible,
-        onWatchAnyway,
-    }));
 }
 
 function schedulePlayerRootUnmount(playerRoot: C2PAPlayerRootController) {
@@ -30,6 +17,46 @@ function schedulePlayerRootUnmount(playerRoot: C2PAPlayerRootController) {
         playerRoot.root.unmount();
         playerRoot.container.remove();
     }, 0);
+}
+
+function createInitialPlayerRootState(): C2PAPlayerRootState {
+    return {
+        isFrictionOverlayVisible: false,
+        isMenuOpen: false,
+        menuC2paStatus: null,
+        menuCompromisedRegions: [],
+        menuResetKey: 'initial',
+        menuContentTarget: null,
+    };
+}
+
+function createPlayerRootController(
+    container: HTMLDivElement,
+    root: Root,
+    onWatchAnyway: () => void,
+): C2PAPlayerRootController {
+    let state = createInitialPlayerRootState();
+    const listeners = new Set<() => void>();
+
+    return {
+        container,
+        root,
+        onWatchAnyway,
+        getState: () => state,
+        setState: (partialState) => {
+            state = {
+                ...state,
+                ...partialState,
+            };
+            listeners.forEach((listener) => listener());
+        },
+        subscribe: (listener) => {
+            listeners.add(listener);
+            return () => {
+                listeners.delete(listener);
+            };
+        },
+    };
 }
 
 /**
@@ -45,23 +72,27 @@ export const initializeFrictionOverlay = function (
     setPlaybackStarted: () => void,
 ): C2PAPlayerRootController {
     const playerRootContainer = document.createElement('div');
+    const root = createRoot(playerRootContainer);
     const handleWatchAnyway = function () {
-        playerRoot.isFrictionOverlayVisible = false;
-        renderPlayerRoot(playerRoot, playerRoot.onWatchAnyway);
+        playerRoot.setState({
+            isFrictionOverlayVisible: false,
+        });
         setPlaybackStarted();
         videoPlayer.play();
     };
-    const playerRoot: C2PAPlayerRootController = {
-        container: playerRootContainer,
-        root: createRoot(playerRootContainer),
-        isFrictionOverlayVisible: false,
-        onWatchAnyway: handleWatchAnyway,
-    };
+    const playerRoot = createPlayerRootController(
+        playerRootContainer,
+        root,
+        handleWatchAnyway,
+    );
 
     const playerContainer = videoPlayer.el();
     playerContainer?.appendChild(playerRoot.container);
 
-    renderPlayerRoot(playerRoot, handleWatchAnyway);
+    playerRoot.root.render(createElement(C2PAPlayerRoot, {
+        controller: playerRoot,
+        onWatchAnyway: handleWatchAnyway,
+    }));
 
     return playerRoot;
 };
@@ -81,8 +112,9 @@ export const displayFrictionOverlay = function (
 ): void {
     if (!playbackStarted) {
         videoPlayer.pause();
-        playerRoot.isFrictionOverlayVisible = true;
-        renderPlayerRoot(playerRoot, playerRoot.onWatchAnyway);
+        playerRoot.setState({
+            isFrictionOverlayVisible: true,
+        });
     }
 };
 

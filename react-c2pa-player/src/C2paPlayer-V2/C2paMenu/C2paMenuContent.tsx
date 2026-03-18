@@ -19,7 +19,7 @@ interface C2paMenuContentProps {
 
 function MenuTitle() {
   return (
-    <li className="vjs-menu-title">
+    <li className="vjs-menu-title c2pa-react-menu-title">
       Content Credentials
     </li>
   );

@@ -14,6 +14,8 @@ declare const videojs: {
 
 interface MenuItemConstructor {
     new (player: unknown, options: { label: string; id: string }): {
+        addClass?: (className: string) => void;
+        el?: () => HTMLElement | null;
         handleClick: () => void;
     };
 }
@@ -40,13 +42,21 @@ export const initializeC2PAMenu = function (videoPlayer: VideoJsPlayerLike) {
         closeC2paMenu = false;
 
         createItems() {
-            return this.options_?.myItems?.map((menuItem) => {
-                const item = new MenuItem(this.player_, { label: menuItem.name, id: menuItem.id });
-                item.handleClick = function () {
-                    return;
-                };
-                return item;
-            }) ?? [];
+            const placeholderItem = new MenuItem(this.player_, {
+                label: '',
+                id: 'c2pa-menu-placeholder',
+            });
+            placeholderItem.addClass?.('vjs-hidden');
+            placeholderItem.addClass?.('c2pa-menu-placeholder-item');
+            const placeholderElement = placeholderItem.el?.();
+            if (placeholderElement) {
+                placeholderElement.setAttribute('aria-hidden', 'true');
+                placeholderElement.style.display = 'none';
+            }
+            placeholderItem.handleClick = function () {
+                return;
+            };
+            return [placeholderItem];
         }
 
         handleClick() {
