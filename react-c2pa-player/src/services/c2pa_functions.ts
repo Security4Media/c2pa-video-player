@@ -5,13 +5,6 @@ function isCawgIdentityUntrustedFailure(result: { code?: string; url?: string })
     return result.code === 'signingCredential.untrusted' && result.url?.includes('cawg.identity');
 }
 
-export function getActiveManifest(manifestStore: ManifestStore): Manifest | null {
-    if (!manifestStore?.active_manifest || !manifestStore?.manifests) {
-        return null;
-    }
-
-    return manifestStore.manifests[manifestStore.active_manifest] ?? null;
-}
 
 export function getValidationResultsForManifest(validationDeltas: { success?: any[]; failure?: any[] } = {}) {
     return {
@@ -198,4 +191,13 @@ export function getIngredientValidationStatus(manifestRef: string, manifestStore
     }
 
     return 'Unknown';
+}
+
+
+export function getActiveManifest(manifestStore: ManifestStore): Manifest | null {
+    if (!manifestStore?.active_manifest || !manifestStore?.manifests) {
+        return null;
+    }
+
+    return manifestStore.manifests[manifestStore.active_manifest] ?? null;
 }

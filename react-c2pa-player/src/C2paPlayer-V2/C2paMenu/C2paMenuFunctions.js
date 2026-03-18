@@ -669,7 +669,7 @@ export let updateC2PAMenu = function (
   const shouldForceUpdate = menuState.isMenuOpen && timeSinceLastUpdate > 2000; // Force update every 2 seconds when menu is open
 
   // Only update menu if it's actually open, unless manifest changed, or forced by timer
-  const manifestStore = c2paStatus?.details?.video?.manifestStore;
+  const manifestStore = c2paStatus?.manifestStore;
   const currentManifestId = manifestStore?.active_manifest;
   const manifestChanged = currentManifestId !== menuState.lastManifestId;
 

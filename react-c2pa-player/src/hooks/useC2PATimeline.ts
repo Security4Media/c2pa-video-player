@@ -1,5 +1,5 @@
 import { useCallback, useRef, useEffect, useState } from 'react';
-import type { ProgressSegmentElement } from '../types/c2pa.types';
+import type { ProgressSegmentElement, ValidationState } from '../types/c2pa.types';
 
 interface UseC2PATimelineProps {
   videoPlayer: any;
@@ -140,7 +140,7 @@ export function useC2PATimeline({ videoPlayer, isMonolithic }: UseC2PATimelinePr
   const createTimelineSegment = useCallback((
     segmentStartTime: number,
     segmentEndTime: number,
-    verificationStatus: string,
+    verificationStatus: ValidationState,
     isInvalid = false
   ): ProgressSegmentElement => {
     const segment = document.createElement('div') as ProgressSegmentElement;
@@ -174,7 +174,7 @@ export function useC2PATimeline({ videoPlayer, isMonolithic }: UseC2PATimelinePr
   const addSegment = useCallback((
     startTime: number,
     endTime: number,
-    validationState: string,
+    validationState: ValidationState,
     isInvalid = false
   ) => {
     if (!c2paControlBarRef.current) return;
@@ -234,11 +234,11 @@ export function useC2PATimeline({ videoPlayer, isMonolithic }: UseC2PATimelinePr
       } else {
         if (!isMonolithic && 
             lastSegment.dataset.endTime !== seekTime.toString() && 
-            lastSegment.dataset.verificationStatus !== 'unknown') {
+            lastSegment.dataset.verificationStatus !== 'Unknown') {
           const unknownSegment = createTimelineSegment(
             parseFloat(lastSegment.dataset.endTime),
             seekTime,
-            'unknown'
+            'Unknown'
           );
           c2paControlBarRef.current?.el().appendChild(unknownSegment);
           progressSegmentsRef.current.push(unknownSegment);

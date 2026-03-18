@@ -4,7 +4,11 @@ import {
   selectCreativeWorkContent,
   selectIngredients,
   selectOrganizationIdentity,
+  selectSignatureIssuer,
+  selectSignatureTime,
 } from './C2paManifestFunctions';
+
+import { getActiveManifest, getActiveManifestValidationStatus } from '../../services/c2pa_functions';
 
 export var C2PAMenu = function () {
   //Items to show in the c2pa menu
@@ -70,10 +74,10 @@ export var C2PAMenu = function () {
 
       const activeManifest = getActiveManifest(manifestStore);
       if (itemName == 'SIG_ISSUER') {
-        return activeManifest?.signature_info?.issuer;
+        return selectSignatureIssuer(activeManifest);
       }
       if (itemName == 'DATE') {
-        const timeValue = activeManifest?.signature_info?.time;
+        const timeValue = selectSignatureTime(activeManifest);
         const date = timeValue ? new Date(timeValue) : null;
         return date
           ? new Intl.DateTimeFormat('en-US', {

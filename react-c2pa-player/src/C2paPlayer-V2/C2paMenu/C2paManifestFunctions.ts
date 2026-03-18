@@ -5,4 +5,6 @@ export {
     selectCreativeWorkOrganization,
     selectIngredients,
     selectOrganizationIdentity,
+    selectSignatureIssuer,
+    selectSignatureTime,
 } from './manifestSelectors';
