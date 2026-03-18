@@ -6,7 +6,7 @@
 
 import { initializeC2PAControlBar } from './C2paControlBar/C2paControlBarFunctions.js';
 import { displayFrictionOverlay, initializeFrictionOverlay } from './C2paFrictionModal/C2paFrictionModalFunctions.js';
-import { adjustC2PAMenu, initializeC2PAMenu, updateC2PAMenu } from './C2paMenu/C2paMenuFunctions.js';
+import { adjustC2PAMenu, disposeC2PAMenu, initializeC2PAMenu, updateC2PAMenu } from './C2paMenu/C2paMenuFunctions.js';
 import { getTimelineFunctions } from './C2paTimeline/C2paTimelineFunctions.js';
 
 export var C2PAPlayer = function (
@@ -107,6 +107,8 @@ export var C2PAPlayer = function (
                 clearInterval(menuAdjustInterval);
                 menuAdjustInterval = null;
             }
+
+            disposeC2PAMenu();
 
             // Remove C2PA UI components from Video.js player
             try {

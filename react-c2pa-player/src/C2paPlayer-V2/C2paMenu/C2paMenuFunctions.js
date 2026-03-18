@@ -1,42 +1,7 @@
-/**
- * C2PA Menu Functions - Extensible menu rendering system
- * 
- * This module provides a flexible, extensible system for rendering C2PA metadata in a Video.js menu.
- * 
- * EXTENDING THE MENU:
- * 
- * 1. Add new menu item in C2paMenu.js:
- *    const c2paMenuItems = {
- *      ...existing items,
- *      MY_NEW_ITEM: 'My Custom Field'
- *    };
- * 
- * 2. Register a custom renderer:
- *    import { registerMenuItemRenderer } from './C2paMenuFunctions.js';
- * 
- *    registerMenuItemRenderer('MY_NEW_ITEM', ({ itemName, itemValue, delimiter }) => {
- *      return `<div class="custom-item">${itemName}: ${itemValue}</div>`;
- *    });
- * 
- * 3. For interactive items, return { html, postRender }:
- *    registerMenuItemRenderer('COLLAPSIBLE_ITEM', ({ itemName, itemValue, menuItem }) => {
- *      return {
- *        html: `<div class="header" id="toggle">${itemName}</div><div class="content">${itemValue}</div>`,
- *        postRender: () => {
- *          const toggle = menuItem.el().querySelector('#toggle');
- *          toggle.onclick = () => { // add interactivity };
- *        }
- *      };
- *    });
- * 
- * 4. Add data extraction in C2paMenu.js c2paItem() method:
- *    if (itemName == 'MY_NEW_ITEM') {
- *      return extractMyDataFromManifest(activeManifest);
- *    }
- */
-
+import { createElement } from 'react';
+import { createRoot } from 'react-dom/client';
 import { buildC2PAMenuViewModel, C2PAMenu } from './C2paMenu.js';
-import { providerInfoFromSocialId } from './Providers.js';
+import { C2paMenuContent } from './C2paMenuContent';
 
 //C2PA menu instance
 const c2paMenuInstance = new C2PAMenu();
@@ -57,313 +22,17 @@ const menuState = {
 
   // Reference to menu component
   menuReference: null,
+  reactRoot: null,
+  reactTarget: null,
+  reactPayload: null,
 };
 
 // ============================================
 // MENU ITEM RENDERERS
 // ============================================
 
-/**
- * Registry of menu item renderers by item key
- * Each renderer receives: { itemName, itemKey, itemValue, delimiter, menuItem }
- * 
- * Renderers can return:
- * - HTML string (simple render)
- * - { html: string, postRender: function } (for interactive items)
- * - null (to use default renderer)
- */
-const menuItemRenderers = {
-  SOCIAL: renderSocialMediaItem,
-  CAWG_IDENTITY: renderCawgIdentityItem,
-  INGREDIENTS: renderIngredientsItem,
-  WEBSITE: renderWebsiteItem,
-  ALERT: renderAlertItem,
-  C2PA_VALIDATION_STATUS: renderValidationStatusItem,
-};
-
-/**
- * Register a custom renderer for a menu item type
- * @param {string} itemKey - The menu item key (e.g., 'SOCIAL', 'WEBSITE')
- * @param {function} renderer - The renderer function
- * @example
- * registerMenuItemRenderer('CUSTOM_FIELD', ({ itemName, itemValue }) => {
- *   return `<span class="custom">${itemName}: ${itemValue}</span>`;
- * });
- */
 export function registerMenuItemRenderer(itemKey, renderer) {
-  menuItemRenderers[itemKey] = renderer;
-}
-
-/**
- * Render social media links
- */
-function renderSocialMediaItem({ itemName, itemValue, delimiter }) {
-  const socialArray = itemValue.map(function (account) {
-    const formattedWebsite = providerInfoFromSocialId(account).name;
-    return `<span><a class="url" href="${account}" onclick="window.open('${account}')">${formattedWebsite}</a></span>`;
-  });
-  return `<span class="itemName"> ${itemName} </span> ${delimiter} ${socialArray.join('\n')}`;
-}
-
-/**
- * Render CAWG identity with collapsible content
- */
-function renderCawgIdentityItem({ itemName, itemValue, menuItem }) {
-  if (itemValue && typeof itemValue === 'object') {
-    // Check if there's an existing state before rebuilding
-    const existingContent = menuItem.el().querySelector('.cawg-identity');
-    if (existingContent) {
-      menuState.ui.cawgIdentityExpanded = existingContent.style.display === 'flex';
-    }
-
-    let cawgHtml = `<div class="cawg-identity" style="display: ${menuState.ui.cawgIdentityExpanded ? 'flex' : 'none'};">`;
-
-    // Display issuer
-    if (itemValue.issuer) {
-      cawgHtml += `<div><span class="itemName">Issuer:</span> ${itemValue.issuer}</div>`;
-    }
-
-    // Display referenced assertions
-    if (itemValue.referenced_assertions) {
-      cawgHtml += `<div><span class="itemName">Referenced Assertions:</span> ${itemValue.referenced_assertions}</div>`;
-    }
-
-    // Display validation status
-    if (itemValue.validation_status) {
-      const statusClass = itemValue.validation_status.toLowerCase();
-      cawgHtml += `<div><span class="itemName">Validation Status:</span> <span class="validation-${statusClass}">${itemValue.validation_status}</span></div>`;
-    }
-    cawgHtml += '</div>';
-
-    const html = `<div class="cawg-header"><span class="itemName">${itemName}</span><span class="cawg-toggle ${menuState.ui.cawgIdentityExpanded ? 'expanded' : ''}">›</span></div>${cawgHtml}`;
-
-    // Return HTML and post-render callback for interactivity
-    return {
-      html,
-      postRender: () => {
-        const header = menuItem.el().querySelector('.cawg-header');
-        const toggle = menuItem.el().querySelector('.cawg-toggle');
-        const content = menuItem.el().querySelector('.cawg-identity');
-
-        header.style.cursor = 'pointer';
-        header.onclick = function (e) {
-          e.stopPropagation();
-          if (content.style.display === 'none') {
-            content.style.display = 'flex';
-            toggle.classList.add('expanded');
-            menuState.ui.cawgIdentityExpanded = true;
-          } else {
-            content.style.display = 'none';
-            toggle.classList.remove('expanded');
-            menuState.ui.cawgIdentityExpanded = false;
-          }
-        };
-      }
-    };
-  } else {
-    return `<span class="itemName"> ${itemName}</span> ${itemValue}`;
-  }
-}
-
-/**
- * Render ingredients with collapsible content for each ingredient
- */
-function renderIngredientsItem({ itemName, itemValue, menuItem }) {
-  if (!itemValue || !Array.isArray(itemValue) || itemValue.length === 0) {
-    return `<span class="itemName">${itemName}</span>: None`;
-  }
-
-  let html = `<div class="ingredients-container">`;
-  html += `<div class="ingredients-main-header"><span class="itemName">${itemName}</span></div>`;
-
-  itemValue.forEach((ingredient) => {
-    html += renderSingleIngredient(ingredient, menuItem);
-  });
-
-  html += `</div>`;
-
-  // Return HTML and post-render callback for interactivity
-  return {
-    html,
-    postRender: () => {
-      attachIngredientHandlers(itemValue, menuItem);
-    }
-  };
-}
-
-/**
- * Render a single ingredient (can be called recursively for nested ingredients)
- */
-function renderSingleIngredient(ingredient, menuItem, parentId = '') {
-  const ingredientIndex = ingredient.index;
-  const ingredientId = parentId ? `${parentId}-ingredient-${ingredientIndex}` : `ingredient-${ingredientIndex}`;
-  const stateKey = ingredientId;
-
-  // Check if there's an existing state before rebuilding
-  const existingContent = menuItem.el().querySelector(`#${ingredientId}`);
-  const isExpanded = existingContent
-    ? existingContent.style.display === 'flex'
-    : menuState.ui.ingredientsExpanded[stateKey] || false;
-
-  let html = '';
-
-  // Build ingredient header with optional ingredient count badge
-  html += `<div class="ingredient-item">`;
-  html += `<div class="ingredient-header" data-id="${ingredientId}">`;
-  html += `<span class="itemName">Ingredient ${ingredientIndex}</span>`;
-  if (ingredient.ingredientCount && ingredient.ingredientCount > 0) {
-    html += `<span class="ingredient-count">(${ingredient.ingredientCount} ingredient${ingredient.ingredientCount > 1 ? 's' : ''})</span>`;
-  }
-  html += `<span class="ingredient-toggle ${isExpanded ? 'expanded' : ''}">›</span>`;
-  html += `</div>`;
-
-  // Build ingredient content
-  html += `<div id="${ingredientId}" class="ingredient-content" style="display: ${isExpanded ? 'flex' : 'none'};">`;
-
-  if (ingredient.title) {
-    html += `<div><span class="itemName">Title:</span> ${ingredient.title}</div>`;
-  }
-
-  if (ingredient.issuer) {
-    html += `<div><span class="itemName">Issued by:</span> ${ingredient.issuer}</div>`;
-  }
-
-  if (ingredient.claimGenerator) {
-    html += `<div><span class="itemName">App or device:</span> ${ingredient.claimGenerator}</div>`;
-  }
-
-  if (ingredient.date) {
-    html += `<div><span class="itemName">Issued on:</span> ${ingredient.date}</div>`;
-  }
-
-  // Display validation status
-  if (ingredient.validationStatus) {
-    const statusClass = ingredient.validationStatus.toLowerCase();
-    html += `<div><span class="itemName">Validation Status:</span> <span class="validation-${statusClass}">${ingredient.validationStatus}</span></div>`;
-  }
-
-  // Render nested ingredients if they exist
-  if (ingredient.ingredients && Array.isArray(ingredient.ingredients) && ingredient.ingredients.length > 0) {
-    html += `<div class="nested-ingredients">`;
-    html += `<div class="nested-ingredients-header"><span class="itemName">Sub-Ingredients:</span></div>`;
-    ingredient.ingredients.forEach((nestedIngredient) => {
-      html += renderSingleIngredient(nestedIngredient, menuItem, ingredientId);
-    });
-    html += `</div>`;
-  }
-
-  html += '</div>'; // ingredient-content
-  html += `</div>`; // ingredient-item
-
-  return html;
-}
-
-/**
- * Attach click handlers to all ingredients (including nested ones)
- */
-function attachIngredientHandlers(ingredients, menuItem, parentId = '') {
-  ingredients.forEach((ingredient) => {
-    const ingredientId = parentId ? `${parentId}-ingredient-${ingredient.index}` : `ingredient-${ingredient.index}`;
-    const stateKey = ingredientId;
-
-    const header = menuItem.el().querySelector(`.ingredient-header[data-id="${ingredientId}"]`);
-    const toggle = header?.querySelector('.ingredient-toggle');
-    const content = menuItem.el().querySelector(`#${ingredientId}`);
-
-    if (header && toggle && content) {
-      // Check if handler is already attached
-      if (header.hasAttribute('data-handler-attached')) {
-        // Handler already attached, skip
-        console.log(`[C2PA] Handler already attached for ${ingredientId}, skipping`);
-      } else {
-        // Mark as handler attached
-        header.setAttribute('data-handler-attached', 'true');
-
-        header.style.cursor = 'pointer';
-        header.onclick = function (e) {
-          e.stopPropagation();
-          if (content.style.display === 'none') {
-            content.style.display = 'flex';
-            toggle.classList.add('expanded');
-            menuState.ui.ingredientsExpanded[stateKey] = true;
-          } else {
-            content.style.display = 'none';
-            toggle.classList.remove('expanded');
-            menuState.ui.ingredientsExpanded[stateKey] = false;
-          }
-        };
-      }
-    }
-
-    // Recursively attach handlers for nested ingredients
-    if (ingredient.ingredients && Array.isArray(ingredient.ingredients)) {
-      attachIngredientHandlers(ingredient.ingredients, menuItem, ingredientId);
-    }
-  });
-}
-
-/**
- * Render website link
- */
-function renderWebsiteItem({ itemName, itemValue, delimiter }) {
-  return `<div class="itemName">${itemName}</div>${delimiter}<a class="url" href="${itemValue}" onclick="window.open('${itemValue}')">${itemValue}</a>`;
-}
-
-/**
- * Render alert message
- */
-function renderAlertItem({ itemValue }) {
-  return `<div class="alert-div"><img class="alert-icon"></img><div>${itemValue}</div></div>`;
-}
-
-/**
- * Render validation status (special handling for "Failed")
- */
-function renderValidationStatusItem({ itemName, itemValue, delimiter, menuItem }) {
-  if (itemValue === 'Failed') {
-    menuItem.el().classList.add('validation-padding');
-    return `<span class="itemName nextLine">${itemName}</span>`;
-  }
-  // Apply color styling for all validation statuses
-  const statusClass = itemValue.toLowerCase();
-  return `<span class="itemName">${itemName}</span>${delimiter}<span class="validation-${statusClass}">${itemValue}</span>`;
-}
-
-/**
- * Default renderer for simple text items
- */
-function renderDefaultItem({ itemName, itemValue, delimiter }) {
-  if (itemValue.length >= 23) {
-    return `<div class="itemName">${itemName}</div>${delimiter}${itemValue}`;
-  } else {
-    return `<span class="itemName">${itemName}</span>${delimiter}${itemValue}`;
-  }
-}
-
-/**
- * Render invalid validation error message
- */
-function renderInvalidValidationError() {
-  return `<div class="alert-div"><div><strong>❌ Content Credentials are Invalid</strong><br/>The content credentials for this video could not be verified </br>and may have been tampered with.</div></div>`;
-}
-
-/**
- * Render loading message
- */
-function renderLoadingMessage() {
-  return `<div class="alert-div" style="background-color: rgba(14, 65, 148, 0.2); border-color: rgba(255, 255, 255, 0.3);">
-    <div style="display: flex; align-items: center; gap: 15px;">
-      <div style="width: 30px; height: 30px; border: 3px solid rgba(255, 255, 255, 0.3); border-top-color: rgba(125, 180, 255, 1); border-radius: 50%; animation: spin 1s linear infinite;"></div>
-      <div><strong>Loading Content Credentials...</strong><br/>Please wait while we fetch the manifest information.</div>
-    </div>
-  </div>`;
-}
-
-/**
- * Render no manifest information message
- */
-function renderNoManifestMessage() {
-  return `<div class="alert-div" style="background-color: rgba(14, 65, 148, 0.2); border-color: rgba(255, 255, 255, 0.3);"><div><strong>⚠️ No Content Credentials Found</strong><br/>This video does not contain Content Credentials information.</div></div>`;
+  console.warn('[C2PA] registerMenuItemRenderer is deprecated during the React menu migration', itemKey, renderer);
 }
 
 // ============================================
@@ -384,120 +53,83 @@ function updateButtonValidationState(videoPlayer, isInvalid) {
   }
 }
 
-/**
- * Handle invalid validation state - show only error message
- */
-function handleInvalidValidation(c2paMenuItems, videoPlayer) {
+function setMenuModeInvalid(videoPlayer) {
   // Mark as invalid in persistent state
   menuState.isInvalid = true;
   updateButtonValidationState(videoPlayer, true);
-
-  for (let i = 0; i < c2paMenuItems.length; i++) {
-    const c2paItem = c2paMenuItems[i];
-    const c2paItemKey = c2paItem.options_.id;
-
-    if (c2paItemKey === 'C2PA_VALIDATION_STATUS') {
-      c2paItem.el().innerHTML = renderInvalidValidationError();
-      c2paItem.el().style.display = 'block';
-    } else {
-      c2paItem.el().style.display = 'none';
-    }
-  }
 }
 
-/**
- * Handle loading state - show loading message and hide all other items
- */
-function handleLoading(c2paMenuItems, videoPlayer) {
+function setMenuModeLoading(videoPlayer) {
   console.log('[C2PA] Showing loading state');
-  // Don't change button state if we're in invalid state (preserve across video end)
   if (!menuState.isInvalid) {
     updateButtonValidationState(videoPlayer, false);
   }
-
-  for (let i = 0; i < c2paMenuItems.length; i++) {
-    const c2paItem = c2paMenuItems[i];
-
-    // Show loading message in the first item slot
-    if (i === 0) {
-      c2paItem.el().innerHTML = renderLoadingMessage();
-      c2paItem.el().style.display = 'block';
-    } else {
-      // Hide all other items completely
-      c2paItem.el().innerHTML = '';
-      c2paItem.el().style.display = 'none';
-    }
-  }
 }
 
-/**
- * Handle missing manifest - show informational message
- */
-function handleNoManifest(c2paMenuItems, videoPlayer) {
+function setMenuModeNoManifest(videoPlayer) {
   console.log('[C2PA] Showing no manifest message');
-  // Don't change button state if we're in invalid state (preserve across video end)
   if (!menuState.isInvalid) {
     updateButtonValidationState(videoPlayer, false);
   }
-
-  for (let i = 0; i < c2paMenuItems.length; i++) {
-    const c2paItem = c2paMenuItems[i];
-
-    // Show message in the first item slot
-    if (i === 0) {
-      c2paItem.el().innerHTML = renderNoManifestMessage();
-      c2paItem.el().style.display = 'block';
-    } else {
-      // Clear and hide all other items
-      c2paItem.el().innerHTML = '';
-      c2paItem.el().style.display = 'none';
-    }
-  }
 }
 
-/**
- * Render a single menu item using appropriate renderer
- */
-function renderMenuItem(menuItem, itemName, itemKey, itemValue) {
-  const delimiter = c2paMenuInstance.c2paMenuDelimiter();
-  const renderer = menuItemRenderers[itemKey];
+function getMenuContentTarget(c2paMenu) {
+  return c2paMenu?.el()?.querySelector('.vjs-menu-button-popup .vjs-menu .vjs-menu-content') ?? null;
+}
 
-  let result;
-  if (renderer) {
-    result = renderer({ itemName, itemKey, itemValue, delimiter, menuItem });
-  } else {
-    result = renderDefaultItem({ itemName, itemKey, itemValue, delimiter });
+function scheduleRootUnmount(root) {
+  if (!root) {
+    return;
   }
 
-  // Handle renderer returning null (use default)
-  if (result === null) {
-    result = renderDefaultItem({ itemName, itemKey, itemValue, delimiter });
+  setTimeout(() => {
+    root.unmount();
+  }, 0);
+}
+
+function ensureMenuReactRoot(c2paMenu) {
+  const target = getMenuContentTarget(c2paMenu);
+  if (!target) {
+    return null;
   }
 
-  // Handle renderer returning object with html and postRender callback
-  if (typeof result === 'object' && result.html) {
-    // Check if this is a cached result (html matches current innerHTML)
-    const currentHTML = menuItem.el().innerHTML;
-    if (result.skipRender || currentHTML === result.html) {
-      // Skip DOM update if content hasn't changed
-      console.log(`[C2PA] Skipping DOM update for ${itemKey} - content unchanged`);
-      if (result.postRender) {
-        result.postRender();
-      }
-    } else {
-      // Update DOM only if content has changed
-      menuItem.el().innerHTML = result.html;
-      if (result.postRender) {
-        result.postRender();
-      }
-    }
-  } else {
-    // Simple string result - check before updating
-    const currentHTML = menuItem.el().innerHTML;
-    if (currentHTML !== result) {
-      menuItem.el().innerHTML = result;
-    }
+  if (menuState.reactRoot && menuState.reactTarget === target) {
+    return menuState.reactRoot;
   }
+
+  if (menuState.reactRoot) {
+    scheduleRootUnmount(menuState.reactRoot);
+  }
+
+  menuState.reactTarget = target;
+  menuState.reactRoot = createRoot(target);
+  return menuState.reactRoot;
+}
+
+function renderReactMenu(payload) {
+  const menuComponent = menuState.menuReference;
+  const reactRoot = ensureMenuReactRoot(menuComponent);
+  if (!reactRoot) {
+    console.warn('[C2PA] React menu root could not be created');
+    return;
+  }
+
+  menuState.reactPayload = payload;
+
+  reactRoot.render(createElement(C2paMenuContent, {
+    menuItems: c2paMenuInstance.c2paMenuItems(),
+    items: payload.items,
+    mode: payload.mode,
+    uiState: menuState.ui,
+    onToggleCawg: () => {
+      menuState.ui.cawgIdentityExpanded = !menuState.ui.cawgIdentityExpanded;
+      renderReactMenu(menuState.reactPayload);
+    },
+    onToggleIngredient: (ingredientId) => {
+      menuState.ui.ingredientsExpanded[ingredientId] = !menuState.ui.ingredientsExpanded[ingredientId];
+      renderReactMenu(menuState.reactPayload);
+    },
+  }));
 }
 
 // ============================================
@@ -599,6 +231,7 @@ export let initializeC2PAMenu = function (videoPlayer) {
 
   // Store global reference for immediate access
   menuState.menuReference = videoPlayer.controlBar.getChild('C2PAMenuButton');
+  ensureMenuReactRoot(menuState.menuReference);
 
   console.log('[C2PAMenu] C2PA menu button added to control bar');
   console.log('[C2PAMenu] Control bar children:', videoPlayer.controlBar.children());
@@ -660,7 +293,6 @@ export let updateC2PAMenu = function (
     menuState.menuReference = c2paMenu;
   }
 
-  const c2paMenuItems = c2paMenu.items;
   const compromisedRegions = getCompromisedRegions(isMonolithic, videoPlayer);
 
   // Check timing for periodic updates when menu is open
@@ -679,7 +311,7 @@ export let updateC2PAMenu = function (
     updateButtonValidationState(videoPlayer, true);
     // If menu is open, also update the menu content
     if (menuState.isMenuOpen) {
-      handleInvalidValidation(c2paMenuItems, videoPlayer);
+      renderReactMenu({ mode: 'invalid', items: {} });
     }
     // Don't return - allow manifest change check below
   }
@@ -715,7 +347,8 @@ export let updateC2PAMenu = function (
   if (hasDefinitiveNoManifest) {
     if (menuState.lastManifestId !== 'no-manifest') {
       console.log('[C2PA] No C2PA manifest found - showing no manifest message');
-      handleNoManifest(c2paMenuItems, videoPlayer);
+      setMenuModeNoManifest(videoPlayer);
+      renderReactMenu({ mode: 'no-manifest', items: {} });
       menuState.lastManifestId = 'no-manifest';
     }
     return;
@@ -724,7 +357,8 @@ export let updateC2PAMenu = function (
   // If we don't have valid manifest yet, show loading
   if (!hasValidManifestStore) {
     console.log('[C2PA] Manifest not available yet - showing loading');
-    handleLoading(c2paMenuItems, videoPlayer);
+    setMenuModeLoading(videoPlayer);
+    renderReactMenu({ mode: 'loading', items: {} });
     return;
   }
 
@@ -754,7 +388,8 @@ export let updateC2PAMenu = function (
   // Handle invalid validation state
   const isInvalid = validationStatus === 'Invalid';
   if (isInvalid) {
-    handleInvalidValidation(c2paMenuItems, videoPlayer);
+    setMenuModeInvalid(videoPlayer);
+    renderReactMenu({ mode: 'invalid', items: {} });
     console.log('[C2PA] Invalid validation message displayed');
     return;
   }
@@ -764,28 +399,8 @@ export let updateC2PAMenu = function (
 
   const menuViewModel = buildC2PAMenuViewModel(c2paStatus, compromisedRegions);
 
-  // Render all menu items
-  let hasAnyContent = false;
-
-  for (let i = 0; i < c2paMenuItems.length; i++) {
-    const c2paItem = c2paMenuItems[i];
-    const c2paItemName = c2paItem.options_.label;
-    const c2paItemKey = c2paItem.options_.id;
-
-    // Get item value from C2PA manifest
-    const c2paItemValue = menuViewModel.items[c2paItemKey] ?? null;
-
-    console.log('[C2PA] Menu item: ', c2paItemName, c2paItemKey, c2paItemValue);
-
-    if (c2paItemValue != null) {
-      renderMenuItem(c2paItem, c2paItemName, c2paItemKey, c2paItemValue);
-      c2paItem.el().style.display = 'block';
-      hasAnyContent = true;
-    } else {
-      // Hide menu items with no value
-      c2paItem.el().style.display = 'none';
-    }
-  }
+  const hasAnyContent = Object.values(menuViewModel.items).some(value => value != null);
+  renderReactMenu({ mode: 'ready', items: menuViewModel.items });
 
   if (hasAnyContent) {
     console.log('[C2PA] Menu rendering complete with content');
@@ -806,4 +421,15 @@ export function resetC2PAMenuCache() {
   menuState.isInvalid = false;
   menuState.ui.ingredientsExpanded = {};
   menuState.ui.cawgIdentityExpanded = false;
+}
+
+export function disposeC2PAMenu() {
+  if (menuState.reactRoot) {
+    scheduleRootUnmount(menuState.reactRoot);
+  }
+
+  menuState.reactRoot = null;
+  menuState.reactTarget = null;
+  menuState.reactPayload = null;
+  menuState.menuReference = null;
 }
