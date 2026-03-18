@@ -1,10 +1,6 @@
 import { createElement } from 'react';
 import { createRoot } from 'react-dom/client';
-import { buildC2PAMenuRenderState, C2PAMenu } from './C2paMenu.js';
-import { C2paMenuContent } from './C2paMenuContent';
-
-//C2PA menu instance
-const c2paMenuInstance = new C2PAMenu();
+import { c2paMenuItems, C2paMenuRoot } from './C2paMenuRoot';
 
 // Simplified state object for menu management
 const menuState = {
@@ -19,7 +15,6 @@ const menuState = {
   menuReference: null,
   reactRoot: null,
   reactTarget: null,
-  reactPayload: null,
 };
 
 // ============================================
@@ -82,13 +77,10 @@ function renderReactMenu(payload) {
     return;
   }
 
-  menuState.reactPayload = payload;
-
-  reactRoot.render(createElement(C2paMenuContent, {
-    menuItems: c2paMenuInstance.c2paMenuItems(),
-    items: payload.items,
-    mode: payload.mode,
-    resetKey: `${menuState.resetVersion}:${payload.mode}:${menuState.lastManifestId ?? 'none'}`,
+  reactRoot.render(createElement(C2paMenuRoot, {
+    c2paStatus: payload.c2paStatus,
+    compromisedRegions: payload.compromisedRegions,
+    resetKey: `${menuState.resetVersion}:${menuState.lastManifestId ?? 'none'}`,
   }));
 }
 
@@ -166,9 +158,8 @@ export let initializeC2PAMenu = function (videoPlayer) {
 
   //Add items to c2pa menu
   let myC2PAItems = [];
-  const menuItems = c2paMenuInstance.c2paMenuItems();
-  Object.keys(menuItems).forEach((key) => {
-    const value = menuItems[key];
+  Object.keys(c2paMenuItems).forEach((key) => {
+    const value = c2paMenuItems[key];
     myC2PAItems.push({
       name: value,
       id: key,
@@ -251,8 +242,7 @@ export let updateC2PAMenu = function (
   }
 
   const compromisedRegions = getCompromisedRegions(isMonolithic, videoPlayer);
-  const renderState = buildC2PAMenuRenderState(c2paStatus, compromisedRegions);
-  const currentManifestId = renderState.manifestId;
+  const currentManifestId = c2paStatus?.manifestStore?.active_manifest ?? null;
   const manifestChanged = currentManifestId !== menuState.lastManifestId;
 
   const now = Date.now();
@@ -263,7 +253,7 @@ export let updateC2PAMenu = function (
     console.log('[C2PA] Maintaining invalid button state (persists across all video states)');
     updateButtonValidationState(videoPlayer, true);
     if (menuState.isMenuOpen) {
-      renderReactMenu({ mode: 'invalid', items: {} });
+      renderReactMenu({ c2paStatus, compromisedRegions });
     }
   }
 
@@ -279,7 +269,6 @@ export let updateC2PAMenu = function (
 
   console.log('[C2PA] Rendering menu', {
     manifestId: currentManifestId,
-    mode: renderState.mode,
     previousManifestId: menuState.lastManifestId,
     manifestChanged,
     forcedUpdate: shouldForceUpdate
@@ -288,14 +277,11 @@ export let updateC2PAMenu = function (
   if (manifestChanged) {
     menuState.lastManifestId = currentManifestId;
     menuState.resetVersion += 1;
-    if (currentManifestId != null) {
-      menuState.isInvalid = false;
-    }
   }
 
-  menuState.isInvalid = renderState.isInvalid;
-  updateButtonValidationState(videoPlayer, renderState.isInvalid);
-  renderReactMenu({ mode: renderState.mode, items: renderState.items });
+  menuState.isInvalid = c2paStatus?.manifestStore?.validation_state === 'Invalid';
+  updateButtonValidationState(videoPlayer, menuState.isInvalid);
+  renderReactMenu({ c2paStatus, compromisedRegions });
 };
 
 /**
@@ -318,7 +304,6 @@ export function disposeC2PAMenu() {
 
   menuState.reactRoot = null;
   menuState.reactTarget = null;
-  menuState.reactPayload = null;
   menuState.menuReference = null;
   menuState.resetVersion = 0;
 }
