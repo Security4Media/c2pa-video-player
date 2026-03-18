@@ -7,11 +7,11 @@ import type {
     GetCompromisedRegions,
     VideoJsPlayerLike,
 } from './C2paMenu/C2paMenu.types';
-import { initializeC2PAControlBar } from './C2paControlBar/C2paControlBarFunctions.js';
+import { initializeC2PAControlBar } from './C2paControlBar/C2paControlBarFunctions';
 import {
     displayFrictionOverlay,
     initializeFrictionOverlay,
-} from './C2paFrictionModal/C2paFrictionModalFunctions.js';
+} from './C2paFrictionModal/C2paFrictionModalFunctions';
 import {
     adjustC2PAMenu,
     disposeC2PAMenu,
