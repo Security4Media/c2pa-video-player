@@ -35,7 +35,7 @@
  *    }
  */
 
-import { C2PAMenu } from './C2paMenu.js';
+import { buildC2PAMenuViewModel, C2PAMenu } from './C2paMenu.js';
 import { providerInfoFromSocialId } from './Providers.js';
 
 //C2PA menu instance
@@ -762,6 +762,8 @@ export let updateC2PAMenu = function (
   // Update button state for valid content
   updateButtonValidationState(videoPlayer, false);
 
+  const menuViewModel = buildC2PAMenuViewModel(c2paStatus, compromisedRegions);
+
   // Render all menu items
   let hasAnyContent = false;
 
@@ -771,11 +773,7 @@ export let updateC2PAMenu = function (
     const c2paItemKey = c2paItem.options_.id;
 
     // Get item value from C2PA manifest
-    const c2paItemValue = c2paMenuInstance.c2paItem(
-      c2paItemKey,
-      c2paStatus,
-      compromisedRegions,
-    );
+    const c2paItemValue = menuViewModel.items[c2paItemKey] ?? null;
 
     console.log('[C2PA] Menu item: ', c2paItemName, c2paItemKey, c2paItemValue);
 
