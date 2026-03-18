@@ -102,6 +102,61 @@ export function buildC2PAMenuViewModel(c2paStatus, compromisedRegions = []) {
   };
 }
 
+export function buildC2PAMenuRenderState(c2paStatus, compromisedRegions = []) {
+
+  const hasLoadedManifestStore = c2paStatus && c2paStatus?.manifestStore
+    && c2paStatus.manifestStore.active_manifest;
+
+  if (!hasLoadedManifestStore) {
+    return {
+      mode: 'loading',
+      manifestId: 'loading',
+      items: {},
+      isInvalid: false,
+      hasAnyContent: false,
+    };
+  }
+
+  const manifestStore = c2paStatus?.manifestStore;
+  const manifestId = manifestStore?.active_manifest;
+  const hasDefinitiveNoManifest =
+    (c2paStatus && !manifestStore) ||
+    (manifestStore?.manifests && Object.keys(manifestStore.manifests).length === 0);
+
+  if (hasDefinitiveNoManifest) {
+    return {
+      mode: 'no-manifest',
+      manifestId: 'no-manifest',
+      items: {},
+      isInvalid: false,
+      hasAnyContent: false,
+    };
+  }
+
+
+  const validationStatus = manifestStore?.validation_state ?? 'Unknown';
+  if (validationStatus === 'Invalid') {
+    return {
+      mode: 'invalid',
+      manifestId,
+      items: {},
+      isInvalid: true,
+      hasAnyContent: false,
+    };
+  }
+
+  const viewModel = buildC2PAMenuViewModel(c2paStatus, compromisedRegions);
+  const hasAnyContent = Object.values(viewModel.items).some(value => value != null);
+
+  return {
+    mode: 'ready',
+    manifestId,
+    items: viewModel.items,
+    isInvalid: false,
+    hasAnyContent,
+  };
+}
+
 export var C2PAMenu = function () {
   return {
     c2paMenuItems: function () {

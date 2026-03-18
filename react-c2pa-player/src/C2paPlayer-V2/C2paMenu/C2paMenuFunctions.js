@@ -1,6 +1,6 @@
 import { createElement } from 'react';
 import { createRoot } from 'react-dom/client';
-import { buildC2PAMenuViewModel, C2PAMenu } from './C2paMenu.js';
+import { buildC2PAMenuRenderState, C2PAMenu } from './C2paMenu.js';
 import { C2paMenuContent } from './C2paMenuContent';
 
 //C2PA menu instance
@@ -30,13 +30,6 @@ export function registerMenuItemRenderer(itemKey, renderer) {
   console.warn('[C2PA] registerMenuItemRenderer is deprecated during the React menu migration', itemKey, renderer);
 }
 
-// ============================================
-// VALIDATION STATE MANAGEMENT
-// ============================================
-
-/**
- * Update button validation state
- */
 function updateButtonValidationState(videoPlayer, isInvalid) {
   const c2paButton = videoPlayer.el().querySelector('.c2pa-menu-button button');
   if (!c2paButton) return;
@@ -45,26 +38,6 @@ function updateButtonValidationState(videoPlayer, isInvalid) {
     c2paButton.classList.add('c2pa-menu-button-invalid');
   } else {
     c2paButton.classList.remove('c2pa-menu-button-invalid');
-  }
-}
-
-function setMenuModeInvalid(videoPlayer) {
-  // Mark as invalid in persistent state
-  menuState.isInvalid = true;
-  updateButtonValidationState(videoPlayer, true);
-}
-
-function setMenuModeLoading(videoPlayer) {
-  console.log('[C2PA] Showing loading state');
-  if (!menuState.isInvalid) {
-    updateButtonValidationState(videoPlayer, false);
-  }
-}
-
-function setMenuModeNoManifest(videoPlayer) {
-  console.log('[C2PA] Showing no manifest message');
-  if (!menuState.isInvalid) {
-    updateButtonValidationState(videoPlayer, false);
   }
 }
 
@@ -273,123 +246,56 @@ export let updateC2PAMenu = function (
   videoPlayer,
   getCompromisedRegions,
 ) {
-  // Store reference if not already stored
   if (!menuState.menuReference && c2paMenu) {
     menuState.menuReference = c2paMenu;
   }
 
   const compromisedRegions = getCompromisedRegions(isMonolithic, videoPlayer);
-
-  // Check timing for periodic updates when menu is open
-  const now = Date.now();
-  const timeSinceLastUpdate = now - menuState.lastUpdateTime;
-  const shouldForceUpdate = menuState.isMenuOpen && timeSinceLastUpdate > 2000; // Force update every 2 seconds when menu is open
-
-
-  // Check if we have a definitive "no manifest" state
-  const hasDefinitiveNoManifest =
-    (c2paStatus && !c2paStatus.manifestStore) ||
-    (c2paStatus?.manifestStore?.manifests && Object.keys(c2paStatus.manifestStore.manifests).length === 0);
-
-  // Handle definitive "no manifest" case
-  if (hasDefinitiveNoManifest) {
-    if (menuState.lastManifestId !== 'no-manifest') {
-      console.log('[C2PA] No C2PA manifest found - showing no manifest message');
-      setMenuModeNoManifest(videoPlayer);
-      renderReactMenu({ mode: 'no-manifest', items: {} });
-      menuState.lastManifestId = 'no-manifest';
-    }
-    return;
-  }
-
-  let manifestStore = c2paStatus?.manifestStore;
-  // Check if manifest exists and has complete content
-  console.log('[C2PA-MENU] Manifest store:', manifestStore);
-  const hasValidManifestStore = manifestStore != null &&
-    manifestStore.manifests != null &&
-    Object.keys(manifestStore.manifests).length > 0 &&
-    manifestStore.active_manifest != null;
-
-
-  // Only update menu if it's actually open, unless manifest changed, or forced by timer
-  const currentManifestId = manifestStore?.active_manifest;
+  const renderState = buildC2PAMenuRenderState(c2paStatus, compromisedRegions);
+  const currentManifestId = renderState.manifestId;
   const manifestChanged = currentManifestId !== menuState.lastManifestId;
 
-  // CRITICAL: Maintain invalid button state even when menu is closed or video ends
+  const now = Date.now();
+  const timeSinceLastUpdate = now - menuState.lastUpdateTime;
+  const shouldForceUpdate = menuState.isMenuOpen && timeSinceLastUpdate > 2000;
+
   if (menuState.isInvalid) {
     console.log('[C2PA] Maintaining invalid button state (persists across all video states)');
     updateButtonValidationState(videoPlayer, true);
-    // If menu is open, also update the menu content
     if (menuState.isMenuOpen) {
       renderReactMenu({ mode: 'invalid', items: {} });
     }
-    // Don't return - allow manifest change check below
   }
 
   if (!menuState.isMenuOpen && !manifestChanged) {
-    // Menu is closed and manifest hasn't changed - skip update (but invalid state already maintained above)
     return;
   }
 
   if (!shouldForceUpdate && !manifestChanged && menuState.lastManifestId !== null) {
-    // No forced update needed, no manifest change, and we already have content - skip
     return;
   }
 
-  // Update the timestamp
   menuState.lastUpdateTime = now;
-
-  // If we don't have valid manifest yet, show loading
-  if (!hasValidManifestStore) {
-    console.log('[C2PA] Manifest not available yet - showing loading');
-    setMenuModeLoading(videoPlayer);
-    renderReactMenu({ mode: 'loading', items: {} });
-    return;
-  }
-
-  // Get current manifest data
-  const validationStatus = manifestStore?.validation_state ?? 'Unknown';
 
   console.log('[C2PA] Rendering menu', {
     manifestId: currentManifestId,
-    validationStatus,
+    mode: renderState.mode,
     previousManifestId: menuState.lastManifestId,
     manifestChanged,
     forcedUpdate: shouldForceUpdate
   });
 
-  // Update manifest ID
   if (manifestChanged) {
     menuState.lastManifestId = currentManifestId;
     menuState.resetVersion += 1;
-    // Only reset invalid state if we have a new valid manifest (not null/undefined)
     if (currentManifestId != null) {
       menuState.isInvalid = false;
     }
   }
 
-  // Handle invalid validation state
-  const isInvalid = validationStatus === 'Invalid';
-  if (isInvalid) {
-    setMenuModeInvalid(videoPlayer);
-    renderReactMenu({ mode: 'invalid', items: {} });
-    console.log('[C2PA] Invalid validation message displayed');
-    return;
-  }
-
-  // Update button state for valid content
-  updateButtonValidationState(videoPlayer, false);
-
-  const menuViewModel = buildC2PAMenuViewModel(c2paStatus, compromisedRegions);
-
-  const hasAnyContent = Object.values(menuViewModel.items).some(value => value != null);
-  renderReactMenu({ mode: 'ready', items: menuViewModel.items });
-
-  if (hasAnyContent) {
-    console.log('[C2PA] Menu rendering complete with content');
-  } else {
-    console.log('[C2PA] Warning: No menu items could be rendered');
-  }
+  menuState.isInvalid = renderState.isInvalid;
+  updateButtonValidationState(videoPlayer, renderState.isInvalid);
+  renderReactMenu({ mode: renderState.mode, items: renderState.items });
 };
 
 /**
