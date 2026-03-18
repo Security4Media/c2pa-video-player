@@ -300,8 +300,33 @@ export let updateC2PAMenu = function (
   const timeSinceLastUpdate = now - menuState.lastUpdateTime;
   const shouldForceUpdate = menuState.isMenuOpen && timeSinceLastUpdate > 2000; // Force update every 2 seconds when menu is open
 
+
+  // Check if we have a definitive "no manifest" state
+  const hasDefinitiveNoManifest =
+    (c2paStatus && !c2paStatus.manifestStore) ||
+    (c2paStatus?.manifestStore?.manifests && Object.keys(c2paStatus.manifestStore.manifests).length === 0);
+
+  // Handle definitive "no manifest" case
+  if (hasDefinitiveNoManifest) {
+    if (menuState.lastManifestId !== 'no-manifest') {
+      console.log('[C2PA] No C2PA manifest found - showing no manifest message');
+      setMenuModeNoManifest(videoPlayer);
+      renderReactMenu({ mode: 'no-manifest', items: {} });
+      menuState.lastManifestId = 'no-manifest';
+    }
+    return;
+  }
+
+  let manifestStore = c2paStatus?.manifestStore;
+  // Check if manifest exists and has complete content
+  console.log('[C2PA-MENU] Manifest store:', manifestStore);
+  const hasValidManifestStore = manifestStore != null &&
+    manifestStore.manifests != null &&
+    Object.keys(manifestStore.manifests).length > 0 &&
+    manifestStore.active_manifest != null;
+
+
   // Only update menu if it's actually open, unless manifest changed, or forced by timer
-  const manifestStore = c2paStatus?.manifestStore;
   const currentManifestId = manifestStore?.active_manifest;
   const manifestChanged = currentManifestId !== menuState.lastManifestId;
 
@@ -329,31 +354,6 @@ export let updateC2PAMenu = function (
   // Update the timestamp
   menuState.lastUpdateTime = now;
 
-  // Check if manifest exists and has complete content
-  console.log('[C2PA-MENU] Manifest store:', manifestStore);
-  const hasValidManifestStore = manifestStore != null &&
-    manifestStore.manifests != null &&
-    Object.keys(manifestStore.manifests).length > 0 &&
-    manifestStore.active_manifest != null;
-
-  // Check if we have a definitive "no manifest" state
-  const hasDefinitiveNoManifest = c2paStatus != null && c2paStatus.details != null &&
-    (manifestStore === null ||
-      (manifestStore != null &&
-        manifestStore.manifests != null &&
-        Object.keys(manifestStore.manifests).length === 0));
-
-  // Handle definitive "no manifest" case
-  if (hasDefinitiveNoManifest) {
-    if (menuState.lastManifestId !== 'no-manifest') {
-      console.log('[C2PA] No C2PA manifest found - showing no manifest message');
-      setMenuModeNoManifest(videoPlayer);
-      renderReactMenu({ mode: 'no-manifest', items: {} });
-      menuState.lastManifestId = 'no-manifest';
-    }
-    return;
-  }
-
   // If we don't have valid manifest yet, show loading
   if (!hasValidManifestStore) {
     console.log('[C2PA] Manifest not available yet - showing loading');
@@ -363,7 +363,7 @@ export let updateC2PAMenu = function (
   }
 
   // Get current manifest data
-  const validationStatus = c2paStatus?.validation_state;
+  const validationStatus = manifestStore?.validation_state ?? 'Unknown';
 
   console.log('[C2PA] Rendering menu', {
     manifestId: currentManifestId,
