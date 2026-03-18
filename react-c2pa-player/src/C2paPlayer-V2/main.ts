@@ -18,7 +18,7 @@ import {
     initializeC2PAMenu,
     updateC2PAMenu,
 } from './C2paMenu/C2paMenuFunctions.js';
-import { getTimelineFunctions } from './C2paTimeline/C2paTimelineFunctions.js';
+import { getTimelineFunctions } from './C2paTimeline/C2paTimelineFunctions';
 
 interface TimelineComponentLike {
     el(): HTMLElement;

@@ -16,6 +16,7 @@ export interface VideoJsControlBarLike {
 
 export interface VideoJsPlayerLike extends VideoJsComponentLike {
     controlBar: VideoJsControlBarLike;
+    duration(): number;
 }
 
 export type GetCompromisedRegions = (
