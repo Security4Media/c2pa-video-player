@@ -1,0 +1,103 @@
+import { Ingredient, Manifest, ManifestStore } from '@contentauth/c2pa-web';
+import { getIngredientValidationStatus } from '../../../services/c2pa_functions';
+
+/**
+ * Extract detailed information from a single ingredient
+ * @param {Ingredient} ingredientData - The ingredient data from manifest.ingredients
+ * @param {ManifestStore} manifestStore - The manifest store containing all manifests
+ * @param {number} index - The ingredient index (1-based)
+ * @returns {Ingredient} Ingredient details object
+ */
+function extractIngredientDetails(ingredientData: Ingredient, manifestStore: ManifestStore, index: number) {
+    const ingredient: Partial<Ingredient> = {
+        index: index,
+    };
+
+    const title = ingredientData.title || ingredientData.document_id || ingredientData.label;
+    if (title) {
+        ingredient.title = title;
+    } else {
+        console.warn(`[C2PA] Ingredient ${index} is missing a title/document_id/label, using default title`);
+        ingredient.title = `Ingredient ${index}`;
+    }
+
+    const manifestRef = ingredientData.active_manifest;
+    let ingredientManifest = null;
+
+    if (manifestRef && manifestStore && manifestStore.manifests) {
+        ingredientManifest = manifestStore.manifests[manifestRef];
+        console.log(`[C2PA] Found ingredient manifest for ingredient ${index}:`, ingredientManifest);
+    }
+
+    if (ingredientManifest) {
+        if (ingredientManifest.signature_info?.issuer) {
+            ingredient.issuer = ingredientManifest.signature_info.issuer;
+        }
+
+        if (ingredientManifest.signature_info?.time) {
+            const date = new Date(ingredientManifest.signature_info.time);
+            ingredient.date = new Intl.DateTimeFormat('en-US', {
+                year: 'numeric',
+                month: 'short',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit',
+            }).format(date);
+        }
+
+        const claimGenerators = ingredientManifest.claim_generator_info;
+        if (claimGenerators && claimGenerators.length > 0) {
+            ingredient.claimGenerator = claimGenerators
+                .map((gen) => gen.version ? `${gen.name} ${gen.version}` : gen.name)
+                .join(', ');
+        }
+
+        const validationStatus = getIngredientValidationStatus(manifestRef as string, manifestStore);
+        if (validationStatus) {
+            ingredient.validationStatus = validationStatus;
+        }
+
+        ingredient.manifestRef = manifestRef;
+        ingredient.manifest = ingredientManifest;
+    }
+
+    return ingredient;
+}
+
+/**
+ * Select ingredients from a manifest
+ * This function can be reused to extract ingredients from any manifest,
+ * including nested ingredients from an ingredient's manifest
+ * @param {Manifest} manifest - The manifest to extract ingredients from
+ * @param {ManifestStore} manifestStore - The manifest store containing all manifests
+ * @returns {Array|null} Array of ingredient objects or null if no ingredients
+ */
+export function selectIngredients(manifest: Manifest, manifestStore: ManifestStore) {
+    const ingredientAssertions = manifest.ingredients;
+
+    if (!ingredientAssertions || ingredientAssertions.length === 0) {
+        return null;
+    }
+
+    console.log(`[C2PA] Found ${ingredientAssertions.length} ingredient(s) in manifest`);
+
+    const ingredients: Array<Ingredient> = [];
+
+    ingredientAssertions.forEach((ingredientData, index) => {
+        if (!ingredientData) return;
+
+        const ingredient = extractIngredientDetails(ingredientData, manifestStore, index + 1);
+
+        if (ingredient.manifest) {
+            const nestedIngredients = selectIngredients(ingredient.manifest as Manifest, manifestStore);
+            if (nestedIngredients && nestedIngredients.length > 0) {
+                ingredient.ingredients = nestedIngredients;
+                ingredient.ingredientCount = nestedIngredients.length;
+            }
+        }
+
+        ingredients.push(ingredient);
+    });
+
+    return ingredients.length > 0 ? ingredients : null;
+}

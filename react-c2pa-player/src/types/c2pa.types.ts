@@ -1,15 +1,12 @@
 import type { ManifestStore } from '@contentauth/c2pa-web';
+export type { ManifestStore } from '@contentauth/c2pa-web';
+
+export type ValidationState = 'Trusted' | 'Valid' | 'Invalid' | 'Unknown';
 
 export interface C2PAStatus {
-  verified: boolean;
-  validation_state: 'Trusted' | 'Valid' | 'Invalid' | 'Unknown';
-  details: {
-    [key: string]: {
-      manifestStore: ManifestStore | null;
-      error: string | null;
-      valid: boolean;
-    };
-  };
+  manifestStore: ManifestStore | null;
+  verificationStatus: ValidationState;
+  validationState?: ValidationState;
 }
 
 export interface C2PAPlayerProps {
@@ -21,13 +18,13 @@ export interface C2PAPlayerProps {
 export interface TimelineSegment {
   startTime: number;
   endTime: number;
-  verificationStatus: 'Trusted' | 'Valid' | 'Invalid' | 'Unknown';
+  verificationStatus: ValidationState;
 }
 
 export interface ProgressSegmentElement extends HTMLDivElement {
   dataset: {
     startTime: string;
     endTime: string;
-    verificationStatus: string;
+    verificationStatus: ValidationState;
   };
 }

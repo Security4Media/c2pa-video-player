@@ -1,15 +1,22 @@
+import {
+  selectClaimGenerator,
+  selectCreativeWorkAuthors,
+  selectCreativeWorkContent,
+  selectIngredients,
+  selectOrganizationIdentity,
+} from './C2paManifestFunctions';
+
 export var C2PAMenu = function () {
   //Items to show in the c2pa menu
   const c2paMenuItems = {
     SIG_ISSUER: 'Issued by',
     DATE: 'Issued on',
     CLAIM_GENERATOR: 'App or device used',
-    NAME: 'Name',
-    LOCATION: 'Location',
-    WEBSITE: 'Website',
+    ORGANIZATION: 'Organization',
+    NAME: 'Producer',
     CAWG_IDENTITY: 'Publisher Identity (CAWG)',
-    CAWG_VALIDATION_STATUS: 'CAWG Validation Status',
-    INGREDIENTS: 'Ingredients',
+    TRAINING_OPTOUT: 'About AI training opt-out',
+    INGREDIENTS: 'History of provenance',
     C2PA_VALIDATION_STATUS: 'Validation Status',
     ALERT: 'Alert',
   };
@@ -50,24 +57,18 @@ export var C2PAMenu = function () {
 
     //Functions to access the c2pa menu items from the c2pa manifest
     c2paItem: function (itemName, c2paStatus, compromisedRegions = []) {
-      const verificationStatus = c2paStatus.validation_state;
       let manifestStore,
         producer,
-        socialMedia,
-        generator,
-        website = null;
-
+        generator
       try {
-        manifestStore = c2paStatus.details.video.manifestStore;
-        console.log('[C2PA] This is the manifest', manifestStore);
+        manifestStore = c2paStatus.manifestStore;
 
       } catch (error) {
-        console.error('[C2PA] Manifest does not exist');
+        console.error('[C2PA-MENU] Manifest does not exist');
         return null
       }
 
-      const activeManifestId = manifestStore.active_manifest;
-      const activeManifest = manifestStore.manifests[activeManifestId];
+      const activeManifest = getActiveManifest(manifestStore);
       if (itemName == 'SIG_ISSUER') {
         return activeManifest?.signature_info?.issuer;
       }
@@ -83,8 +84,8 @@ export var C2PAMenu = function () {
           : null;
       }
       if (itemName == 'CLAIM_GENERATOR') {
-        generator = selectFormattedClaimGenerator(activeManifest);
-        return generator;
+        generator = selectClaimGenerator(activeManifest);
+        return generator?.map(gen => gen.version ? `${gen.name} ${gen.version}` : gen.name).join(', ') ?? null;
 
       }
       if (itemName == 'NAME') {
@@ -92,21 +93,15 @@ export var C2PAMenu = function () {
         producer = authors?.length > 0 ? authors.map(author => author.name).join(', ') : null;
         return producer ?? null;
       }
-      // if (itemName == 'LOCATION') {
-      //   location = selectLocation(activeManifest);
-      //   return location;
-      // }
+
       if (itemName == 'WEBSITE') {
         website = selectWebsite(activeManifest);
         return website;
       }
-      if (itemName == 'SOCIAL') {
-        socialMedia = selectSocialAccounts(activeManifest);
-        return socialMedia?.map((account) => account['@id']) ?? null;
-      }
+
 
       if (itemName == 'C2PA_VALIDATION_STATUS') {
-        switch (verificationStatus) {
+        switch (getActiveManifestValidationStatus(manifestStore)) {
           case "Trusted":
             return 'Trusted';
           case "Valid":
@@ -119,22 +114,16 @@ export var C2PAMenu = function () {
       }
 
       if (itemName == 'CAWG_IDENTITY') {
-        let cawgId = selectCawgIdentity(activeManifest, manifestStore);
-        if (!cawgId) {
+        let cawgOrganizationItem = selectOrganizationIdentity(activeManifest, manifestStore);
+        if (!cawgOrganizationItem) {
           return null;
         }
-        const [cawgIdentityStr, cawgIdentityObj] = cawgId;
-        return cawgIdentityObj ?? null;
+        return cawgOrganizationItem ?? null;
       }
 
       if (itemName == 'INGREDIENTS') {
         let ingredients = selectIngredients(activeManifest, manifestStore);
         return ingredients && ingredients.length > 0 ? ingredients : null;
-      }
-
-      if (itemName == 'CAWG_VALIDATION_STATUS') {
-        // CAWG validation status is now displayed within CAWG_IDENTITY dropdown
-        return null;
       }
 
       if (itemName == 'ALERT') {
@@ -145,343 +134,3 @@ export var C2PAMenu = function () {
     },
   };
 };
-
-
-function selectCreativeWorkAuthors(manifest) {
-  const creativeWorkAssertion = manifest.assertions.find(
-    assertion => assertion.label === 'stds.schema-org.CreativeWork'
-  );
-  return creativeWorkAssertion?.data?.author ?? null;
-}
-
-function selectFormattedClaimGenerator(manifest) {
-  const claim_generators = manifest.claim_generator_info;
-  const generatorString = claim_generators
-    ?.map((gen) => gen.version ? `${gen.name} ${gen.version}` : gen.name)
-    .join(', ');
-
-  return generatorString ?? null;
-
-}
-
-function selectWebsite(manifest) {
-  const creativeWorkAssertion = manifest.assertions.find(
-    assertion => assertion.label === 'stds.schema-org.CreativeWork'
-  );
-  return creativeWorkAssertion?.data?.url ?? null;
-}
-
-function selectLocation(manifest) {
-  let exifAssertion = manifest.assertions.find(
-    assertion => assertion.label === 'stds.exif'
-  );
-
-  if (!exifAssertion?.data) {
-    return null;
-  }
-
-  let longitude =
-    exifAssertion?.data[
-    'EXIF:GPSLatitude'
-    ];
-  let latitude =
-    exifAssertion?.data[
-    'EXIF:GPSLatitude'
-    ];
-
-  let location = '';
-  if (latitude) {
-    location += `Lat: ${parseFloat(latitude)} `;
-  }
-
-  if (location && longitude) {
-    location += ', ';
-  }
-  if (longitude) {
-    location += `Long: ${parseFloat(longitude)}`;
-  }
-
-  return location || null;
-}
-
-function selectCawgIdentity(manifest, manifestStore) {
-  const cawgAssertion = manifest.assertions.find(
-    assertion => assertion.label === 'cawg.identity'
-  );
-
-  if (!cawgAssertion?.data) {
-    return null;
-  }
-
-  let cawgString = '';
-  let cawgObj = {};
-
-
-  // Add issuer
-  let signature_info = cawgAssertion.data.signature_info;
-  cawgString += `Issuer: ${signature_info.issuer}`;
-  cawgObj['issuer'] = signature_info.issuer;
-
-
-  let signer_payload = cawgAssertion.data.signer_payload
-  let referenced_assertions = signer_payload.referenced_assertions;
-  // Add referenced assertions (filter out hash and revocation_status)
-  if (referenced_assertions && Array.isArray(referenced_assertions)) {
-    // filter hard-binding assertions
-    const filteredAssertions = referenced_assertions
-      .filter(assertion => !assertion.url.includes('hash'))
-      .map(assertion => assertion.url.split('/').pop()) // get the action name only from the hashed url
-      .join(', ');
-
-
-    if (filteredAssertions) {
-      cawgString += cawgString ? ', ' : '';
-      cawgString += `Referenced Assertions: ${filteredAssertions}`;
-      cawgObj['referenced_assertions'] = filteredAssertions;
-    }
-  }
-
-  // Add validation status
-  if (manifestStore) {
-    const validationStatus = getCAWGValidationStatus(manifestStore);
-    if (validationStatus) {
-      cawgObj['validation_status'] = validationStatus;
-    }
-  }
-
-  return [cawgString, cawgObj];
-}
-
-/**
- * Extract detailed information from a single ingredient
- * @param {Object} ingredientData - The ingredient data from manifest.ingredients
- * @param {Object} manifestStore - The manifest store containing all manifests
- * @param {number} index - The ingredient index (1-based)
- * @returns {Object} Ingredient details object
- */
-function extractIngredientDetails(ingredientData, manifestStore, index) {
-  const ingredient = {
-    index: index,
-  };
-
-  // Extract title from ingredient data
-  if (ingredientData.title) {
-    ingredient.title = ingredientData.title;
-  } else if (ingredientData.dc_title) {
-    ingredient.title = ingredientData.dc_title;
-  }
-
-  // Get the ingredient manifest reference
-  const manifestRef = ingredientData.active_manifest;
-  let ingredientManifest = null;
-
-  // Try to find the ingredient manifest in the manifest store
-  if (manifestRef && manifestStore && manifestStore.manifests) {
-    ingredientManifest = manifestStore.manifests[manifestRef];
-    console.log(`[C2PA] Found ingredient manifest for ingredient ${index}:`, ingredientManifest);
-  }
-
-  // If we have the ingredient manifest, extract more details
-  if (ingredientManifest) {
-    // Extract issuer
-    if (ingredientManifest.signature_info?.issuer) {
-      ingredient.issuer = ingredientManifest.signature_info.issuer;
-    }
-
-    // Extract date and time
-    if (ingredientManifest.signature_info?.time) {
-      const date = new Date(ingredientManifest.signature_info.time);
-      ingredient.date = new Intl.DateTimeFormat('en-US', {
-        year: 'numeric',
-        month: 'short',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-      }).format(date);
-    }
-
-    // Extract claim generator
-    const claimGenerators = ingredientManifest.claim_generator_info;
-    if (claimGenerators && claimGenerators.length > 0) {
-      ingredient.claimGenerator = claimGenerators
-        .map((gen) => gen.version ? `${gen.name} ${gen.version}` : gen.name)
-        .join(', ');
-    }
-
-    // Extract validation status for this ingredient
-    const validationStatus = getIngredientValidationStatus(manifestRef, manifestStore);
-    if (validationStatus) {
-      ingredient.validationStatus = validationStatus;
-    }
-
-    // Store the manifest reference for potential nested ingredient extraction
-    ingredient.manifestRef = manifestRef;
-    ingredient.manifest = ingredientManifest;
-  }
-
-  return ingredient;
-}
-
-/**
- * Select ingredients from a manifest
- * This function can be reused to extract ingredients from any manifest,
- * including nested ingredients from an ingredient's manifest
- * @param {Object} manifest - The manifest to extract ingredients from
- * @param {Object} manifestStore - The manifest store containing all manifests
- * @returns {Array|null} Array of ingredient objects or null if no ingredients
- */
-function selectIngredients(manifest, manifestStore) {
-  // Get ingredients from the manifest
-  const ingredientAssertions = manifest.ingredients;
-
-  if (!ingredientAssertions || ingredientAssertions.length === 0) {
-    return null;
-  }
-
-  console.log(`[C2PA] Found ${ingredientAssertions.length} ingredient(s) in manifest`);
-
-  const ingredients = [];
-
-  ingredientAssertions.forEach((ingredientData, index) => {
-    if (!ingredientData) return;
-
-    // Extract ingredient details using the helper function
-    const ingredient = extractIngredientDetails(ingredientData, manifestStore, index + 1);
-
-    // Optionally, extract nested ingredients if this ingredient has its own manifest
-    if (ingredient.manifest) {
-      const nestedIngredients = selectIngredients(ingredient.manifest, manifestStore);
-      if (nestedIngredients && nestedIngredients.length > 0) {
-        ingredient.ingredients = nestedIngredients;
-        ingredient.ingredientCount = nestedIngredients.length;
-      }
-    }
-
-    ingredients.push(ingredient);
-  });
-
-  return ingredients.length > 0 ? ingredients : null;
-}
-
-
-function getCAWGValidationStatus(manifestStore) {
-
-  // Check if CAWG identity assertion is present
-  const cawgAssertion = manifestStore.manifests[manifestStore.active_manifest].assertions.find(
-    assertion => assertion.label === 'cawg.identity'
-  );
-
-  if (!cawgAssertion) {
-    return null; // Hide menu item if CAWG assertion is not present
-  }
-
-  // Evaluate validation results for CAWG identity
-  const validationResults = manifestStore.validation_results;
-  if (!validationResults) {
-    return 'Unknown';
-  }
-
-  //Check that the CAWG is Trusted : well fomed + trusted credentials  
-  const successResults = validationResults.activeManifest.success;
-  let isWellFormed, isTrusted = false;
-
-  if (successResults && successResults.length > 0) {
-    isTrusted = successResults.some(result => (result.code === 'signingCredential.trusted') && result.url.includes('cawg.identity'));
-    isWellFormed = successResults.some(result => (result.code === 'cawg.identity.well-formed') && result.url.includes('cawg.identity'));
-    if (isWellFormed && isTrusted) {
-      return 'Trusted';
-    }
-  }
-
-  //Check that the CAWG is Valid =  well formed + trusted credentials  
-  if (isWellFormed) {
-    const failureResults = validationResults.activeManifest.failure;
-    if (failureResults && failureResults.length > 0) {
-      const isUntrusted = failureResults.some(result => (result.code === 'signingCredential.untrusted') && result.url.includes('cawg.identity'));
-      if (isUntrusted) {
-        return 'Valid';
-      }
-    }
-  }
-
-  return 'Invalid';
-}
-
-/**
- * Get validation status for a specific ingredient manifest
- * @param {string} manifestRef - The manifest reference ID (e.g., 'urn:c2pa:0513dfb9-a76d-4ae1-aa1c-95f016dd58d7')
- * @param {Object} manifestStore - The manifest store containing validation results
- * @returns {string} Validation status: 'Trusted', 'Valid', 'Invalid', or 'Unknown'
- */
-function getIngredientValidationStatus(manifestRef, manifestStore) {
-  if (!manifestRef || !manifestStore || !manifestStore.validation_results) {
-    return 'Unknown';
-  }
-
-  const ingredientDeltas = manifestStore.validation_results.ingredientDeltas;
-
-  if (!ingredientDeltas || !Array.isArray(ingredientDeltas) || ingredientDeltas.length === 0) {
-    return 'Unknown';
-  }
-
-  // Find the ingredient delta that matches this manifestRef
-  // The URL format is: "self#jumbf=/c2pa/{manifestRef}/..."
-  const ingredientDelta = ingredientDeltas.find(delta => {
-    const validationDeltas = delta.validationDeltas;
-    if (!validationDeltas) return false;
-
-    // Check both success and failure arrays for URL matches
-    const allResults = [
-      ...(validationDeltas.success || []),
-      ...(validationDeltas.failure || [])
-    ];
-
-    return allResults.some(result =>
-      result.url && result.url.includes(`/c2pa/${manifestRef}`)
-    );
-  });
-
-  if (!ingredientDelta || !ingredientDelta.validationDeltas) {
-    console.log(`[C2PA] No validation delta found for ingredient ${manifestRef}`);
-    return 'Unknown';
-  }
-
-  const validationDeltas = ingredientDelta.validationDeltas;
-  const success = validationDeltas.success || [];
-  const failure = validationDeltas.failure || [];
-
-  console.log(`[C2PA] Ingredient ${manifestRef} validation:`, {
-    successCount: success.length,
-    failureCount: failure.length,
-    successCodes: success.map(s => s.code)
-  });
-
-  // If failure is not empty → Invalid
-  if (failure.length > 0) {
-    return 'Invalid';
-  }
-
-  // If success is not empty AND failure is empty
-  if (success.length > 0) {
-    const hasTimeStampTrusted = success.some(result => result.code === 'timeStamp.trusted');
-    const hasSigningCredentialTrusted = success.some(result => result.code === 'signingCredential.trusted');
-    const hasIngredientManifestValidated = success.some(result => result.code === 'ingredient.manifest.validated');
-
-    // If success has BOTH timeStamp.trusted AND signingCredential.trusted → Trusted
-    if (hasTimeStampTrusted && hasSigningCredentialTrusted) {
-      return 'Trusted';
-    }
-
-    // If success does NOT have timeStamp.trusted OR does NOT have signingCredential.trusted
-    // BUT has ingredient.manifest.validated → Valid
-    if ((!hasTimeStampTrusted || !hasSigningCredentialTrusted) && hasIngredientManifestValidated) {
-      return 'Valid';
-    }
-
-    // Has some success but doesn't match Trusted or Valid criteria
-    // This could be partial success, treat as Valid
-    return 'Valid';
-  }
-
-  return 'Unknown';
-}
