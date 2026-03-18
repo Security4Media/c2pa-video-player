@@ -11,6 +11,10 @@ import {
 } from './C2paManifestFunctions';
 import { C2paMenuContent } from './C2paMenuContent';
 
+/**
+ * Static menu item registry shared by the Video.js shell and the React
+ * menu tree.
+ */
 export const c2paMenuItems = {
   SIG_ISSUER: 'Issued by',
   DATE: 'Issued on',
@@ -118,6 +122,11 @@ function buildMenuRenderState(c2paStatus: C2PAStatus | null, compromisedRegions:
   };
 }
 
+/**
+ * React menu container that derives display state from the raw C2PA
+ * status payload and forwards the normalized result to the presentational
+ * content component.
+ */
 export function C2paMenuRoot({ c2paStatus, compromisedRegions, resetKey }: C2paMenuRootProps) {
   const renderState = buildMenuRenderState(c2paStatus, compromisedRegions);
 

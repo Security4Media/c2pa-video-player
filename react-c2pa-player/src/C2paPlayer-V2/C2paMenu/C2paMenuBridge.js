@@ -13,6 +13,22 @@ const menuState = {
   reactTarget: null,
 };
 
+function resetMenuState() {
+  menuState.lastManifestId = null;
+  menuState.isMenuOpen = false;
+  menuState.lastUpdateTime = 0;
+  menuState.isInvalid = false;
+  menuState.resetVersion = 0;
+}
+
+/**
+ * Legacy compatibility hook for the pre-React menu renderer API.
+ * Custom item renderers are no longer consumed by the menu module,
+ * so this function only emits a deprecation warning.
+ *
+ * @param {string} itemKey - Legacy menu item identifier
+ * @param {Function} renderer - Legacy renderer callback
+ */
 export function registerMenuItemRenderer(itemKey, renderer) {
   console.warn('[C2PA] registerMenuItemRenderer is deprecated during the React menu migration', itemKey, renderer);
 }
@@ -75,6 +91,13 @@ function renderReactMenu(payload) {
   }));
 }
 
+/**
+ * Store the Video.js menu component reference used by the React bridge.
+ * The bridge mounts the React tree into the menu popup content owned by
+ * this component.
+ *
+ * @param {Object} c2paMenu - Video.js C2PA menu component instance
+ */
 export function setMenuReference(c2paMenu) {
   if (!c2paMenu) {
     return;
@@ -84,15 +107,34 @@ export function setMenuReference(c2paMenu) {
   ensureMenuReactRoot();
 }
 
+/**
+ * Mark the menu as open so bridge updates may render into the visible
+ * popup while playback is progressing.
+ */
 export function handleMenuOpened() {
   menuState.isMenuOpen = true;
 }
 
+/**
+ * Mark the menu as closed and bump the reset token so React-only UI
+ * state is reset the next time the popup opens.
+ */
 export function handleMenuClosed() {
   menuState.isMenuOpen = false;
   menuState.resetVersion += 1;
 }
 
+/**
+ * Update the mounted React menu using the latest C2PA status and player
+ * timeline state. The bridge throttles updates while the menu is closed
+ * and keeps the invalid button styling synchronized with validation.
+ *
+ * @param {Object|null} c2paStatus - Current C2PA status payload
+ * @param {Object} c2paMenu - Video.js C2PA menu component instance
+ * @param {boolean} isMonolithic - Whether playback is monolithic or streaming
+ * @param {Object} videoPlayer - Video.js player instance
+ * @param {Function} getCompromisedRegions - Returns compromised timeline ranges
+ */
 export function updateC2PAMenu(
   c2paStatus,
   c2paMenu,
@@ -147,15 +189,20 @@ export function updateC2PAMenu(
   renderReactMenu({ c2paStatus, compromisedRegions });
 }
 
+/**
+ * Clear cached bridge state so the next menu update behaves like a fresh
+ * session.
+ */
 export function resetC2PAMenuCache() {
   console.log('[C2PA] Manually resetting menu state');
-  menuState.lastManifestId = null;
-  menuState.isMenuOpen = false;
-  menuState.lastUpdateTime = 0;
-  menuState.isInvalid = false;
+  resetMenuState();
   menuState.resetVersion += 1;
 }
 
+/**
+ * Unmount the React menu root and release all state associated with the
+ * current Video.js menu instance.
+ */
 export function disposeC2PAMenu() {
   if (menuState.reactRoot) {
     scheduleRootUnmount(menuState.reactRoot);
@@ -164,9 +211,5 @@ export function disposeC2PAMenu() {
   menuState.reactRoot = null;
   menuState.reactTarget = null;
   menuState.menuReference = null;
-  menuState.lastManifestId = null;
-  menuState.isMenuOpen = false;
-  menuState.lastUpdateTime = 0;
-  menuState.isInvalid = false;
-  menuState.resetVersion = 0;
+  resetMenuState();
 }

@@ -408,6 +408,11 @@ function renderMenuItem(
   return null;
 }
 
+/**
+ * Presentational menu body component. It receives already-derived menu
+ * state and manages only local UI interactions such as expanding and
+ * collapsing CAWG and ingredient sections.
+ */
 export function C2paMenuContent({
   menuItems,
   items,

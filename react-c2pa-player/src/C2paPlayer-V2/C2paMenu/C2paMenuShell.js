@@ -1,6 +1,13 @@
 import { c2paMenuItems } from './C2paMenuRoot';
 import { handleMenuClosed, handleMenuOpened, setMenuReference } from './C2paMenuBridge.js';
 
+/**
+ * Register the Video.js C2PA menu button and attach it to the control
+ * bar. The popup shell remains managed by Video.js while the popup
+ * content is rendered through the React bridge.
+ *
+ * @param {Object} videoPlayer - Video.js player instance
+ */
 export let initializeC2PAMenu = function (videoPlayer) {
   console.log('[C2PAMenu] Initializing C2PA menu, videoPlayer:', videoPlayer);
   console.log('[C2PAMenu] videojs available:', typeof videojs !== 'undefined', window.videojs);
@@ -81,6 +88,14 @@ export let initializeC2PAMenu = function (videoPlayer) {
   console.log('[C2PAMenu] Control bar children:', videoPlayer.controlBar.children());
 };
 
+/**
+ * Resize the Video.js popup so it matches the video viewport, leaving
+ * space for the control bar at the bottom.
+ *
+ * @param {Object} c2paMenu - Video.js C2PA menu component instance
+ * @param {HTMLElement} videoElement - Root video player element
+ * @param {number} c2paMenuHeightOffset - Height reserved for the control bar
+ */
 export let adjustC2PAMenu = function (
   c2paMenu,
   videoElement,
