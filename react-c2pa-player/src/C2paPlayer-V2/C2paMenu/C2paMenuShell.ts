@@ -117,42 +117,16 @@ export const initializeC2PAMenu = function (videoPlayer: VideoJsPlayerLike) {
 };
 
 /**
- * Resize the Video.js popup so it matches the video viewport, leaving
- * space for the control bar at the bottom.
+ * Compatibility no-op retained while menu sizing is handled through CSS.
  *
  * @param c2paMenu - Video.js C2PA menu component instance
  * @param videoElement - Root video player element
  * @param c2paMenuHeightOffset - Height reserved for the control bar
  */
 export const adjustC2PAMenu = function (
-    c2paMenu: VideoJsMenuComponentLike | null,
-    videoElement: HTMLElement,
-    c2paMenuHeightOffset: number,
+    _c2paMenu: VideoJsMenuComponentLike | null,
+    _videoElement: HTMLElement,
+    _c2paMenuHeightOffset: number,
 ) {
-    if (!c2paMenu || !c2paMenu.el()) {
-        console.warn('[C2PA] Menu not available for adjustment');
-        return;
-    }
-
-    const menuRoot = c2paMenu.el();
-    const menuEl = menuRoot?.querySelector('.vjs-menu-button-popup .vjs-menu') as HTMLElement | null;
-    const menuContent = menuRoot?.querySelector('.vjs-menu-button-popup .vjs-menu .vjs-menu-content') as HTMLElement | null;
-
-    if (!menuEl || !menuContent) {
-        console.warn('[C2PA] Menu elements not found');
-        return;
-    }
-
-    const playerWidth = videoElement.offsetWidth;
-    const playerHeight = videoElement.offsetHeight - c2paMenuHeightOffset;
-
-    menuEl.style.width = `${playerWidth}px`;
-    menuEl.style.height = `${playerHeight}px`;
-    menuEl.style.top = '0';
-    menuEl.style.left = '0';
-
-    menuContent.style.width = `${playerWidth}px`;
-    menuContent.style.maxWidth = `${playerWidth}px`;
-    menuContent.style.height = `${playerHeight}px`;
-    menuContent.style.maxHeight = `${playerHeight}px`;
+    return;
 };

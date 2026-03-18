@@ -15,7 +15,6 @@ import {
     initializeFrictionOverlay,
 } from './C2paFrictionModal/C2paFrictionModalFunctions';
 import {
-    adjustC2PAMenu,
     disposeC2PAMenu,
     initializeC2PAMenu,
     setPlayerRootController,
@@ -118,9 +117,6 @@ export const C2PAPlayer = function (
     let lastPlaybackTime = 0.0;
 
     const minSeekTime = 0.5;
-    const c2paMenuHeightOffset = 30;
-
-    let menuAdjustInterval: ReturnType<typeof setInterval> | null = null;
 
     const setPlaybackStarted = function () {
         playbackStarted = true;
@@ -171,21 +167,11 @@ export const C2PAPlayer = function (
                 lastPlaybackTime = nextPlaybackTime;
             });
 
-            menuAdjustInterval = setInterval(function () {
-                adjustC2PAMenu(c2paMenu, videoElement, c2paMenuHeightOffset);
-            }, 500);
-            adjustC2PAMenu(c2paMenu, videoElement, c2paMenuHeightOffset);
-
             console.log('[C2PA] Initialization complete');
         },
 
         dispose: function () {
             console.log('[C2PA] Disposing C2PAPlayer');
-
-            if (menuAdjustInterval) {
-                clearInterval(menuAdjustInterval);
-                menuAdjustInterval = null;
-            }
 
             disposeC2PAMenu();
             disposeFrictionOverlay(playerRoot);

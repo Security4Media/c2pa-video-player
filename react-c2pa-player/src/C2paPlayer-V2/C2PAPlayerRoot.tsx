@@ -1,5 +1,4 @@
 import { useSyncExternalStore } from 'react';
-import { createPortal } from 'react-dom';
 import type { C2PAPlayerRootController } from './C2PAPlayerRoot.types';
 import { C2paFrictionOverlay } from './C2paFrictionModal/C2paFrictionOverlay';
 import { C2paMenuRoot } from './C2paMenu/C2paMenuRoot';
@@ -34,16 +33,19 @@ export function C2PAPlayerRoot({
                 isVisible={state.isFrictionOverlayVisible}
                 onWatchAnyway={onWatchAnyway}
             />
-            {state.menuContentTarget
-                ? createPortal(
-                    <C2paMenuRoot
-                        c2paStatus={state.menuC2paStatus}
-                        compromisedRegions={state.menuCompromisedRegions}
-                        resetKey={state.menuResetKey}
-                    />,
-                    state.menuContentTarget,
-                )
-                : null}
+            {state.isMenuOpen ? (
+                <div className="c2pa-player-menu-overlay">
+                    <div className="vjs-menu">
+                        <ul className="vjs-menu-content" role="menu">
+                            <C2paMenuRoot
+                                c2paStatus={state.menuC2paStatus}
+                                compromisedRegions={state.menuCompromisedRegions}
+                                resetKey={state.menuResetKey}
+                            />
+                        </ul>
+                    </div>
+                </div>
+            ) : null}
         </>
     );
 }

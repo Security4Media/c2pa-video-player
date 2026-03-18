@@ -207,22 +207,42 @@
 /*** MENU CSS ***/
 /* Ensure menu button popup container doesn't clip menu */
 .video-js .vjs-menu-button-popup.c2pa-menu-button {
-  position: relative !important;
+  position: static !important;
   overflow: visible !important;
 }
 
+/* Hide the native popup panel; React renders the visible menu overlay */
+.video-js .vjs-menu-button-popup.c2pa-menu-button > .vjs-menu {
+  display: none !important;
+}
+
 /* Style of the c2pa menu - overlay on video area, behind control bar */
-.vjs-menu-button-popup .vjs-menu {
+.video-js .c2pa-player-menu-overlay {
   position: absolute !important;
-  left: 0 !important;
-  bottom: 100% !important;
+  top: 0 !important;
   right: 0 !important;
-  top: auto !important;
-  height: calc(100vh - 4.5rem) !important;
+  bottom: 0 !important;
+  left: 0 !important;
   margin: 0 !important;
   z-index: 10 !important;
   pointer-events: auto !important;
-  transform: translateY(1.25rem) !important;
+  transform: none !important;
+  width: auto !important;
+  height: auto !important;
+  display: flex !important;
+  align-items: flex-start !important;
+  justify-content: flex-start !important;
+  padding: 1rem !important;
+  box-sizing: border-box !important;
+  overflow: hidden !important;
+}
+
+.video-js .c2pa-player-menu-overlay .vjs-menu {
+  display: flex !important;
+  align-items: flex-start !important;
+  justify-content: flex-start !important;
+  width: 100% !important;
+  height: 100% !important;
 }
 
 /* Control bar stays above menu */
@@ -231,13 +251,11 @@
   position: relative;
 }
 
-.vjs-menu-button-popup .vjs-menu .vjs-menu-content {
+.video-js .c2pa-player-menu-overlay .vjs-menu .vjs-menu-content {
   font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  max-height: none;
   /* Transparent background for canvas */
   background: transparent;
-  padding: 2rem;
-  padding-bottom: 0;
+  padding: 0;
   overflow-y: auto;
   overflow-x: hidden;
   box-sizing: border-box;
@@ -245,22 +263,24 @@
   display: flex;
   flex-direction: column;
   align-items: flex-start;
+  justify-content: flex-start;
   width: 100%;
   height: 100%;
-  backdrop-filter: blur(0.5rem) saturate(110%);
+  min-height: 0;
   border: none;
   box-shadow: none;
 }
 
 /* Target the UL element which IS the vjs-menu-content - add box with animated border */
-.vjs-menu-button-popup .vjs-menu ul.vjs-menu-content {
+.video-js .c2pa-player-menu-overlay .vjs-menu ul.vjs-menu-content {
   width: auto !important;
-  max-width: min(90vw, 50rem) !important;
-  min-width: min(20rem, 90vw) !important;
+  max-width: min(calc(100% - 2rem), 50rem) !important;
+  min-width: min(20rem, calc(100% - 2rem)) !important;
   display: flex !important;
   flex-direction: column !important;
   align-items: flex-start !important;
-  margin: 1rem 0 0 0 !important;
+  justify-content: flex-start !important;
+  margin: 0 !important;
   padding: 2rem !important;
   padding-bottom: 2.5rem !important;
   list-style: none !important;
@@ -282,23 +302,21 @@
     0 0.5rem 2rem rgba(0, 0, 0, 0.5), 
     0 0 0 1px rgba(255, 255, 255, 0.15) inset !important;
   /* Ensure box doesn't extend beyond visible area */
-  max-height: calc(100vh - 8rem) !important;
+  max-height: 100% !important;
   overflow-y: auto !important;
 }
 
 /* Responsive adjustments for smaller screens */
 @media (max-width: 768px) {
-  .vjs-menu-button-popup .vjs-menu ul.vjs-menu-content {
-    max-width: 95vw !important;
+  .video-js .c2pa-player-menu-overlay .vjs-menu ul.vjs-menu-content {
+    max-width: calc(100% - 1rem) !important;
     padding: 1.5rem !important;
     padding-bottom: 2rem !important;
-    margin-top: 0.75rem !important;
   }
 }
 
 /* Hide scrollbar while keeping scroll functionality */
-.vjs-menu-button-popup .vjs-menu .vjs-menu-content,
-.vjs-menu-button-popup .vjs-menu ul.vjs-menu-content {
+.video-js .c2pa-player-menu-overlay .vjs-menu ul.vjs-menu-content {
   /* Firefox */
   scrollbar-width: none;
   /* IE and Edge */
@@ -306,8 +324,7 @@
 }
 
 /* Webkit browsers (Chrome, Safari, Edge) */
-.vjs-menu-button-popup .vjs-menu .vjs-menu-content::-webkit-scrollbar,
-.vjs-menu-button-popup .vjs-menu ul.vjs-menu-content::-webkit-scrollbar {
+.video-js .c2pa-player-menu-overlay .vjs-menu ul.vjs-menu-content::-webkit-scrollbar {
   display: none;
   width: 0;
   height: 0;
@@ -651,16 +668,6 @@
 
 .validation-padding {
   padding-bottom: 0px !important;
-}
-
-/* Disable hover effect on c2pa menu - but ONLY when menu is not expanded */
-.vjs-workinghover .vjs-menu-button-popup:not([aria-expanded="true"]):hover .vjs-menu {
-  display: none;
-}
-
-/* Keep menu visible when expanded, even on hover */
-.vjs-workinghover .vjs-menu-button-popup[aria-expanded="true"]:hover .vjs-menu {
-  display: block !important;
 }
 
 /*** FRICTION OVERLAY ***/
