@@ -1,9 +1,8 @@
+import type { C2PAStatus } from '@/types/c2pa.types';
 import { createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import type { C2PAStatus } from '@/types/c2pa.types';
 import { C2paMenuRoot } from './C2paMenuRoot';
 import type {
-    C2paMenuBridgePayload,
     C2paMenuBridgeState,
     GetCompromisedRegions,
     VideoJsMenuComponentLike,
@@ -91,7 +90,10 @@ function ensureMenuReactRoot(): Root | null {
     return menuState.reactRoot;
 }
 
-function renderReactMenu(payload: C2paMenuBridgePayload) {
+function renderReactMenu(
+    c2paStatus: C2PAStatus | null,
+    compromisedRegions: string[],
+) {
     const reactRoot = ensureMenuReactRoot();
     if (!reactRoot) {
         console.warn('[C2PA] React menu root could not be created');
@@ -99,8 +101,8 @@ function renderReactMenu(payload: C2paMenuBridgePayload) {
     }
 
     reactRoot.render(createElement(C2paMenuRoot, {
-        c2paStatus: payload.c2paStatus,
-        compromisedRegions: payload.compromisedRegions,
+        c2paStatus,
+        compromisedRegions,
         resetKey: `${menuState.resetVersion}:${menuState.lastManifestId ?? 'none'}`,
     }));
 }
@@ -172,7 +174,7 @@ export function updateC2PAMenu(
         console.log('[C2PA] Maintaining invalid button state (persists across all video states)');
         updateButtonValidationState(videoPlayer, true);
         if (menuState.isMenuOpen) {
-            renderReactMenu({ c2paStatus, compromisedRegions });
+            renderReactMenu(c2paStatus, compromisedRegions);
         }
     }
 
@@ -200,7 +202,7 @@ export function updateC2PAMenu(
 
     menuState.isInvalid = c2paStatus?.manifestStore?.validation_state === 'Invalid';
     updateButtonValidationState(videoPlayer, menuState.isInvalid);
-    renderReactMenu({ c2paStatus, compromisedRegions });
+    renderReactMenu(c2paStatus, compromisedRegions);
 }
 
 /**
