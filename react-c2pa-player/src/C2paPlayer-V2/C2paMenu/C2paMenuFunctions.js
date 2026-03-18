@@ -8,17 +8,12 @@ const c2paMenuInstance = new C2PAMenu();
 
 // Simplified state object for menu management
 const menuState = {
-  // UI state - controls what's expanded/visible (persists across renders)
-  ui: {
-    cawgIdentityExpanded: false,
-    ingredientsExpanded: {}, // Store expanded state for each ingredient by index
-  },
-
   // Simple tracking - just track what manifest we're currently showing
   lastManifestId: null,
   isMenuOpen: false, // Track if menu is currently visible
   lastUpdateTime: 0, // Track last update time for periodic refresh
   isInvalid: false, // Track if current credentials are invalid (persists across video state changes)
+  resetVersion: 0,
 
   // Reference to menu component
   menuReference: null,
@@ -120,15 +115,7 @@ function renderReactMenu(payload) {
     menuItems: c2paMenuInstance.c2paMenuItems(),
     items: payload.items,
     mode: payload.mode,
-    uiState: menuState.ui,
-    onToggleCawg: () => {
-      menuState.ui.cawgIdentityExpanded = !menuState.ui.cawgIdentityExpanded;
-      renderReactMenu(menuState.reactPayload);
-    },
-    onToggleIngredient: (ingredientId) => {
-      menuState.ui.ingredientsExpanded[ingredientId] = !menuState.ui.ingredientsExpanded[ingredientId];
-      renderReactMenu(menuState.reactPayload);
-    },
+    resetKey: `${menuState.resetVersion}:${payload.mode}:${menuState.lastManifestId ?? 'none'}`,
   }));
 }
 
@@ -190,9 +177,7 @@ export let initializeC2PAMenu = function (videoPlayer) {
         this.closeC2paMenu = false;
         console.log('[C2PA] Menu closed - marking as closed');
         menuState.isMenuOpen = false;
-        // Reset expanded states for fresh display on next open
-        menuState.ui.ingredientsExpanded = {};
-        menuState.ui.cawgIdentityExpanded = false;
+        menuState.resetVersion += 1;
         // Keep lastManifestId so we can check if manifest changed when reopened
         super.unpressButton();
       }
@@ -376,9 +361,7 @@ export let updateC2PAMenu = function (
   // Update manifest ID
   if (manifestChanged) {
     menuState.lastManifestId = currentManifestId;
-    // Reset expanded states on manifest change
-    menuState.ui.ingredientsExpanded = {};
-    menuState.ui.cawgIdentityExpanded = false;
+    menuState.resetVersion += 1;
     // Only reset invalid state if we have a new valid manifest (not null/undefined)
     if (currentManifestId != null) {
       menuState.isInvalid = false;
@@ -419,8 +402,7 @@ export function resetC2PAMenuCache() {
   menuState.isMenuOpen = false;
   menuState.lastUpdateTime = 0;
   menuState.isInvalid = false;
-  menuState.ui.ingredientsExpanded = {};
-  menuState.ui.cawgIdentityExpanded = false;
+  menuState.resetVersion += 1;
 }
 
 export function disposeC2PAMenu() {
@@ -432,4 +414,5 @@ export function disposeC2PAMenu() {
   menuState.reactTarget = null;
   menuState.reactPayload = null;
   menuState.menuReference = null;
+  menuState.resetVersion = 0;
 }

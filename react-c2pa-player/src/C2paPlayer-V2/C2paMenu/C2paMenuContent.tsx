@@ -1,22 +1,15 @@
-import { Fragment } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { providerInfoFromSocialId } from './Providers.js';
 
 type MenuItems = Record<string, string>;
 type MenuValues = Record<string, any>;
 type MenuMode = 'ready' | 'loading' | 'no-manifest' | 'invalid';
 
-interface MenuUIState {
-  cawgIdentityExpanded: boolean;
-  ingredientsExpanded: Record<string, boolean>;
-}
-
 interface C2paMenuContentProps {
   menuItems: MenuItems;
   items: MenuValues;
   mode: MenuMode;
-  uiState: MenuUIState;
-  onToggleCawg: () => void;
-  onToggleIngredient: (id: string) => void;
+  resetKey: string;
 }
 
 function LoadingState() {
@@ -207,16 +200,16 @@ function CawgIdentityItem({
 function IngredientNode({
   ingredient,
   parentId,
-  uiState,
+  ingredientsExpanded,
   onToggleIngredient,
 }: {
   ingredient: any;
   parentId?: string;
-  uiState: MenuUIState;
+  ingredientsExpanded: Record<string, boolean>;
   onToggleIngredient: (id: string) => void;
 }) {
   const ingredientId = parentId ? `${parentId}-ingredient-${ingredient.index}` : `ingredient-${ingredient.index}`;
-  const isExpanded = uiState.ingredientsExpanded[ingredientId] || false;
+  const isExpanded = ingredientsExpanded[ingredientId] || false;
   const statusClass = ingredient.validationStatus?.toLowerCase();
 
   return (
@@ -274,7 +267,7 @@ function IngredientNode({
                 key={`${ingredientId}-${nestedIngredient.index}`}
                 ingredient={nestedIngredient}
                 parentId={ingredientId}
-                uiState={uiState}
+                ingredientsExpanded={ingredientsExpanded}
                 onToggleIngredient={onToggleIngredient}
               />
             ))}
@@ -288,12 +281,12 @@ function IngredientNode({
 function IngredientsItem({
   itemName,
   itemValue,
-  uiState,
+  ingredientsExpanded,
   onToggleIngredient,
 }: {
   itemName: string;
   itemValue: any[];
-  uiState: MenuUIState;
+  ingredientsExpanded: Record<string, boolean>;
   onToggleIngredient: (id: string) => void;
 }) {
   return (
@@ -305,7 +298,7 @@ function IngredientsItem({
         <IngredientNode
           key={`ingredient-${ingredient.index}`}
           ingredient={ingredient}
-          uiState={uiState}
+          ingredientsExpanded={ingredientsExpanded}
           onToggleIngredient={onToggleIngredient}
         />
       ))}
@@ -353,7 +346,8 @@ function renderMenuItem(
   itemKey: string,
   itemName: string,
   itemValue: any,
-  uiState: MenuUIState,
+  cawgIdentityExpanded: boolean,
+  ingredientsExpanded: Record<string, boolean>,
   onToggleCawg: () => void,
   onToggleIngredient: (id: string) => void,
 ) {
@@ -371,24 +365,24 @@ function renderMenuItem(
 
   if (itemKey === 'CAWG_IDENTITY' && typeof itemValue === 'object') {
     return (
-      <CawgIdentityItem
-        itemName={itemName}
-        itemValue={itemValue}
-        isExpanded={uiState.cawgIdentityExpanded}
-        onToggle={onToggleCawg}
-      />
-    );
+        <CawgIdentityItem
+          itemName={itemName}
+          itemValue={itemValue}
+          isExpanded={cawgIdentityExpanded}
+          onToggle={onToggleCawg}
+        />
+      );
   }
 
   if (itemKey === 'INGREDIENTS' && Array.isArray(itemValue)) {
     return (
-      <IngredientsItem
-        itemName={itemName}
-        itemValue={itemValue}
-        uiState={uiState}
-        onToggleIngredient={onToggleIngredient}
-      />
-    );
+        <IngredientsItem
+          itemName={itemName}
+          itemValue={itemValue}
+          ingredientsExpanded={ingredientsExpanded}
+          onToggleIngredient={onToggleIngredient}
+        />
+      );
   }
 
   if (itemKey === 'ORGANIZATION' && typeof itemValue === 'object') {
@@ -418,10 +412,27 @@ export function C2paMenuContent({
   menuItems,
   items,
   mode,
-  uiState,
-  onToggleCawg,
-  onToggleIngredient,
+  resetKey,
 }: C2paMenuContentProps) {
+  const [cawgIdentityExpanded, setCawgIdentityExpanded] = useState(false);
+  const [ingredientsExpanded, setIngredientsExpanded] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    setCawgIdentityExpanded(false);
+    setIngredientsExpanded({});
+  }, [resetKey]);
+
+  const handleToggleCawg = () => {
+    setCawgIdentityExpanded(current => !current);
+  };
+
+  const handleToggleIngredient = (ingredientId: string) => {
+    setIngredientsExpanded(current => ({
+      ...current,
+      [ingredientId]: !current[ingredientId],
+    }));
+  };
+
   if (mode === 'loading') {
     return <LoadingState />;
   }
@@ -441,9 +452,10 @@ export function C2paMenuContent({
           itemKey,
           itemName,
           items[itemKey] ?? null,
-          uiState,
-          onToggleCawg,
-          onToggleIngredient,
+          cawgIdentityExpanded,
+          ingredientsExpanded,
+          handleToggleCawg,
+          handleToggleIngredient,
         );
 
         if (!content) {
