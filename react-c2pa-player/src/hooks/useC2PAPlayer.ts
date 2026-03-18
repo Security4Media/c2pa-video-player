@@ -1,10 +1,10 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
 import type { ManifestStore } from '@contentauth/c2pa-web';
 import type { C2PAStatus } from '../types/c2pa.types';
+import type { C2PAPlayerInstance } from '../C2paPlayer-V2/main';
 
 // Import the C2PAPlayer from the V2 module
-// @ts-ignore - JavaScript module
-import { C2PAPlayer } from '../C2paPlayer-V2/main.js';
+import { C2PAPlayer } from '../C2paPlayer-V2/main';
 
 // Import C2PA validation from monolithic service (matches HTML plugin pattern)
 import { c2pa_init } from '../services/c2pa-v2-monolithic';
@@ -13,13 +13,6 @@ interface UseC2PAPlayerOptions {
   isMonolithic?: boolean;
   onError?: (error: string) => void;
 }
-
-interface C2PAPlayerInstance {
-  initialize: () => void;
-  dispose?: () => void;
-  playbackUpdate: (status: C2PAStatus) => void;
-}
-
 
 interface UseC2PAPlayerState {
   isInitialized: boolean;
