@@ -13,6 +13,7 @@ import {
     displayFrictionOverlay,
     disposeFrictionOverlay,
     initializeFrictionOverlay,
+    updatePlayerRootValidationState,
 } from './C2paFrictionModal/C2paFrictionModalFunctions';
 import {
     disposeC2PAMenu,
@@ -214,12 +215,15 @@ export const C2PAPlayer = function (
                     c2paControlBar,
                 );
                 updateC2PATimeline(currentTime, videoPlayer, c2paControlBar);
-                updateC2PAMenu(
+                const compromisedRegions = getCompromisedRegions(isMonolithic, videoPlayer);
+                updatePlayerRootValidationState(
+                    playerRoot,
                     c2paStatus,
+                    compromisedRegions,
+                );
+                updateC2PAMenu(
                     c2paMenu,
-                    isMonolithic,
                     videoPlayer,
-                    getCompromisedRegions,
                 );
             }
 

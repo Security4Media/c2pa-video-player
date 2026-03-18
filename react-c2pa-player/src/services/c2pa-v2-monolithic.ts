@@ -15,6 +15,7 @@ import cawg_store   from '/trust/cawg_store.cfg?url';
 import cawg_allowed from '/trust/cawg_allowed_extended.pem?url';
 import c2pa_anchors from '/trust/c2pa_anchors_extended.pem?url';
 import c2pa_store   from '/trust/c2pa_store.cfg?url';
+import { getActiveManifestValidationStatus } from './c2pa_functions';
 
 
 /**
@@ -66,8 +67,14 @@ export async function c2pa_init(player: HTMLVideoElement, onPlaybackTimeUpdated:
       const blob = await response.blob();
       const reader = await c2pa.reader.fromBlob(blob.type, blob);
       
-      if (reader) {
-        manifestStore = await reader.manifestStore();
+        if (reader) {
+          manifestStore = await reader.manifestStore();
+          if (manifestStore) {
+          // HACK the validation state due to CAWG trust validation error.
+          // Keep the SDK field untouched when our local status is Unknown,
+          // because the SDK type does not accept that value.
+          manifestStore.validation_state =  getActiveManifestValidationStatus(manifestStore);
+        }
         console.log('[C2PA Init] Extracted manifest:', manifestStore);
       }
     } catch (err) {
@@ -78,7 +85,7 @@ export async function c2pa_init(player: HTMLVideoElement, onPlaybackTimeUpdated:
     const createUpdateEvent = () => {
       return {
         manifestStore: manifestStore,
-        validationState: manifestStore?.validation_state || 'Unknown'
+        validationState: manifestStore?.validation_state || 'Unknown',
       };
 
     };
@@ -93,8 +100,6 @@ export async function c2pa_init(player: HTMLVideoElement, onPlaybackTimeUpdated:
     });
 
     console.log('[C2PA Init] Initialization complete, timeupdate listener added');
-
-    return { manifestStore, updateEvent };
   } catch (error) {
     console.error('[C2PA Init] Initialization error:', error);
     throw error;

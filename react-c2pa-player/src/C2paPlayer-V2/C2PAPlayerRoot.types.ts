@@ -4,8 +4,8 @@ import type { Root } from 'react-dom/client';
 export interface C2PAPlayerRootState {
     isFrictionOverlayVisible: boolean;
     isMenuOpen: boolean;
-    menuC2paStatus: C2PAStatus | null;
-    menuCompromisedRegions: string[];
+    c2paStatus: C2PAStatus | null;
+    compromisedRegions: string[];
     menuResetKey: string;
     menuContentTarget: Element | null;
 }

@@ -2,7 +2,6 @@ import type { C2PAStatus } from '@/types/c2pa.types';
 import type { C2PAPlayerRootController } from '../C2PAPlayerRoot.types';
 import type {
     C2paMenuBridgeState,
-    GetCompromisedRegions,
     VideoJsMenuComponentLike,
     VideoJsPlayerLike,
 } from './C2paMenu.types';
@@ -11,12 +10,9 @@ function createInitialMenuState(): C2paMenuBridgeState {
     return {
         lastManifestId: null,
         isMenuOpen: false,
-        lastUpdateTime: 0,
         isInvalid: false,
         resetVersion: 0,
         menuReference: null,
-        reactRoot: null,
-        reactTarget: null,
     };
 }
 
@@ -26,7 +22,6 @@ let playerRootController: C2PAPlayerRootController | null = null;
 function resetMenuState() {
     menuState.lastManifestId = null;
     menuState.isMenuOpen = false;
-    menuState.lastUpdateTime = 0;
     menuState.isInvalid = false;
     menuState.resetVersion = 0;
 }
@@ -62,7 +57,6 @@ function getMenuContentTarget(c2paMenu: VideoJsMenuComponentLike | null): Elemen
 
 function syncMenuStateToPlayerRoot(
     c2paStatus: C2PAStatus | null,
-    compromisedRegions: string[],
 ) {
     if (!playerRootController) {
         return;
@@ -70,8 +64,7 @@ function syncMenuStateToPlayerRoot(
 
     playerRootController.setState({
         isMenuOpen: menuState.isMenuOpen,
-        menuC2paStatus: c2paStatus,
-        menuCompromisedRegions: compromisedRegions,
+        c2paStatus,
         menuResetKey: `${menuState.resetVersion}:${menuState.lastManifestId ?? 'none'}`,
         menuContentTarget: getMenuContentTarget(menuState.menuReference),
     });
@@ -91,8 +84,7 @@ export function setMenuReference(c2paMenu: VideoJsMenuComponentLike | null) {
 
     menuState.menuReference = c2paMenu;
     syncMenuStateToPlayerRoot(
-        playerRootController?.getState().menuC2paStatus ?? null,
-        playerRootController?.getState().menuCompromisedRegions ?? [],
+        playerRootController?.getState().c2paStatus ?? null,
     );
 }
 
@@ -109,8 +101,7 @@ export function setPlayerRootController(controller: C2PAPlayerRootController | n
     }
 
     syncMenuStateToPlayerRoot(
-        playerRootController.getState().menuC2paStatus,
-        playerRootController.getState().menuCompromisedRegions,
+        playerRootController.getState().c2paStatus,
     );
 }
 
@@ -150,17 +141,14 @@ export function handleMenuClosed() {
  * @param getCompromisedRegions - Returns compromised timeline ranges
  */
 export function updateC2PAMenu(
-    c2paStatus: C2PAStatus | null,
     c2paMenu: VideoJsMenuComponentLike | null,
-    isMonolithic: boolean,
     videoPlayer: VideoJsPlayerLike,
-    getCompromisedRegions: GetCompromisedRegions,
 ) {
     if (!menuState.menuReference && c2paMenu) {
         setMenuReference(c2paMenu);
     }
 
-    const compromisedRegions = getCompromisedRegions(isMonolithic, videoPlayer);
+    const c2paStatus = playerRootController?.getState().c2paStatus ?? null;
     const currentManifestId = c2paStatus?.manifestStore?.active_manifest ?? null;
     const manifestChanged = currentManifestId !== menuState.lastManifestId;
 
@@ -183,7 +171,7 @@ export function updateC2PAMenu(
 
     menuState.isInvalid = c2paStatus?.manifestStore?.validation_state === 'Invalid';
     updateButtonValidationState(videoPlayer, menuState.isInvalid);
-    syncMenuStateToPlayerRoot(c2paStatus, compromisedRegions);
+    syncMenuStateToPlayerRoot(c2paStatus);
 }
 
 /**
@@ -196,8 +184,8 @@ export function resetC2PAMenuCache() {
     menuState.resetVersion += 1;
     playerRootController?.setState({
         isMenuOpen: false,
-        menuC2paStatus: null,
-        menuCompromisedRegions: [],
+        c2paStatus: null,
+        compromisedRegions: [],
         menuResetKey: `${menuState.resetVersion}:none`,
     });
 }
@@ -209,8 +197,8 @@ export function resetC2PAMenuCache() {
 export function disposeC2PAMenu() {
     playerRootController?.setState({
         isMenuOpen: false,
-        menuC2paStatus: null,
-        menuCompromisedRegions: [],
+        c2paStatus: null,
+        compromisedRegions: [],
         menuContentTarget: null,
         menuResetKey: `${menuState.resetVersion}:none`,
     });

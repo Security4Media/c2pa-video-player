@@ -1,8 +1,11 @@
-import { ValidationState } from '@/types/c2pa.types';
-import { Manifest, ManifestStore } from '@contentauth/c2pa-web';
+import { Manifest, ManifestStore, ValidationState } from '@contentauth/c2pa-web';
 
 function isCawgIdentityUntrustedFailure(result: { code?: string; url?: string }) {
     return result.code === 'signingCredential.untrusted' && result.url?.includes('cawg.identity');
+}
+
+function isUntrustedSigningCredentialFailure(result: { code?: string }) {
+    return result.code === 'signingCredential.untrusted';
 }
 
 
@@ -25,11 +28,11 @@ export function getValidationResultsForManifest(validationDeltas: { success?: an
  * @param {ManifestStore} manifestStore - The manifest store containing the active manifest and validation results
  * @returns {ValidationState} Validation status: 'Trusted', 'Valid', 'Invalid', or 'Unknown'
  */
-export function getActiveManifestValidationStatus(manifestStore: ManifestStore): ValidationState{
+export function getActiveManifestValidationStatus(manifestStore: ManifestStore): ValidationState {
     const validationResults = manifestStore?.validation_results?.activeManifest;
 
     if (!validationResults) {
-        return 'Unknown';
+        return 'Invalid';
     }
 
     const { success, failure } = getValidationResultsForManifest(validationResults);
@@ -41,7 +44,7 @@ export function getActiveManifestValidationStatus(manifestStore: ManifestStore):
     }
 
     if (success.length === 0) {
-        return failure.length > 0 ? 'Valid' : 'Unknown';
+        return failure.length > 0 ? 'Valid' : 'Invalid';
     }
 
     const hasTimeStampTrusted = success.some(result => result.code === 'timeStamp.trusted');
@@ -58,7 +61,7 @@ export function getActiveManifestValidationStatus(manifestStore: ManifestStore):
         return 'Trusted';
     }
 
-    return 'Unknown';
+    return 'Invalid';
 }
 
 
@@ -70,19 +73,19 @@ export function getCAWGValidationStatus(manifestStore: ManifestStore): Validatio
     );
 
     if (!cawgAssertion) {
-        return 'Unknown';
+        return 'Invalid';
     }
 
     // Evaluate validation results for CAWG identity
     const validationResults = manifestStore.validation_results;
     if (!validationResults) {
-        return 'Unknown';
+        return 'Invalid';
     }
 
     //Check that the CAWG is Trusted : well fomed + trusted credentials  
     const activeManifestResults = validationResults.activeManifest;
     if (!activeManifestResults) {
-        return 'Unknown';
+        return 'Invalid';
     }
 
     const successResults = activeManifestResults.success;
@@ -123,14 +126,19 @@ export function getCAWGValidationStatus(manifestStore: ManifestStore): Validatio
  * @returns {ValidationState} Validation status: 'Trusted', 'Valid', 'Invalid', or 'Unknown'
  */
 export function getIngredientValidationStatus(manifestRef: string, manifestStore: ManifestStore): ValidationState {
-    if (!manifestRef || !manifestStore || !manifestStore.validation_results) {
-        return 'Unknown';
+
+    const validationResults = manifestStore?.validation_results;
+    
+    if (!validationResults) {
+        console.log(`[C2PA] No validation results found in manifest store for ${manifestRef}`);
+        return 'Invalid';
     }
 
-    const ingredientDeltas = manifestStore.validation_results.ingredientDeltas;
+    const ingredientDeltas = manifestStore.validation_results?.ingredientDeltas;
 
-    if (!ingredientDeltas || !Array.isArray(ingredientDeltas) || ingredientDeltas.length === 0) {
-        return 'Unknown';
+    if (!ingredientDeltas) {
+        console.log(`[C2PA] No ingredient deltas found for manifest ${manifestRef}`);
+        return 'Invalid';
     }
 
     // Find the ingredient delta that matches this manifestRef
@@ -152,7 +160,7 @@ export function getIngredientValidationStatus(manifestRef: string, manifestStore
 
     if (!ingredientDelta || !ingredientDelta.validationDeltas) {
         console.log(`[C2PA] No validation delta found for ingredient ${manifestRef}`);
-        return 'Unknown';
+        return 'Invalid';
     }
 
     const { success, failure } = getValidationResultsForManifest(ingredientDelta.validationDeltas);
@@ -163,9 +171,13 @@ export function getIngredientValidationStatus(manifestRef: string, manifestStore
         successCodes: success.map(s => s.code)
     });
 
-    // If failure is not empty → Invalid
+    const hasOnlyUntrustedSigningCredentialFailures =
+        failure.length > 0 && failure.every(isUntrustedSigningCredentialFailure);
+
+    // If failure is not empty and every failure is signingCredential.untrusted → Valid
+    // Otherwise, any other failure combination is Invalid
     if (failure.length > 0) {
-        return 'Invalid';
+        return hasOnlyUntrustedSigningCredentialFailures ? 'Valid' : 'Invalid';
     }
 
     // If success is not empty AND failure is empty
@@ -190,7 +202,7 @@ export function getIngredientValidationStatus(manifestRef: string, manifestStore
         return 'Valid';
     }
 
-    return 'Unknown';
+    return 'Invalid';
 }
 
 

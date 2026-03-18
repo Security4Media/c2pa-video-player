@@ -1,7 +1,5 @@
-import { c2paMenuItems, type C2paMenuItemKey } from './menuViewModel';
 import { handleMenuClosed, handleMenuOpened, setMenuReference } from './C2paMenuBridge';
 import type {
-    MenuShellItem,
     VideoJsMenuButtonComponentLike,
     VideoJsMenuComponentLike,
     VideoJsPlayerLike,
@@ -21,7 +19,29 @@ interface MenuItemConstructor {
 }
 
 interface MenuButtonComponentClass {
-    new (player: unknown, options: { myItems: MenuShellItem[] }): VideoJsMenuButtonComponentLike;
+    new (player: unknown, options?: Record<string, unknown>): VideoJsMenuButtonComponentLike;
+}
+
+function createHiddenPlaceholderItem(
+    MenuItem: MenuItemConstructor,
+    player: unknown,
+) {
+    const placeholderItem = new MenuItem(player, {
+        label: '',
+        id: 'c2pa-menu-placeholder',
+    });
+    placeholderItem.addClass?.('vjs-hidden');
+    placeholderItem.addClass?.('c2pa-menu-placeholder-item');
+    const placeholderElement = placeholderItem.el?.();
+    if (placeholderElement) {
+        placeholderElement.setAttribute('aria-hidden', 'true');
+        placeholderElement.style.display = 'none';
+    }
+    placeholderItem.handleClick = function () {
+        return;
+    };
+
+    return placeholderItem;
 }
 
 /**
@@ -42,21 +62,7 @@ export const initializeC2PAMenu = function (videoPlayer: VideoJsPlayerLike) {
         closeC2paMenu = false;
 
         createItems() {
-            const placeholderItem = new MenuItem(this.player_, {
-                label: '',
-                id: 'c2pa-menu-placeholder',
-            });
-            placeholderItem.addClass?.('vjs-hidden');
-            placeholderItem.addClass?.('c2pa-menu-placeholder-item');
-            const placeholderElement = placeholderItem.el?.();
-            if (placeholderElement) {
-                placeholderElement.setAttribute('aria-hidden', 'true');
-                placeholderElement.style.display = 'none';
-            }
-            placeholderItem.handleClick = function () {
-                return;
-            };
-            return [placeholderItem];
+            return [createHiddenPlaceholderItem(MenuItem, this.player_)];
         }
 
         handleClick() {
@@ -94,17 +100,11 @@ export const initializeC2PAMenu = function (videoPlayer: VideoJsPlayerLike) {
 
     videojs.registerComponent('C2PAMenuButton', C2PAMenuButton);
 
-    const myC2PAItems: MenuShellItem[] = (Object.keys(c2paMenuItems) as C2paMenuItemKey[]).map((key) => ({
-        name: c2paMenuItems[key],
-        id: key,
-    }));
-
     videoPlayer.controlBar.addChild(
         'C2PAMenuButton',
         {
             controlText: 'Content Credentials',
             title: 'Content Credentials',
-            myItems: myC2PAItems,
             className: 'c2pa-menu-button',
         },
         0,
