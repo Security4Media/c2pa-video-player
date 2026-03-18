@@ -12,11 +12,24 @@ export interface VideoJsControlBarLike {
     addChild(name: string, options?: Record<string, unknown>, index?: number): unknown;
     getChild(name: string): VideoJsMenuComponentLike | null;
     children(): unknown[];
+    removeChild?(name: string): void;
 }
 
 export interface VideoJsPlayerLike extends VideoJsComponentLike {
     controlBar: VideoJsControlBarLike;
     duration(): number;
+}
+
+export interface VideoJsMenuButtonComponentLike extends VideoJsMenuComponentLike {
+    buttonPressed_?: boolean;
+    options_?: {
+        myItems?: MenuShellItem[];
+    };
+    player_?: unknown;
+    closeC2paMenu?: boolean;
+    pressButton?(): void;
+    unpressButton?(): void;
+    buildCSSClass?(): string;
 }
 
 export type GetCompromisedRegions = (

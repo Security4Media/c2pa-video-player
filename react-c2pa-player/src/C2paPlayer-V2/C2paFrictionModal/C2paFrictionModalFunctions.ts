@@ -1,28 +1,35 @@
 import { createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import type { VideoJsPlayerLike } from '../C2paMenu/C2paMenu.types';
-import { C2paFrictionOverlay } from './C2paFrictionOverlay';
+import { C2PAPlayerRoot } from '../C2PAPlayerRoot';
 
 interface FrictionOverlayPlayer extends VideoJsPlayerLike {
     play(): void;
     pause(): void;
 }
 
-export interface FrictionOverlayController {
+export interface C2PAPlayerRootController {
     container: HTMLDivElement;
     root: Root;
-    isVisible: boolean;
+    isFrictionOverlayVisible: boolean;
     onWatchAnyway: () => void;
 }
 
-function renderFrictionOverlay(
-    frictionOverlay: FrictionOverlayController,
+function renderPlayerRoot(
+    playerRoot: C2PAPlayerRootController,
     onWatchAnyway: () => void,
 ) {
-    frictionOverlay.root.render(createElement(C2paFrictionOverlay, {
-        isVisible: frictionOverlay.isVisible,
+    playerRoot.root.render(createElement(C2PAPlayerRoot, {
+        isFrictionOverlayVisible: playerRoot.isFrictionOverlayVisible,
         onWatchAnyway,
     }));
+}
+
+function schedulePlayerRootUnmount(playerRoot: C2PAPlayerRootController) {
+    setTimeout(() => {
+        playerRoot.root.unmount();
+        playerRoot.container.remove();
+    }, 0);
 }
 
 /**
@@ -31,32 +38,32 @@ function renderFrictionOverlay(
  *
  * @param videoPlayer - Video.js player instance
  * @param setPlaybackStarted - Callback invoked when the user accepts playback
- * @returns Controller for the mounted React overlay
+ * @returns Controller for the mounted player-level React overlay root
  */
 export const initializeFrictionOverlay = function (
     videoPlayer: FrictionOverlayPlayer,
     setPlaybackStarted: () => void,
-): FrictionOverlayController {
-    const frictionOverlayContainer = document.createElement('div');
+): C2PAPlayerRootController {
+    const playerRootContainer = document.createElement('div');
     const handleWatchAnyway = function () {
-        frictionOverlay.isVisible = false;
-        renderFrictionOverlay(frictionOverlay, frictionOverlay.onWatchAnyway);
+        playerRoot.isFrictionOverlayVisible = false;
+        renderPlayerRoot(playerRoot, playerRoot.onWatchAnyway);
         setPlaybackStarted();
         videoPlayer.play();
     };
-    const frictionOverlay: FrictionOverlayController = {
-        container: frictionOverlayContainer,
-        root: createRoot(frictionOverlayContainer),
-        isVisible: false,
+    const playerRoot: C2PAPlayerRootController = {
+        container: playerRootContainer,
+        root: createRoot(playerRootContainer),
+        isFrictionOverlayVisible: false,
         onWatchAnyway: handleWatchAnyway,
     };
 
     const playerContainer = videoPlayer.el();
-    playerContainer?.appendChild(frictionOverlay.container);
+    playerContainer?.appendChild(playerRoot.container);
 
-    renderFrictionOverlay(frictionOverlay, handleWatchAnyway);
+    renderPlayerRoot(playerRoot, handleWatchAnyway);
 
-    return frictionOverlay;
+    return playerRoot;
 };
 
 /**
@@ -65,32 +72,31 @@ export const initializeFrictionOverlay = function (
  *
  * @param playbackStarted - Whether playback has already been accepted
  * @param videoPlayer - Video.js player instance
- * @param frictionOverlay - Overlay controller created during initialization
+ * @param playerRoot - Player overlay controller created during initialization
  */
 export const displayFrictionOverlay = function (
     playbackStarted: boolean,
     videoPlayer: FrictionOverlayPlayer,
-    frictionOverlay: FrictionOverlayController,
+    playerRoot: C2PAPlayerRootController,
 ): void {
     if (!playbackStarted) {
         videoPlayer.pause();
-        frictionOverlay.isVisible = true;
-        renderFrictionOverlay(frictionOverlay, frictionOverlay.onWatchAnyway);
+        playerRoot.isFrictionOverlayVisible = true;
+        renderPlayerRoot(playerRoot, playerRoot.onWatchAnyway);
     }
 };
 
 /**
  * Unmount and remove the React friction overlay from the player container.
  *
- * @param frictionOverlay - Overlay controller created during initialization
+ * @param playerRoot - Player overlay controller created during initialization
  */
 export const disposeFrictionOverlay = function (
-    frictionOverlay: FrictionOverlayController | null,
+    playerRoot: C2PAPlayerRootController | null,
 ): void {
-    if (!frictionOverlay) {
+    if (!playerRoot) {
         return;
     }
 
-    frictionOverlay.root.unmount();
-    frictionOverlay.container.remove();
+    schedulePlayerRootUnmount(playerRoot);
 };

@@ -18,7 +18,7 @@ import {
     disposeC2PAMenu,
     initializeC2PAMenu,
     updateC2PAMenu,
-} from './C2paMenu/C2paMenuFunctions.js';
+} from './C2paMenu/C2paMenuFunctions';
 import { getTimelineFunctions } from './C2paTimeline/C2paTimelineFunctions';
 
 interface TimelineComponentLike {
@@ -108,7 +108,7 @@ export const C2PAPlayer = function (
         updateC2PATimeline,
     } = getTimelineFunctions() as TimelineFunctions;
 
-    let frictionOverlay: import('./C2paFrictionModal/C2paFrictionModalFunctions').FrictionOverlayController | null = null;
+    let playerRoot: import('./C2paFrictionModal/C2paFrictionModalFunctions').C2PAPlayerRootController | null = null;
     let isManifestInvalid = false;
 
     let seeking = false;
@@ -131,7 +131,7 @@ export const C2PAPlayer = function (
 
             initializeC2PAControlBar(videoPlayer);
             initializeC2PAMenu(videoPlayer);
-            frictionOverlay = initializeFrictionOverlay(videoPlayer, setPlaybackStarted);
+            playerRoot = initializeFrictionOverlay(videoPlayer, setPlaybackStarted);
 
             c2paMenu = videoPlayer.controlBar.getChild('C2PAMenuButton');
             c2paControlBar = videoPlayer.controlBar.progressControl.seekBar.getChild('C2PALoadProgressBar');
@@ -139,9 +139,9 @@ export const C2PAPlayer = function (
             console.log('[C2PA] Components retrieved - c2paMenu:', c2paMenu, 'c2paControlBar:', c2paControlBar);
 
             videoPlayer.on('play', function () {
-                if (isManifestInvalid && !playbackStarted && frictionOverlay) {
+                if (isManifestInvalid && !playbackStarted && playerRoot) {
                     console.log('[C2PA] Manifest invalid, displaying friction overlay');
-                    displayFrictionOverlay(playbackStarted, videoPlayer, frictionOverlay);
+                    displayFrictionOverlay(playbackStarted, videoPlayer, playerRoot);
                 } else {
                     setPlaybackStarted();
                 }
@@ -185,7 +185,7 @@ export const C2PAPlayer = function (
             }
 
             disposeC2PAMenu();
-            disposeFrictionOverlay(frictionOverlay);
+            disposeFrictionOverlay(playerRoot);
 
             try {
                 if (c2paMenu && videoPlayer && videoPlayer.controlBar) {
@@ -200,7 +200,7 @@ export const C2PAPlayer = function (
 
             c2paMenu = null;
             c2paControlBar = null;
-            frictionOverlay = null;
+            playerRoot = null;
             seeking = false;
             playbackStarted = false;
             lastPlaybackTime = 0.0;
