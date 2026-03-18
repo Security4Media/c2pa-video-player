@@ -16,8 +16,6 @@ import cawg_allowed from '/trust/cawg_allowed_extended.pem?url';
 import c2pa_anchors from '/trust/c2pa_anchors_extended.pem?url';
 import c2pa_store   from '/trust/c2pa_store.cfg?url';
 
-const C2paSupportedMediaTypes = ['video'];
-
 
 /**
  * Initialize C2PA validation for a video element
@@ -78,42 +76,11 @@ export async function c2pa_init(player: HTMLVideoElement, onPlaybackTimeUpdated:
 
     // Create update event based on manifest content
     const createUpdateEvent = () => {
-      const ret: any = {
-        verified: true,
-        details: {},
+      return {
+        manifestStore: manifestStore,
+        validationState: manifestStore?.validation_state || 'Unknown'
       };
 
-      const detail: any = {
-        manifestStore: null,
-        error: null,
-      };
-
-      if (manifestStore == null) {
-        detail['error'] = 'null validation_report';
-      }
-
-      detail['manifestStore'] = manifestStore;
-
-      console.log('[C2PA Init] Manifest Store:', manifestStore);
-
-      if (manifestStore && 
-          (manifestStore.validation_state === 'Valid' || 
-           manifestStore.validation_state === 'Trusted')) {
-        detail['valid'] = true;
-      } else {
-        detail['valid'] = false;
-        if (manifestStore?.validation_status) {
-          detail['error'] = manifestStore.validation_status
-            .map((status: any) => `${status.code}: ${status.explanation}`)
-            .join('; ');
-        }
-      }
-
-      ret['details'][C2paSupportedMediaTypes[0]] = detail;
-      ret['validation_state'] = manifestStore?.validation_state || 'Unknown';
-
-      console.log('[C2PA Init] Created c2pa update event:', ret);
-      return ret;
     };
 
     const updateEvent = createUpdateEvent();

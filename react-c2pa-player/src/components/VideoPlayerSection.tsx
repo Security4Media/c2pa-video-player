@@ -2,28 +2,24 @@ import { memo, useCallback, useEffect, useRef, useState, type ReactNode } from '
 import VideoJS, { type VideoJSOptions } from './VideoJS';
 import { useC2PAPlayer } from '../hooks/useC2PAPlayer';
 import './VideoPlayerSection.css';
+import { PlayerStatus } from '@/types/player.types';
 
-type PlayerStatus = 'ready' | 'loading' | 'error';
 
 interface VideoPlayerSectionProps {
   videoJsOptions: VideoJSOptions;
-  onPlayerReady: (player: any) => void;
   onTimeUpdate: (currentTime: number) => void;
   onDurationChange: (duration: number) => void;
   onStatusUpdate: (type: PlayerStatus, message: string) => void;
   onStreamInfo: (message: string) => void;
-  enableC2PA?: boolean;
   children?: ReactNode;
 }
 
 export const VideoPlayerSection = memo(function VideoPlayerSection({
   videoJsOptions,
-  onPlayerReady,
   onTimeUpdate,
   onDurationChange,
   onStatusUpdate,
   onStreamInfo,
-  enableC2PA = true,
   children,
 }: VideoPlayerSectionProps) {
   // Track current video source to detect changes and force remount
@@ -35,7 +31,7 @@ export const VideoPlayerSection = memo(function VideoPlayerSection({
   const currentSource = videoJsOptions.sources?.[0]?.src || '';
   
   // Initialize C2PA Player V2
-  const { initialize: initializeC2PA, reset: resetC2PA, isInitialized: c2paInitialized, manifestData } = useC2PAPlayer({
+  const { initialize: initializeC2PA, reset: resetC2PA, isInitialized: c2paInitialized, manifestStore } = useC2PAPlayer({
     isMonolithic: true,
     onError: (error) => {
       console.error('[VideoPlayerSection] C2PA error:', error);
@@ -66,9 +62,6 @@ export const VideoPlayerSection = memo(function VideoPlayerSection({
   // Handle VideoJS player ready
   const handlePlayerReady = useCallback(
     (player: any) => {
-      console.log('[VideoJS] Player ready callback');
-      onPlayerReady(player);
-
       // Get the underlying video element
       const videoEl = player.el().querySelector('video');
       if (videoEl) {
@@ -87,7 +80,6 @@ export const VideoPlayerSection = memo(function VideoPlayerSection({
             onStatusUpdate('ready', 'Ready to Play');
             
             // Initialize C2PA Player V2 when video is ready
-            if (enableC2PA) {
               console.log('[VideoPlayerSection] Initializing C2PA Player V2, isInitialized:', c2paFunctionsRef.current.c2paInitialized);
               try {
                 c2paFunctionsRef.current.initializeC2PA(player, videoEl);
@@ -97,9 +89,6 @@ export const VideoPlayerSection = memo(function VideoPlayerSection({
                 onStatusUpdate('error', `C2PA init failed: ${error}`);
               }
             }
-          } else {
-            console.log('[VideoPlayerSection] Video canplay event - already processed, skipping C2PA init');
-          }
         });
         
         player.on('playing', () => onStatusUpdate('ready', 'Playing'));
@@ -115,7 +104,7 @@ export const VideoPlayerSection = memo(function VideoPlayerSection({
         console.error('[VideoPlayerSection] Video element not found in player');
       }
     },
-    [onPlayerReady, onStatusUpdate, onStreamInfo, enableC2PA]
+    [onStatusUpdate, onStreamInfo]
   );
 
   return (
@@ -128,7 +117,7 @@ export const VideoPlayerSection = memo(function VideoPlayerSection({
         onDurationChange={onDurationChange}
       />
       {children}
-      {c2paInitialized && manifestData && (
+      {c2paInitialized && manifestStore && (
         <div className="c2pa-status-indicator" style={{ display: 'none' }}>
           {/* C2PA Player V2 is active - UI components injected via Video.js */}
         </div>

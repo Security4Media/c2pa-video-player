@@ -147,7 +147,7 @@ export var C2PAPlayer = function (
                     currentTime
                 );
                 //Creates new c2pa progress segment to be added to the progress bar
-                handleC2PAValidation(c2paStatus.validation_state, currentTime, c2paControlBar);
+                handleC2PAValidation(c2paStatus.verificationStatus, currentTime, c2paControlBar);
                 //Update c2pa progress timeline
                 updateC2PATimeline(currentTime, videoPlayer, c2paControlBar);
                 //Update c2pa menu based on manifest

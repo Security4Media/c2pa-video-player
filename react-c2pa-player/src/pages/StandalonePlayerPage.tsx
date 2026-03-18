@@ -9,8 +9,7 @@ import '@/styles/design-tokens.css';
 import './StandalonePlayerPage.css';
 import ebuLogo from '@/assets/logos/ebu-logo-dark.svg';
 import nabLogo from '@/assets/logos/nab-logo.png';
-
-type PlayerStatus = 'ready' | 'loading' | 'error';
+import { PlayerStatus, VideoMode } from '@/types/player.types';
 
 interface StreamInfo {
   timestamp: string;
@@ -21,7 +20,7 @@ export function StandalonePlayerPage() {
   const [mp4Url, setMp4Url] = useState('');
   const [selectedVideo, setSelectedVideo] = useState('');
   const [availableVideos, setAvailableVideos] = useState<VideoItem[]>([]);
-  const [videoMode, setVideoMode] = useState<'server' | 'local'>('server');
+  const [videoMode, setVideoMode] = useState<VideoMode>('server');
   const [playerStatus, setPlayerStatus] = useState<PlayerStatus>('ready');
   const [statusMessage, setStatusMessage] = useState('Player Ready');
   const [streamInfos, setStreamInfos] = useState<StreamInfo[]>([]);
@@ -35,7 +34,6 @@ export function StandalonePlayerPage() {
     buffered: 0,
   });
 
-  const [videoPlayer, setVideoPlayer] = useState<any>(null);
   const [videoJsOptions, setVideoJsOptions] = useState<VideoJSOptions>({
     autoplay: false,
     controls: true,
@@ -246,45 +244,6 @@ export function StandalonePlayerPage() {
     loadVideoList();
   }, [loadVideoList]);
 
-  // Keyboard shortcuts
-  useEffect(() => {
-    const handleKeyboard = (event: KeyboardEvent) => {
-      if ((event.target as HTMLElement).tagName === 'INPUT') return;
-
-      if (!videoPlayer) return;
-
-      switch (event.key) {
-        case ' ':
-          event.preventDefault();
-          if (videoPlayer.paused()) {
-            videoPlayer.play();
-          } else {
-            videoPlayer.pause();
-          }
-          break;
-        case 'ArrowLeft':
-          videoPlayer.currentTime(Math.max(0, videoPlayer.currentTime() - 10));
-          break;
-        case 'ArrowRight':
-          videoPlayer.currentTime(videoPlayer.currentTime() + 10);
-          break;
-        case 'm':
-          videoPlayer.muted(!videoPlayer.muted());
-          break;
-      }
-    };
-
-    document.addEventListener('keydown', handleKeyboard);
-
-    return () => {
-      document.removeEventListener('keydown', handleKeyboard);
-    };
-  }, [videoPlayer]);
-
-
-  const handlePlayerReady = useCallback((player: any) => {
-    setVideoPlayer(player);
-  }, []);
 
   const handleTimeUpdate = useCallback((currentTime: number) => {
     setPlayerStats((prev) => ({
@@ -335,7 +294,6 @@ export function StandalonePlayerPage() {
 
         <VideoPlayerSection
           videoJsOptions={videoJsOptions}
-          onPlayerReady={handlePlayerReady}
           onTimeUpdate={handleTimeUpdate}
           onDurationChange={handleDurationChange}
           onStatusUpdate={updateStatus}
