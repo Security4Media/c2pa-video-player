@@ -54,19 +54,23 @@ export interface ClaimGeneratorItem {
     version: string | null;
 }
 
+export interface IngredientDisplayItem {
+    index: number;
+    title: string;
+    issuer: string | null;
+    date: string | null;
+    claimGenerator: string | null;
+    validationStatus: ValidationState | null;
+    manifest?: Manifest;
+    manifestRef?: string;
+    ingredients?: IngredientDisplayItem[];
+    ingredientCount?: number;
+}
+
 export interface CawgOrganizationItem {
     issuer: string;
     role?: CawgRole | null;
     creativeWork: CreativeWorkContentItem | null;
     authors: PersonAuthorItem[];
     validationStatus: ValidationState;
-}
-
-export interface IngredientItem {
-    index: number;
-    title: string;
-    issuer: string;
-    date?: string | null;
-    manifest?: Manifest;
-    manifestRef?: string;
 }

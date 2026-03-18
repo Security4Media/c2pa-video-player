@@ -1,4 +1,4 @@
-import { c2paMenuItems } from './C2paMenuRoot';
+import { c2paMenuItems } from './menuViewModel';
 import { handleMenuClosed, handleMenuOpened, setMenuReference } from './C2paMenuBridge.js';
 
 /**

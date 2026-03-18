@@ -1,14 +1,19 @@
-import { Fragment, useEffect, useState } from 'react';
-import { providerInfoFromSocialId } from './Providers.js';
-
-type MenuItems = Record<string, string>;
-type MenuValues = Record<string, any>;
-type MenuMode = 'ready' | 'loading' | 'no-manifest' | 'invalid';
+import { useEffect, useState } from 'react';
+import {
+  C2paMenuItemKey,
+  C2paMenuMode,
+  C2paMenuValueMap,
+} from './menuViewModel';
+import {
+  CawgOrganizationItem,
+  IngredientDisplayItem,
+  OrganizationIdentityItem,
+} from './models';
 
 interface C2paMenuContentProps {
-  menuItems: MenuItems;
-  items: MenuValues;
-  mode: MenuMode;
+  menuItems: Record<C2paMenuItemKey, string>;
+  items: Partial<C2paMenuValueMap>;
+  mode: C2paMenuMode;
   resetKey: string;
 }
 
@@ -105,7 +110,7 @@ function WebsiteLink({ href }: { href: string }) {
   );
 }
 
-function OrganizationItem({ itemName, itemValue }: { itemName: string; itemValue: any }) {
+function OrganizationItem({ itemName, itemValue }: { itemName: string; itemValue: OrganizationIdentityItem }) {
   return (
     <div>
       <div className="itemName">{itemName}</div>
@@ -141,7 +146,7 @@ function CawgIdentityItem({
   onToggle,
 }: {
   itemName: string;
-  itemValue: any;
+  itemValue: CawgOrganizationItem;
   isExpanded: boolean;
   onToggle: () => void;
 }) {
@@ -203,7 +208,7 @@ function IngredientNode({
   ingredientsExpanded,
   onToggleIngredient,
 }: {
-  ingredient: any;
+  ingredient: IngredientDisplayItem;
   parentId?: string;
   ingredientsExpanded: Record<string, boolean>;
   onToggleIngredient: (id: string) => void;
@@ -285,7 +290,7 @@ function IngredientsItem({
   onToggleIngredient,
 }: {
   itemName: string;
-  itemValue: any[];
+  itemValue: IngredientDisplayItem[];
   ingredientsExpanded: Record<string, boolean>;
   onToggleIngredient: (id: string) => void;
 }) {
@@ -306,26 +311,6 @@ function IngredientsItem({
   );
 }
 
-function SocialItem({ itemName, itemValue }: { itemName: string; itemValue: string[] }) {
-  return (
-    <>
-      <span className="itemName">{itemName}</span>{' '}
-      {itemValue.map(account => {
-        const formattedWebsite = providerInfoFromSocialId(account)?.name ?? account;
-        return (
-          <Fragment key={account}>
-            <span>
-              <a className="url" href={account} target="_blank" rel="noreferrer">
-                {formattedWebsite}
-              </a>
-            </span>{' '}
-          </Fragment>
-        );
-      })}
-    </>
-  );
-}
-
 function DefaultItem({ itemName, itemValue }: { itemName: string; itemValue: string }) {
   if (itemValue.length >= 23) {
     return (
@@ -343,9 +328,9 @@ function DefaultItem({ itemName, itemValue }: { itemName: string; itemValue: str
 }
 
 function renderMenuItem(
-  itemKey: string,
+  itemKey: C2paMenuItemKey,
   itemName: string,
-  itemValue: any,
+  itemValue: C2paMenuValueMap[C2paMenuItemKey] | null,
   cawgIdentityExpanded: boolean,
   ingredientsExpanded: Record<string, boolean>,
   onToggleCawg: () => void,
@@ -355,57 +340,36 @@ function renderMenuItem(
     return null;
   }
 
-  if (itemKey === 'ALERT') {
-    return <AlertItem itemValue={itemValue} />;
-  }
-
-  if (itemKey === 'C2PA_VALIDATION_STATUS') {
-    return <ValidationStatus itemName={itemName} itemValue={itemValue} />;
-  }
-
-  if (itemKey === 'CAWG_IDENTITY' && typeof itemValue === 'object') {
-    return (
+  switch (itemKey) {
+    case 'ALERT':
+      return typeof itemValue === 'string' ? <AlertItem itemValue={itemValue} /> : null;
+    case 'C2PA_VALIDATION_STATUS':
+      return typeof itemValue === 'string' ? <ValidationStatus itemName={itemName} itemValue={itemValue} /> : null;
+    case 'CAWG_IDENTITY':
+      return itemValue && typeof itemValue === 'object' && !Array.isArray(itemValue) ? (
         <CawgIdentityItem
           itemName={itemName}
-          itemValue={itemValue}
+          itemValue={itemValue as CawgOrganizationItem}
           isExpanded={cawgIdentityExpanded}
           onToggle={onToggleCawg}
         />
-      );
-  }
-
-  if (itemKey === 'INGREDIENTS' && Array.isArray(itemValue)) {
-    return (
+      ) : null;
+    case 'INGREDIENTS':
+      return Array.isArray(itemValue) ? (
         <IngredientsItem
           itemName={itemName}
-          itemValue={itemValue}
+          itemValue={itemValue as IngredientDisplayItem[]}
           ingredientsExpanded={ingredientsExpanded}
           onToggleIngredient={onToggleIngredient}
         />
-      );
+      ) : null;
+    case 'ORGANIZATION':
+      return itemValue && typeof itemValue === 'object' && !Array.isArray(itemValue)
+        ? <OrganizationItem itemName={itemName} itemValue={itemValue as OrganizationIdentityItem} />
+        : null;
+    default:
+      return typeof itemValue === 'string' ? <DefaultItem itemName={itemName} itemValue={itemValue} /> : null;
   }
-
-  if (itemKey === 'ORGANIZATION' && typeof itemValue === 'object') {
-    return <OrganizationItem itemName={itemName} itemValue={itemValue} />;
-  }
-
-  if (itemKey === 'WEBSITE' && typeof itemValue === 'string') {
-    return (
-      <>
-        <div className="itemName">{itemName}</div> <WebsiteLink href={itemValue} />
-      </>
-    );
-  }
-
-  if (itemKey === 'SOCIAL' && Array.isArray(itemValue)) {
-    return <SocialItem itemName={itemName} itemValue={itemValue} />;
-  }
-
-  if (typeof itemValue === 'string') {
-    return <DefaultItem itemName={itemName} itemValue={itemValue} />;
-  }
-
-  return null;
 }
 
 /**
@@ -454,9 +418,9 @@ export function C2paMenuContent({
     <>
       {Object.entries(menuItems).map(([itemKey, itemName]) => {
         const content = renderMenuItem(
-          itemKey,
+          itemKey as C2paMenuItemKey,
           itemName,
-          items[itemKey] ?? null,
+          items[itemKey as C2paMenuItemKey] ?? null,
           cawgIdentityExpanded,
           ingredientsExpanded,
           handleToggleCawg,

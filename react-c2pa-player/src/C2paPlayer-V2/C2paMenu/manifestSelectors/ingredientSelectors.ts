@@ -1,16 +1,26 @@
 import { Ingredient, Manifest, ManifestStore } from '@contentauth/c2pa-web';
 import { getIngredientValidationStatus } from '../../../services/c2pa_functions';
+import { IngredientDisplayItem } from '../models';
 
 /**
  * Extract detailed information from a single ingredient
  * @param {Ingredient} ingredientData - The ingredient data from manifest.ingredients
  * @param {ManifestStore} manifestStore - The manifest store containing all manifests
  * @param {number} index - The ingredient index (1-based)
- * @returns {Ingredient} Ingredient details object
+ * @returns {IngredientDisplayItem} Ingredient details object
  */
-function extractIngredientDetails(ingredientData: Ingredient, manifestStore: ManifestStore, index: number) {
-    const ingredient: Partial<Ingredient> = {
+function extractIngredientDetails(
+    ingredientData: Ingredient,
+    manifestStore: ManifestStore,
+    index: number,
+): IngredientDisplayItem {
+    const ingredient: IngredientDisplayItem = {
         index: index,
+        title: `Ingredient ${index}`,
+        issuer: null,
+        date: null,
+        claimGenerator: null,
+        validationStatus: null,
     };
 
     const title = ingredientData.title || ingredientData.document_id || ingredientData.label;
@@ -22,7 +32,7 @@ function extractIngredientDetails(ingredientData: Ingredient, manifestStore: Man
     }
 
     const manifestRef = ingredientData.active_manifest;
-    let ingredientManifest = null;
+    let ingredientManifest: Manifest | null = null;
 
     if (manifestRef && manifestStore && manifestStore.manifests) {
         ingredientManifest = manifestStore.manifests[manifestRef];
@@ -57,7 +67,9 @@ function extractIngredientDetails(ingredientData: Ingredient, manifestStore: Man
             ingredient.validationStatus = validationStatus;
         }
 
-        ingredient.manifestRef = manifestRef;
+        if (manifestRef) {
+            ingredient.manifestRef = manifestRef;
+        }
         ingredient.manifest = ingredientManifest;
     }
 
@@ -81,7 +93,7 @@ export function selectIngredients(manifest: Manifest, manifestStore: ManifestSto
 
     console.log(`[C2PA] Found ${ingredientAssertions.length} ingredient(s) in manifest`);
 
-    const ingredients: Array<Ingredient> = [];
+    const ingredients: IngredientDisplayItem[] = [];
 
     ingredientAssertions.forEach((ingredientData, index) => {
         if (!ingredientData) return;
