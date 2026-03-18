@@ -17,6 +17,14 @@ interface C2paMenuContentProps {
   resetKey: string;
 }
 
+function MenuTitle() {
+  return (
+    <li className="vjs-menu-title">
+      Content Credentials
+    </li>
+  );
+}
+
 function LoadingState() {
   return (
     <li className="vjs-menu-item">
@@ -403,19 +411,35 @@ export function C2paMenuContent({
   };
 
   if (mode === 'loading') {
-    return <LoadingState />;
+    return (
+      <>
+        <MenuTitle />
+        <LoadingState />
+      </>
+    );
   }
 
   if (mode === 'no-manifest') {
-    return <NoManifestState />;
+    return (
+      <>
+        <MenuTitle />
+        <NoManifestState />
+      </>
+    );
   }
 
   if (mode === 'invalid') {
-    return <InvalidState />;
+    return (
+      <>
+        <MenuTitle />
+        <InvalidState />
+      </>
+    );
   }
 
   return (
     <>
+      <MenuTitle />
       {Object.entries(menuItems).map(([itemKey, itemName]) => {
         const content = renderMenuItem(
           itemKey as C2paMenuItemKey,
