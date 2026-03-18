@@ -2,6 +2,13 @@ import { createElement } from 'react';
 import { createRoot } from 'react-dom/client';
 import { C2paMenuRoot } from './C2paMenuRoot';
 
+/** @typedef {import('./C2paMenu.types').C2paMenuBridgePayload} C2paMenuBridgePayload */
+/** @typedef {import('./C2paMenu.types').C2paMenuBridgeState} C2paMenuBridgeState */
+/** @typedef {import('./C2paMenu.types').GetCompromisedRegions} GetCompromisedRegions */
+/** @typedef {import('./C2paMenu.types').VideoJsMenuComponentLike} VideoJsMenuComponentLike */
+/** @typedef {import('./C2paMenu.types').VideoJsPlayerLike} VideoJsPlayerLike */
+
+/** @type {C2paMenuBridgeState} */
 const menuState = {
   lastManifestId: null,
   isMenuOpen: false,
@@ -33,6 +40,12 @@ export function registerMenuItemRenderer(itemKey, renderer) {
   console.warn('[C2PA] registerMenuItemRenderer is deprecated during the React menu migration', itemKey, renderer);
 }
 
+/**
+ * Reflect the current validation state in the Video.js menu button styling.
+ *
+ * @param {VideoJsPlayerLike} videoPlayer - Video.js player instance
+ * @param {boolean} isInvalid - Whether the active manifest is invalid
+ */
 function updateButtonValidationState(videoPlayer, isInvalid) {
   const c2paButton = videoPlayer.el().querySelector('.c2pa-menu-button button');
   if (!c2paButton) return;
@@ -44,6 +57,12 @@ function updateButtonValidationState(videoPlayer, isInvalid) {
   }
 }
 
+/**
+ * Resolve the Video.js popup content element used as the React mount target.
+ *
+ * @param {VideoJsMenuComponentLike | null} c2paMenu - Video.js menu component
+ * @returns {Element | null} The menu content element, when available
+ */
 function getMenuContentTarget(c2paMenu) {
   return c2paMenu?.el()?.querySelector('.vjs-menu-button-popup .vjs-menu .vjs-menu-content') ?? null;
 }
@@ -58,6 +77,11 @@ function scheduleRootUnmount(root) {
   }, 0);
 }
 
+/**
+ * Reuse or create the React root bound to the current Video.js menu popup.
+ *
+ * @returns {import('react-dom/client').Root | null} The current React root
+ */
 function ensureMenuReactRoot() {
   const target = getMenuContentTarget(menuState.menuReference);
   if (!target) {
@@ -77,6 +101,11 @@ function ensureMenuReactRoot() {
   return menuState.reactRoot;
 }
 
+/**
+ * Render the React menu tree with the latest normalized bridge payload.
+ *
+ * @param {C2paMenuBridgePayload} payload - Status and compromised-region payload
+ */
 function renderReactMenu(payload) {
   const reactRoot = ensureMenuReactRoot();
   if (!reactRoot) {
@@ -96,7 +125,7 @@ function renderReactMenu(payload) {
  * The bridge mounts the React tree into the menu popup content owned by
  * this component.
  *
- * @param {Object} c2paMenu - Video.js C2PA menu component instance
+ * @param {VideoJsMenuComponentLike | null} c2paMenu - Video.js C2PA menu component instance
  */
 export function setMenuReference(c2paMenu) {
   if (!c2paMenu) {
@@ -129,11 +158,11 @@ export function handleMenuClosed() {
  * timeline state. The bridge throttles updates while the menu is closed
  * and keeps the invalid button styling synchronized with validation.
  *
- * @param {Object|null} c2paStatus - Current C2PA status payload
- * @param {Object} c2paMenu - Video.js C2PA menu component instance
+ * @param {import('@/types/c2pa.types').C2PAStatus | null} c2paStatus - Current C2PA status payload
+ * @param {VideoJsMenuComponentLike | null} c2paMenu - Video.js C2PA menu component instance
  * @param {boolean} isMonolithic - Whether playback is monolithic or streaming
- * @param {Object} videoPlayer - Video.js player instance
- * @param {Function} getCompromisedRegions - Returns compromised timeline ranges
+ * @param {VideoJsPlayerLike} videoPlayer - Video.js player instance
+ * @param {GetCompromisedRegions} getCompromisedRegions - Returns compromised timeline ranges
  */
 export function updateC2PAMenu(
   c2paStatus,
