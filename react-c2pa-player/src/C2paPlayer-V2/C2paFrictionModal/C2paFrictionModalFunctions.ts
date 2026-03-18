@@ -1,8 +1,28 @@
+import { createElement } from 'react';
+import { createRoot, type Root } from 'react-dom/client';
 import type { VideoJsPlayerLike } from '../C2paMenu/C2paMenu.types';
+import { C2paFrictionOverlay } from './C2paFrictionOverlay';
 
 interface FrictionOverlayPlayer extends VideoJsPlayerLike {
     play(): void;
     pause(): void;
+}
+
+export interface FrictionOverlayController {
+    container: HTMLDivElement;
+    root: Root;
+    isVisible: boolean;
+    onWatchAnyway: () => void;
+}
+
+function renderFrictionOverlay(
+    frictionOverlay: FrictionOverlayController,
+    onWatchAnyway: () => void,
+) {
+    frictionOverlay.root.render(createElement(C2paFrictionOverlay, {
+        isVisible: frictionOverlay.isVisible,
+        onWatchAnyway,
+    }));
 }
 
 /**
@@ -11,35 +31,30 @@ interface FrictionOverlayPlayer extends VideoJsPlayerLike {
  *
  * @param videoPlayer - Video.js player instance
  * @param setPlaybackStarted - Callback invoked when the user accepts playback
- * @returns The overlay element appended to the player container
+ * @returns Controller for the mounted React overlay
  */
 export const initializeFrictionOverlay = function (
     videoPlayer: FrictionOverlayPlayer,
     setPlaybackStarted: () => void,
-): HTMLElement {
-    const frictionOverlay = document.createElement('div');
-    frictionOverlay.className = 'friction-overlay';
-
-    const warnMessage = document.createElement('p');
-    warnMessage.textContent =
-        'The information in this video\'s Content Credentials is no longer trustworthy and the video\'s history cannot be confirmed.';
-
-    const watchAnywayBtn = document.createElement('button');
-    watchAnywayBtn.textContent = 'Watch Anyway';
-    watchAnywayBtn.classList.add('friction-button');
-
-    frictionOverlay.appendChild(warnMessage);
-    frictionOverlay.appendChild(watchAnywayBtn);
-    frictionOverlay.style.display = 'none';
-
-    const playerContainer = videoPlayer.el();
-    playerContainer?.appendChild(frictionOverlay);
-
-    watchAnywayBtn.addEventListener('click', function () {
-        frictionOverlay.style.display = 'none';
+): FrictionOverlayController {
+    const frictionOverlayContainer = document.createElement('div');
+    const handleWatchAnyway = function () {
+        frictionOverlay.isVisible = false;
+        renderFrictionOverlay(frictionOverlay, frictionOverlay.onWatchAnyway);
         setPlaybackStarted();
         videoPlayer.play();
-    });
+    };
+    const frictionOverlay: FrictionOverlayController = {
+        container: frictionOverlayContainer,
+        root: createRoot(frictionOverlayContainer),
+        isVisible: false,
+        onWatchAnyway: handleWatchAnyway,
+    };
+
+    const playerContainer = videoPlayer.el();
+    playerContainer?.appendChild(frictionOverlay.container);
+
+    renderFrictionOverlay(frictionOverlay, handleWatchAnyway);
 
     return frictionOverlay;
 };
@@ -50,15 +65,32 @@ export const initializeFrictionOverlay = function (
  *
  * @param playbackStarted - Whether playback has already been accepted
  * @param videoPlayer - Video.js player instance
- * @param frictionOverlay - Overlay element created during initialization
+ * @param frictionOverlay - Overlay controller created during initialization
  */
 export const displayFrictionOverlay = function (
     playbackStarted: boolean,
     videoPlayer: FrictionOverlayPlayer,
-    frictionOverlay: HTMLElement,
+    frictionOverlay: FrictionOverlayController,
 ): void {
     if (!playbackStarted) {
         videoPlayer.pause();
-        frictionOverlay.style.display = 'block';
+        frictionOverlay.isVisible = true;
+        renderFrictionOverlay(frictionOverlay, frictionOverlay.onWatchAnyway);
     }
+};
+
+/**
+ * Unmount and remove the React friction overlay from the player container.
+ *
+ * @param frictionOverlay - Overlay controller created during initialization
+ */
+export const disposeFrictionOverlay = function (
+    frictionOverlay: FrictionOverlayController | null,
+): void {
+    if (!frictionOverlay) {
+        return;
+    }
+
+    frictionOverlay.root.unmount();
+    frictionOverlay.container.remove();
 };

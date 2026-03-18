@@ -10,6 +10,7 @@ import type {
 import { initializeC2PAControlBar } from './C2paControlBar/C2paControlBarFunctions';
 import {
     displayFrictionOverlay,
+    disposeFrictionOverlay,
     initializeFrictionOverlay,
 } from './C2paFrictionModal/C2paFrictionModalFunctions';
 import {
@@ -107,7 +108,7 @@ export const C2PAPlayer = function (
         updateC2PATimeline,
     } = getTimelineFunctions() as TimelineFunctions;
 
-    let frictionOverlay: HTMLElement | null = null;
+    let frictionOverlay: import('./C2paFrictionModal/C2paFrictionModalFunctions').FrictionOverlayController | null = null;
     let isManifestInvalid = false;
 
     let seeking = false;
@@ -184,6 +185,7 @@ export const C2PAPlayer = function (
             }
 
             disposeC2PAMenu();
+            disposeFrictionOverlay(frictionOverlay);
 
             try {
                 if (c2paMenu && videoPlayer && videoPlayer.controlBar) {
