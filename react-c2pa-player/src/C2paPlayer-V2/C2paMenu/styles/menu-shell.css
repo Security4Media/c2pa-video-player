@@ -26,6 +26,10 @@
   overflow: hidden !important;
 }
 
+.video-js .c2pa-player-menu-overlay--closing {
+  pointer-events: none !important;
+}
+
 .video-js .c2pa-player-menu-overlay .vjs-menu {
   display: flex !important;
   align-items: flex-start !important;
@@ -81,6 +85,7 @@
   overflow-y: auto !important;
   scrollbar-width: none;
   -ms-overflow-style: none;
+  transform-origin: 1.25rem calc(100% - 3rem);
 }
 
 .video-js .c2pa-player-menu-overlay .vjs-menu ul.vjs-menu-content::-webkit-scrollbar {
