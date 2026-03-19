@@ -1,4 +1,39 @@
-import type { ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
+
+function LoadingSpinner() {
+  const [rotation, setRotation] = useState(0);
+
+  useEffect(() => {
+    let animationFrameId = 0;
+    let lastTimestamp = 0;
+    const rotationPerMillisecond = 0.36;
+
+    const animate = (timestamp: number) => {
+      if (lastTimestamp === 0) {
+        lastTimestamp = timestamp;
+      }
+
+      const delta = timestamp - lastTimestamp;
+      lastTimestamp = timestamp;
+
+      setRotation(currentRotation => (currentRotation + delta * rotationPerMillisecond) % 360);
+      animationFrameId = window.requestAnimationFrame(animate);
+    };
+
+    animationFrameId = window.requestAnimationFrame(animate);
+
+    return () => {
+      window.cancelAnimationFrame(animationFrameId);
+    };
+  }, []);
+
+  return (
+    <div
+      className="c2pa-loading-state__spinner"
+      style={{ transform: `rotate(${rotation}deg)` }}
+    />
+  );
+}
 
 export function MenuTitle() {
   return (
@@ -13,7 +48,7 @@ export function LoadingState() {
     <li className="vjs-menu-item">
       <div className="alert-div alert-div--loading">
         <div className="c2pa-loading-state">
-          <div className="c2pa-loading-state__spinner" />
+          <LoadingSpinner />
           <div>
             <strong>Loading Content Credentials...</strong>
             <br />

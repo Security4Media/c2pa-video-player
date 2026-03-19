@@ -54,10 +54,10 @@ function OrganizationDetails({ organization }: { organization: OrganizationIdent
 }
 
 function IdentityDetails({ itemValue }: { itemValue: CawgOrganizationItem }) {
+    // const signedByText = itemValue.issuer
+    //   ? `Issued by ${itemValue.role ? ` by ${itemValue.role}` : ''}: ${itemValue.issuer}`
+    //   : null;
   const signedByText = itemValue.issuer
-    ? `Signed${itemValue.role ? ` by ${itemValue.role}` : ''}: ${itemValue.issuer}`
-    : null;
-
   return (
     <div className="c2pa-org-section__identity">
       {signedByText ? (

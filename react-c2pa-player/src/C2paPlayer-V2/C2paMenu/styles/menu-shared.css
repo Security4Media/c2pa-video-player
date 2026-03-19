@@ -84,7 +84,8 @@
   border: 3px solid rgba(255, 255, 255, 0.3);
   border-top-color: rgba(125, 180, 255, 1);
   border-radius: 50%;
-  animation: spin 1s linear infinite;
+  flex-shrink: 0;
+  will-change: transform;
 }
 
 .validation-padding {
