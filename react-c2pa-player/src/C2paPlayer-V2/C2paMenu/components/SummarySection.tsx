@@ -12,20 +12,26 @@ export function SummarySection({
     <>
       {section.issuer ? (
         <li className="vjs-menu-item">
-          <MenuField label={sectionTitles.summaryIssuer} value={section.issuer} />
+          <div className="c2pa-summary-section__value">
+            <MenuField label={sectionTitles.summaryIssuer} value={section.issuer} />
+          </div>
         </li>
       ) : null}
       {section.issuedOn ? (
         <li className="vjs-menu-item">
-          <MenuField label={sectionTitles.summaryDate} value={section.issuedOn} />
+          <div className="c2pa-summary-section__value">
+            <MenuField label={sectionTitles.summaryDate} value={section.issuedOn} />
+          </div>
         </li>
       ) : null}
       {section.validationStatus ? (
         <li className="vjs-menu-item">
-          <MenuField
-            label={sectionTitles.validationStatus}
-            value={<ValidationBadge value={section.validationStatus} />}
-          />
+          <div className="c2pa-summary-section__value">
+            <MenuField
+              label={sectionTitles.validationStatus}
+              value={<ValidationBadge value={section.validationStatus} />}
+            />
+          </div>
         </li>
       ) : null}
       {section.alert ? <AlertItem itemValue={section.alert} /> : null}

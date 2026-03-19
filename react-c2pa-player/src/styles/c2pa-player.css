@@ -1,12 +1,6 @@
 /* C2PA Player V2 Styles */
 /* Based on dash-player-js/c2pa-player.css */
-@import '../C2paPlayer-V2/C2paMenu/styles/menu-shell.css';
-@import '../C2paPlayer-V2/C2paMenu/styles/menu-shared.css';
-@import '../C2paPlayer-V2/C2paMenu/styles/section-shared.css';
-@import '../C2paPlayer-V2/C2paMenu/styles/organization-section.css';
-@import '../C2paPlayer-V2/C2paMenu/styles/history-section.css';
-@import '../C2paPlayer-V2/C2paMenu/styles/work-section.css';
-@import '../C2paPlayer-V2/C2paMenu/styles/ai-optout-section.css';
+@import '../C2paPlayer-V2/C2paMenu/styles/index.css';
 
 :root {
   --c2pa-passed: rgb(42, 122, 243);
@@ -211,7 +205,6 @@
   height: 100%;
 }
 
-/*** MENU CSS ***/
 /*** FRICTION OVERLAY ***/
 .friction-overlay {
   position: absolute;

@@ -11,21 +11,9 @@ export function MenuTitle() {
 export function LoadingState() {
   return (
     <li className="vjs-menu-item">
-      <div
-        className="alert-div"
-        style={{ backgroundColor: 'rgba(14, 65, 148, 0.2)', borderColor: 'rgba(255, 255, 255, 0.3)' }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-          <div
-            style={{
-              width: '30px',
-              height: '30px',
-              border: '3px solid rgba(255, 255, 255, 0.3)',
-              borderTopColor: 'rgba(125, 180, 255, 1)',
-              borderRadius: '50%',
-              animation: 'spin 1s linear infinite',
-            }}
-          />
+      <div className="alert-div alert-div--loading">
+        <div className="c2pa-loading-state">
+          <div className="c2pa-loading-state__spinner" />
           <div>
             <strong>Loading Content Credentials...</strong>
             <br />
@@ -40,10 +28,7 @@ export function LoadingState() {
 export function NoManifestState() {
   return (
     <li className="vjs-menu-item">
-      <div
-        className="alert-div"
-        style={{ backgroundColor: 'rgba(14, 65, 148, 0.2)', borderColor: 'rgba(255, 255, 255, 0.3)' }}
-      >
+      <div className="alert-div alert-div--info">
         <div>
           <strong>Warning: No Content Credentials Found</strong>
           <br />

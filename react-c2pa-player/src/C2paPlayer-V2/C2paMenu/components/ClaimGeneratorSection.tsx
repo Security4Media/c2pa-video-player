@@ -18,7 +18,11 @@ export function ClaimGeneratorSection({
 
   return (
     <li className="vjs-menu-item">
-      <MenuField label={title} value={value} multiline={value.length >= 23} />
+      <div className="c2pa-menu-section c2pa-claim-generator-section">
+        <div className="c2pa-claim-generator-section__value">
+          <MenuField label={title} value={value} multiline={value.length >= 23} />
+        </div>
+      </div>
     </li>
   );
 }
