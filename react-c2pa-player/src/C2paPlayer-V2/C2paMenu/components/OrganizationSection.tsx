@@ -54,32 +54,25 @@ function OrganizationDetails({ organization }: { organization: OrganizationIdent
 }
 
 function IdentityDetails({ itemValue }: { itemValue: CawgOrganizationItem }) {
+  const signedByText = itemValue.issuer
+    ? `Signed${itemValue.role ? ` by ${itemValue.role}` : ''}: ${itemValue.issuer}`
+    : null;
+
   return (
     <div className="c2pa-org-section__identity">
-      {itemValue.issuer ? (
+      {signedByText ? (
         <div className="c2pa-org-section__row">
-          <span className="itemName">Signer:</span> {itemValue.issuer}
-        </div>
-      ) : null}
-      {itemValue.role ? (
-        <div className="c2pa-org-section__row">
-          <span className="itemName">Role:</span> {itemValue.role}
+          {signedByText}
         </div>
       ) : null}
       {itemValue.creativeWork?.datePublished ? (
         <div className="c2pa-org-section__row">
-          <span className="itemName">Published:</span> {itemValue.creativeWork.datePublished}
+          <span className="itemName">Published on :</span> {itemValue.creativeWork.datePublished}
         </div>
       ) : null}
       {itemValue.creativeWork?.license ? (
         <div className="c2pa-org-section__row">
-          <span className="itemName">License:</span> <WebsiteLink href={itemValue.creativeWork.license} />
-        </div>
-      ) : null}
-      {Array.isArray(itemValue.authors) && itemValue.authors.length > 0 ? (
-        <div className="c2pa-org-section__row">
-          <span className="itemName">Authors:</span>{' '}
-          {itemValue.authors.map(author => author.name).filter(Boolean).join(', ')}
+          <span className="itemName">Under license:</span> <WebsiteLink href={itemValue.creativeWork.license} />
         </div>
       ) : null}
     </div>
@@ -112,8 +105,19 @@ export function OrganizationSection({
             </span>
           ) : null}
         </div>
-        {section.organization ? <OrganizationDetails organization={section.organization} /> : null}
-        {section.cawg ? <IdentityDetails itemValue={section.cawg} /> : null}
+         {section.cawg ? <IdentityDetails itemValue={section.cawg} /> : null}
+        {section.organization && (
+          section.organization.website ||
+          section.organization.identifier ||
+          section.organization.leiCode ||
+          section.organization.iso6523Code
+        ) ? (
+          <details className="c2pa-org-section__collapsible" tabIndex={0}>
+            <summary className="c2pa-org-section__collapsible-summary">Organization Details</summary>
+            <OrganizationDetails organization={section.organization} />
+          </details>
+        ) : null}
+       
       </div>
     </li>
   );

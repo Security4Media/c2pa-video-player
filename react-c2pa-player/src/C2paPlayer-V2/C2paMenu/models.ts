@@ -79,7 +79,6 @@ export interface CawgOrganizationItem {
     issuer: string;
     role?: CawgRole | null;
     creativeWork: CreativeWorkContentItem | null;
-    authors: PersonAuthorItem[];
     validationStatus: ValidationState;
 }
 

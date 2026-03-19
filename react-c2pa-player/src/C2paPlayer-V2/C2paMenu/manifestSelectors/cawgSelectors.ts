@@ -1,7 +1,7 @@
 import { Manifest, ManifestStore } from '@contentauth/c2pa-web';
 import { getCAWGValidationStatus } from '../../../services/c2pa_functions';
 import { CawgOrganizationItem, ManifestCawgAssertion } from '../models';
-import { selectCreativeWorkAuthors, selectCreativeWorkContent } from './creativeWorkSelectors';
+import { selectCreativeWorkContent } from './creativeWorkSelectors';
 import {
     CAWG_ASSERTION_LABEL,
     CREATIVE_WORK_ASSERTION_LABEL,
@@ -39,7 +39,6 @@ export function selectOrganizationIdentity(manifest: Manifest, manifestStore?: M
         ? getCAWGValidationStatus(manifestStore)
         : 'Unknown';
     cawgItemBuilder.creativeWork = null;
-    cawgItemBuilder.authors = [];
 
     const referencedAssertionLabels = getReferencedAssertionLabels(cawgAssertion);
     if (!referencedAssertionLabels.includes(CREATIVE_WORK_ASSERTION_LABEL)) {
@@ -50,8 +49,6 @@ export function selectOrganizationIdentity(manifest: Manifest, manifestStore?: M
     }
 
     const creativeWorkContent = selectCreativeWorkContent(manifest);
-    const authors = selectCreativeWorkAuthors(manifest);
-
     if (!creativeWorkContent) {
         console.warn(
             `[C2PA] Referenced CreativeWork assertion '${CREATIVE_WORK_ASSERTION_LABEL}' is missing or malformed`
@@ -60,7 +57,6 @@ export function selectOrganizationIdentity(manifest: Manifest, manifestStore?: M
     }
 
     cawgItemBuilder.creativeWork = creativeWorkContent;
-    cawgItemBuilder.authors = authors;
 
     return cawgItemBuilder as CawgOrganizationItem;
 }

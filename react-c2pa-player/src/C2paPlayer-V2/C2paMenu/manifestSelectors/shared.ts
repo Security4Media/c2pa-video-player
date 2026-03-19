@@ -78,6 +78,15 @@ export function selectCawgAssertion(manifest: Manifest): ManifestCawgAssertion |
 }
 
 export function selectCreativeWorkAssertion(manifest: Manifest): ManifestCreativeWorkAssertion | null {
+    const cawgAssertion = selectCawgAssertion(manifest);
+    const referencedAssertionLabels = cawgAssertion
+        ? getReferencedAssertionLabels(cawgAssertion)
+        : [];
+
+    if (!referencedAssertionLabels.includes(CREATIVE_WORK_ASSERTION_LABEL)) {
+        return null;
+    }
+
     const creativeWorkAssertion = manifest.assertions?.find(
         assertion => assertion.label === CREATIVE_WORK_ASSERTION_LABEL
     ) as ManifestCreativeWorkAssertion | undefined;
