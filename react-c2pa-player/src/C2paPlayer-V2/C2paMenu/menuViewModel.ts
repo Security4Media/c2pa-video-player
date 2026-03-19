@@ -2,54 +2,56 @@ import { C2PAStatus } from '@/types/c2pa.types';
 import type { C2PATimelineState } from '../C2PAPlayerRoot.types';
 import { getActiveManifest, getActiveManifestValidationStatus } from '../../services/c2pa_functions';
 import {
-    selectClaimGenerator,
-    selectCreativeWorkAuthors,
-    selectCreativeWorkContent,
-    selectIngredients,
-    selectOrganizationIdentity,
+    selectAiOptOutSection,
+    selectClaimGeneratorSection,
+    selectHistorySection,
+    selectOrganizationSection,
     selectSignatureIssuer,
     selectSignatureTime,
+    selectWorkSection,
 } from './C2paManifestFunctions';
-import {
-    CawgOrganizationItem,
-    ClaimGeneratorItem,
-    IngredientDisplayItem,
-    OrganizationIdentityItem,
+import type {
+    AiOptOutSectionItem,
+    ClaimGeneratorSectionItem,
+    HistorySectionItem,
+    OrganizationSectionItem,
+    WorkSectionItem,
 } from './models';
 
-export const c2paMenuItems = {
-    SIG_ISSUER: 'Issued by',
-    DATE: 'Issued on',
-    CLAIM_GENERATOR: 'App or device used',
-    ORGANIZATION: 'Organization',
-    NAME: 'Producer',
-    CAWG_IDENTITY: 'Publisher Identity (CAWG)',
-    TRAINING_OPTOUT: 'About AI training opt-out',
-    INGREDIENTS: 'History of provenance',
-    C2PA_VALIDATION_STATUS: 'Validation Status',
-    ALERT: 'Alert',
+export const c2paMenuSectionTitles = {
+    summaryIssuer: 'Issued by',
+    summaryDate: 'Issued on',
+    claimGenerator: 'App or device used',
+    organization: 'Organization + Publisher Identity',
+    work: 'Work',
+    aiOptOut: 'About AI training opt-out',
+    history: 'History of provenance',
+    validationStatus: 'Validation Status',
+    alert: 'Alert',
 } as const;
 
-export type C2paMenuItemKey = keyof typeof c2paMenuItems;
 export type C2paMenuMode = 'ready' | 'loading' | 'no-manifest' | 'invalid';
 
-export interface C2paMenuValueMap {
-    SIG_ISSUER: string | null;
-    DATE: string | null;
-    CLAIM_GENERATOR: string | null;
-    ORGANIZATION: OrganizationIdentityItem | null;
-    NAME: string | null;
-    CAWG_IDENTITY: CawgOrganizationItem | null;
-    TRAINING_OPTOUT: string | null;
-    INGREDIENTS: IngredientDisplayItem[] | null;
-    C2PA_VALIDATION_STATUS: string | null;
-    ALERT: string | null;
+export interface SummarySectionItem {
+    issuer: string | null;
+    issuedOn: string | null;
+    validationStatus: string | null;
+    alert: string | null;
+}
+
+export interface C2paMenuSections {
+    summary: SummarySectionItem;
+    claimGenerator: ClaimGeneratorSectionItem | null;
+    organization: OrganizationSectionItem | null;
+    work: WorkSectionItem | null;
+    aiOptOut: AiOptOutSectionItem | null;
+    history: HistorySectionItem | null;
 }
 
 export interface C2paMenuRenderState {
     mode: C2paMenuMode;
     manifestId: string | null;
-    items: Partial<C2paMenuValueMap>;
+    sections: C2paMenuSections | null;
     isInvalid: boolean;
 }
 
@@ -73,22 +75,14 @@ function formatSignatureDate(timeValue: string | null) {
         : null;
 }
 
-function formatClaimGenerators(claimGenerators: ClaimGeneratorItem[] | null) {
-    return claimGenerators?.map(gen => (gen.version ? `${gen.name} ${gen.version}` : gen.name)).join(', ') ?? null;
-}
-
-function formatProducerNames(authors: Array<{ name: string | null }>) {
-    return authors.length > 0 ? authors.map(author => author.name).filter(Boolean).join(', ') : null;
-}
-
 /**
- * Build the normalized render state consumed by the React menu tree.
+ * Build the normalized section-based render state consumed by the React menu tree.
  * The bridge passes raw player status into React, and this helper keeps
- * the mapping from manifest data to UI-facing values in one typed place.
+ * the mapping from manifest data to UI-facing sections in one typed place.
  *
  * @param c2paStatus - Current C2PA player status payload
  * @param timeline - Timeline snapshot from the shared player controller
- * @returns Render state describing menu mode, manifest identity, and item values
+ * @returns Render state describing menu mode, manifest identity, and visible sections
  */
 export function buildMenuRenderState(
     c2paStatus: C2PAStatus | null,
@@ -103,7 +97,7 @@ export function buildMenuRenderState(
         return {
             mode: 'no-manifest',
             manifestId: 'no-manifest',
-            items: {},
+            sections: null,
             isInvalid: false,
         };
     }
@@ -113,7 +107,7 @@ export function buildMenuRenderState(
         return {
             mode: 'loading',
             manifestId: manifestStore?.active_manifest ?? 'loading',
-            items: {},
+            sections: null,
             isInvalid: false,
         };
     }
@@ -123,29 +117,26 @@ export function buildMenuRenderState(
         return {
             mode: 'invalid',
             manifestId: manifestStore.active_manifest ?? null,
-            items: {},
+            sections: null,
             isInvalid: true,
         };
     }
 
-    const claimGenerators = selectClaimGenerator(activeManifest);
-    const authors = selectCreativeWorkAuthors(activeManifest);
-    const creativeWorkContent = selectCreativeWorkContent(activeManifest);
-
     return {
         mode: 'ready',
         manifestId: manifestStore.active_manifest ?? null,
-        items: {
-            SIG_ISSUER: selectSignatureIssuer(activeManifest),
-            DATE: formatSignatureDate(selectSignatureTime(activeManifest)),
-            CLAIM_GENERATOR: formatClaimGenerators(claimGenerators),
-            ORGANIZATION: creativeWorkContent?.organization ?? null,
-            NAME: formatProducerNames(authors),
-            CAWG_IDENTITY: selectOrganizationIdentity(activeManifest, manifestStore),
-            TRAINING_OPTOUT: null,
-            INGREDIENTS: selectIngredients(activeManifest, manifestStore),
-            C2PA_VALIDATION_STATUS: validationStatus ?? 'Unknown',
-            ALERT: buildAlertMessage(timeline),
+        sections: {
+            summary: {
+                issuer: selectSignatureIssuer(activeManifest),
+                issuedOn: formatSignatureDate(selectSignatureTime(activeManifest)),
+                validationStatus: validationStatus ?? 'Unknown',
+                alert: buildAlertMessage(timeline),
+            },
+            claimGenerator: selectClaimGeneratorSection(activeManifest),
+            organization: selectOrganizationSection(activeManifest, manifestStore),
+            work: selectWorkSection(activeManifest, manifestStore),
+            aiOptOut: selectAiOptOutSection(activeManifest),
+            history: selectHistorySection(activeManifest, manifestStore),
         },
         isInvalid: false,
     };

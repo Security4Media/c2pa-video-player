@@ -1,6 +1,6 @@
 import type { C2PATimelineState } from '../C2PAPlayerRoot.types';
 import { C2paMenuContent } from './C2paMenuContent';
-import { c2paMenuItems, buildMenuRenderState } from './menuViewModel';
+import { buildMenuRenderState, c2paMenuSectionTitles } from './menuViewModel';
 import { C2PAStatus } from '@/types/c2pa.types';
 
 interface C2paMenuRootProps {
@@ -19,8 +19,8 @@ export function C2paMenuRoot({ c2paStatus, timeline, resetKey }: C2paMenuRootPro
 
   return (
     <C2paMenuContent
-      menuItems={c2paMenuItems}
-      items={renderState.items}
+      sectionTitles={c2paMenuSectionTitles}
+      sections={renderState.sections}
       mode={renderState.mode}
       resetKey={`${resetKey}:${renderState.manifestId ?? 'none'}`}
     />

@@ -1,18 +1,23 @@
-import { useEffect, useState } from 'react';
-import {
-  C2paMenuItemKey,
+import { useEffect, useState, type ReactNode } from 'react';
+import type {
   C2paMenuMode,
-  C2paMenuValueMap,
+  C2paMenuSections,
+  SummarySectionItem,
 } from './menuViewModel';
 import {
+  AiOptOutSectionItem,
   CawgOrganizationItem,
+  ClaimGeneratorSectionItem,
+  HistorySectionItem,
   IngredientDisplayItem,
   OrganizationIdentityItem,
+  OrganizationSectionItem,
+  WorkSectionItem,
 } from './models';
 
 interface C2paMenuContentProps {
-  menuItems: Record<C2paMenuItemKey, string>;
-  items: Partial<C2paMenuValueMap>;
+  sectionTitles: Record<string, string>;
+  sections: C2paMenuSections | null;
   mode: C2paMenuMode;
   resetKey: string;
 }
@@ -87,25 +92,26 @@ function InvalidState() {
   );
 }
 
-function ValidationStatus({ itemName, itemValue }: { itemName: string; itemValue: string }) {
-  if (itemValue === 'Failed') {
-    return <span className="itemName nextLine">{itemName}</span>;
+function MenuField({
+  label,
+  value,
+  multiline = false,
+}: {
+  label: string;
+  value: ReactNode;
+  multiline?: boolean;
+}) {
+  if (multiline) {
+    return (
+      <div>
+        <div className="itemName">{label}</div> {value}
+      </div>
+    );
   }
 
-  const statusClass = itemValue.toLowerCase();
   return (
-    <>
-      <span className="itemName">{itemName}</span>{' '}
-      <span className={`validation-${statusClass}`}>{itemValue}</span>
-    </>
-  );
-}
-
-function AlertItem({ itemValue }: { itemValue: string }) {
-  return (
-    <div className="alert-div">
-      <img className="alert-icon" />
-      <div>{itemValue}</div>
+    <div>
+      <span className="itemName">{label}</span> {value}
     </div>
   );
 }
@@ -118,53 +124,118 @@ function WebsiteLink({ href }: { href: string }) {
   );
 }
 
-function OrganizationItem({ itemName, itemValue }: { itemName: string; itemValue: OrganizationIdentityItem }) {
+function ValidationBadge({ value }: { value: string }) {
+  return <span className={`validation-${value.toLowerCase()}`}>{value}</span>;
+}
+
+function AlertItem({ itemValue }: { itemValue: string }) {
   return (
-    <div>
-      <div className="itemName">{itemName}</div>
-      {itemValue.name ? <div>{itemValue.name}</div> : null}
-      {itemValue.website ? (
-        <div>
-          <span className="itemName">Website:</span> <WebsiteLink href={itemValue.website} />
-        </div>
-      ) : null}
-      {itemValue.identifier ? (
-        <div>
-          <span className="itemName">Identifier:</span> {itemValue.identifier}
-        </div>
-      ) : null}
-      {itemValue.leiCode ? (
-        <div>
-          <span className="itemName">LEI:</span> {itemValue.leiCode}
-        </div>
-      ) : null}
-      {itemValue.iso6523Code ? (
-        <div>
-          <span className="itemName">ISO 6523:</span> {itemValue.iso6523Code}
-        </div>
-      ) : null}
-    </div>
+    <li className="vjs-menu-item">
+      <div className="alert-div">
+        <img className="alert-icon" />
+        <div>{itemValue}</div>
+      </div>
+    </li>
   );
 }
 
-function CawgIdentityItem({
-  itemName,
+function SummarySection({
+  section,
+  sectionTitles,
+}: {
+  section: SummarySectionItem;
+  sectionTitles: Record<string, string>;
+}) {
+  return (
+    <>
+      {section.issuer ? (
+        <li className="vjs-menu-item">
+          <MenuField label={sectionTitles.summaryIssuer} value={section.issuer} />
+        </li>
+      ) : null}
+      {section.issuedOn ? (
+        <li className="vjs-menu-item">
+          <MenuField label={sectionTitles.summaryDate} value={section.issuedOn} />
+        </li>
+      ) : null}
+      {section.validationStatus ? (
+        <li className="vjs-menu-item">
+          <MenuField
+            label={sectionTitles.validationStatus}
+            value={<ValidationBadge value={section.validationStatus} />}
+          />
+        </li>
+      ) : null}
+      {section.alert ? <AlertItem itemValue={section.alert} /> : null}
+    </>
+  );
+}
+
+function ClaimGeneratorSection({
+  section,
+  title,
+}: {
+  section: ClaimGeneratorSectionItem;
+  title: string;
+}) {
+  const value = section.products
+    .map(product => (product.version ? `${product.name} ${product.version}` : product.name))
+    .join(', ');
+
+  if (!value) {
+    return null;
+  }
+
+  return (
+    <li className="vjs-menu-item">
+      <MenuField label={title} value={value} multiline={value.length >= 23} />
+    </li>
+  );
+}
+
+function OrganizationDetails({ organization }: { organization: OrganizationIdentityItem }) {
+  return (
+    <>
+      {organization.name ? <div>{organization.name}</div> : null}
+      {organization.website ? (
+        <div>
+          <span className="itemName">Website:</span> <WebsiteLink href={organization.website} />
+        </div>
+      ) : null}
+      {organization.identifier ? (
+        <div>
+          <span className="itemName">Identifier:</span> {organization.identifier}
+        </div>
+      ) : null}
+      {organization.leiCode ? (
+        <div>
+          <span className="itemName">LEI:</span> {organization.leiCode}
+        </div>
+      ) : null}
+      {organization.iso6523Code ? (
+        <div>
+          <span className="itemName">ISO 6523:</span> {organization.iso6523Code}
+        </div>
+      ) : null}
+    </>
+  );
+}
+
+function CawgIdentityDetails({
   itemValue,
   isExpanded,
   onToggle,
 }: {
-  itemName: string;
   itemValue: CawgOrganizationItem;
   isExpanded: boolean;
   onToggle: () => void;
 }) {
   const validationStatus = itemValue.validationStatus;
-  const statusClass = validationStatus?.toLowerCase();
 
   return (
     <>
       <div className="cawg-header" onClick={onToggle} style={{ cursor: 'pointer' }}>
-        <span className="itemName">{itemName}</span>
+        <span className="itemName">Publisher Identity (CAWG)</span>
         <span className={`cawg-toggle ${isExpanded ? 'expanded' : ''}`}>›</span>
       </div>
       <div className="cawg-identity" style={{ display: isExpanded ? 'flex' : 'none' }}>
@@ -181,7 +252,7 @@ function CawgIdentityItem({
         {validationStatus ? (
           <div>
             <span className="itemName">Validation Status:</span>{' '}
-            <span className={`validation-${statusClass}`}>{validationStatus}</span>
+            <ValidationBadge value={validationStatus} />
           </div>
         ) : null}
         {itemValue.creativeWork?.organization?.name ? (
@@ -202,11 +273,119 @@ function CawgIdentityItem({
         {Array.isArray(itemValue.authors) && itemValue.authors.length > 0 ? (
           <div>
             <span className="itemName">Authors:</span>{' '}
-            {itemValue.authors.map((author: any) => author.name).filter(Boolean).join(', ')}
+            {itemValue.authors.map(author => author.name).filter(Boolean).join(', ')}
           </div>
         ) : null}
       </div>
     </>
+  );
+}
+
+function OrganizationSection({
+  section,
+  title,
+  isExpanded,
+  onToggleCawg,
+}: {
+  section: OrganizationSectionItem;
+  title: string;
+  isExpanded: boolean;
+  onToggleCawg: () => void;
+}) {
+  return (
+    <li className="vjs-menu-item">
+      <div className="ingredients-container">
+        <div className="ingredients-main-header">
+          <span className="itemName">{title}</span>
+        </div>
+        {section.organization ? <OrganizationDetails organization={section.organization} /> : null}
+        {section.cawg ? (
+          <CawgIdentityDetails
+            itemValue={section.cawg}
+            isExpanded={isExpanded}
+            onToggle={onToggleCawg}
+          />
+        ) : null}
+      </div>
+    </li>
+  );
+}
+
+function WorkSection({
+  section,
+  title,
+}: {
+  section: WorkSectionItem;
+  title: string;
+}) {
+  return (
+    <li className="vjs-menu-item">
+      <div>
+        <div className="itemName">{title}</div>
+        {section.role ? (
+          <div>
+            <span className="itemName">Role:</span> {section.role}
+          </div>
+        ) : null}
+        {section.authors.map((author, index) => (
+          <div key={`${author.identifier ?? author.email ?? author.name ?? 'author'}-${index}`} style={{ marginTop: '8px' }}>
+            {author.name ? (
+              <div>
+                <span className="itemName">Author:</span> {author.name}
+              </div>
+            ) : null}
+            {author.skill ? (
+              <div>
+                <span className="itemName">Role:</span> {author.skill}
+              </div>
+            ) : null}
+            {author.email ? (
+              <div>
+                <span className="itemName">Email:</span> {author.email}
+              </div>
+            ) : null}
+            {author.department ? (
+              <div>
+                <span className="itemName">Department:</span> {author.department}
+              </div>
+            ) : null}
+            {author.identifier ? (
+              <div>
+                <span className="itemName">Identifier:</span> {author.identifier}
+              </div>
+            ) : null}
+          </div>
+        ))}
+      </div>
+    </li>
+  );
+}
+
+function AiOptOutSection({
+  section,
+  title,
+}: {
+  section: AiOptOutSectionItem;
+  title: string;
+}) {
+  return (
+    <li className="vjs-menu-item">
+      <div>
+        <div className="itemName">{title}</div>
+        {section.assertions.map(assertion => (
+          <div key={assertion.label} style={{ marginTop: '8px' }}>
+            <div>
+              <span className="itemName">Assertion:</span> {assertion.label}
+            </div>
+            {assertion.entries.map(entry => (
+              <div key={`${assertion.label}-${entry.key}`}>
+                <span className="itemName">{entry.key}:</span> {entry.use ?? 'Unknown'}
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
+    </li>
   );
 }
 
@@ -223,7 +402,6 @@ function IngredientNode({
 }) {
   const ingredientId = parentId ? `${parentId}-ingredient-${ingredient.index}` : `ingredient-${ingredient.index}`;
   const isExpanded = ingredientsExpanded[ingredientId] || false;
-  const statusClass = ingredient.validationStatus?.toLowerCase();
 
   return (
     <div className="ingredient-item">
@@ -266,16 +444,15 @@ function IngredientNode({
         {ingredient.validationStatus ? (
           <div>
             <span className="itemName">Validation Status:</span>{' '}
-            <span className={`validation-${statusClass}`}>{ingredient.validationStatus}</span>
+            <ValidationBadge value={ingredient.validationStatus} />
           </div>
         ) : null}
-
         {Array.isArray(ingredient.ingredients) && ingredient.ingredients.length > 0 ? (
           <div className="nested-ingredients">
             <div className="nested-ingredients-header">
               <span className="itemName">Sub-Ingredients:</span>
             </div>
-            {ingredient.ingredients.map((nestedIngredient: any) => (
+            {ingredient.ingredients.map((nestedIngredient) => (
               <IngredientNode
                 key={`${ingredientId}-${nestedIngredient.index}`}
                 ingredient={nestedIngredient}
@@ -291,93 +468,34 @@ function IngredientNode({
   );
 }
 
-function IngredientsItem({
-  itemName,
-  itemValue,
+function HistorySection({
+  section,
+  title,
   ingredientsExpanded,
   onToggleIngredient,
 }: {
-  itemName: string;
-  itemValue: IngredientDisplayItem[];
+  section: HistorySectionItem;
+  title: string;
   ingredientsExpanded: Record<string, boolean>;
   onToggleIngredient: (id: string) => void;
 }) {
   return (
-    <div className="ingredients-container">
-      <div className="ingredients-main-header">
-        <span className="itemName">{itemName}</span>
+    <li className="vjs-menu-item">
+      <div className="ingredients-container">
+        <div className="ingredients-main-header">
+          <span className="itemName">{title}</span>
+        </div>
+        {section.ingredients.map((ingredient) => (
+          <IngredientNode
+            key={`ingredient-${ingredient.index}`}
+            ingredient={ingredient}
+            ingredientsExpanded={ingredientsExpanded}
+            onToggleIngredient={onToggleIngredient}
+          />
+        ))}
       </div>
-      {itemValue.map((ingredient: any) => (
-        <IngredientNode
-          key={`ingredient-${ingredient.index}`}
-          ingredient={ingredient}
-          ingredientsExpanded={ingredientsExpanded}
-          onToggleIngredient={onToggleIngredient}
-        />
-      ))}
-    </div>
+    </li>
   );
-}
-
-function DefaultItem({ itemName, itemValue }: { itemName: string; itemValue: string }) {
-  if (itemValue.length >= 23) {
-    return (
-      <>
-        <div className="itemName">{itemName}</div> {itemValue}
-      </>
-    );
-  }
-
-  return (
-    <>
-      <span className="itemName">{itemName}</span> {itemValue}
-    </>
-  );
-}
-
-function renderMenuItem(
-  itemKey: C2paMenuItemKey,
-  itemName: string,
-  itemValue: C2paMenuValueMap[C2paMenuItemKey] | null,
-  cawgIdentityExpanded: boolean,
-  ingredientsExpanded: Record<string, boolean>,
-  onToggleCawg: () => void,
-  onToggleIngredient: (id: string) => void,
-) {
-  if (itemValue == null) {
-    return null;
-  }
-
-  switch (itemKey) {
-    case 'ALERT':
-      return typeof itemValue === 'string' ? <AlertItem itemValue={itemValue} /> : null;
-    case 'C2PA_VALIDATION_STATUS':
-      return typeof itemValue === 'string' ? <ValidationStatus itemName={itemName} itemValue={itemValue} /> : null;
-    case 'CAWG_IDENTITY':
-      return itemValue && typeof itemValue === 'object' && !Array.isArray(itemValue) ? (
-        <CawgIdentityItem
-          itemName={itemName}
-          itemValue={itemValue as CawgOrganizationItem}
-          isExpanded={cawgIdentityExpanded}
-          onToggle={onToggleCawg}
-        />
-      ) : null;
-    case 'INGREDIENTS':
-      return Array.isArray(itemValue) ? (
-        <IngredientsItem
-          itemName={itemName}
-          itemValue={itemValue as IngredientDisplayItem[]}
-          ingredientsExpanded={ingredientsExpanded}
-          onToggleIngredient={onToggleIngredient}
-        />
-      ) : null;
-    case 'ORGANIZATION':
-      return itemValue && typeof itemValue === 'object' && !Array.isArray(itemValue)
-        ? <OrganizationItem itemName={itemName} itemValue={itemValue as OrganizationIdentityItem} />
-        : null;
-    default:
-      return typeof itemValue === 'string' ? <DefaultItem itemName={itemName} itemValue={itemValue} /> : null;
-  }
 }
 
 /**
@@ -386,8 +504,8 @@ function renderMenuItem(
  * collapsing CAWG and ingredient sections.
  */
 export function C2paMenuContent({
-  menuItems,
-  items,
+  sectionTitles,
+  sections,
   mode,
   resetKey,
 }: C2paMenuContentProps) {
@@ -437,30 +555,48 @@ export function C2paMenuContent({
     );
   }
 
+  if (!sections) {
+    return <MenuTitle />;
+  }
+
   return (
     <>
       <MenuTitle />
-      {Object.entries(menuItems).map(([itemKey, itemName]) => {
-        const content = renderMenuItem(
-          itemKey as C2paMenuItemKey,
-          itemName,
-          items[itemKey as C2paMenuItemKey] ?? null,
-          cawgIdentityExpanded,
-          ingredientsExpanded,
-          handleToggleCawg,
-          handleToggleIngredient,
-        );
-
-        if (!content) {
-          return null;
-        }
-
-        return (
-          <li key={itemKey} className="vjs-menu-item">
-            {content}
-          </li>
-        );
-      })}
+      <SummarySection section={sections.summary} sectionTitles={sectionTitles} />
+      {sections.claimGenerator ? (
+        <ClaimGeneratorSection
+          section={sections.claimGenerator}
+          title={sectionTitles.claimGenerator}
+        />
+      ) : null}
+      {sections.organization ? (
+        <OrganizationSection
+          section={sections.organization}
+          title={sectionTitles.organization}
+          isExpanded={cawgIdentityExpanded}
+          onToggleCawg={handleToggleCawg}
+        />
+      ) : null}
+      {sections.work ? (
+        <WorkSection
+          section={sections.work}
+          title={sectionTitles.work}
+        />
+      ) : null}
+      {sections.aiOptOut ? (
+        <AiOptOutSection
+          section={sections.aiOptOut}
+          title={sectionTitles.aiOptOut}
+        />
+      ) : null}
+      {sections.history ? (
+        <HistorySection
+          section={sections.history}
+          title={sectionTitles.history}
+          ingredientsExpanded={ingredientsExpanded}
+          onToggleIngredient={handleToggleIngredient}
+        />
+      ) : null}
     </>
   );
 }
