@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { type CSSProperties, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import type { C2PAPlayerRootController } from './C2PAPlayerRoot.types';
 import { C2paFrictionOverlay } from './C2paFrictionModal/C2paFrictionOverlay';
 import { C2paMenuRoot } from './C2paMenu/C2paMenuRoot';
@@ -15,6 +15,18 @@ const MENU_CLOSE_ANIMATION_EASING = 'cubic-bezier(0.55, 0.06, 0.68, 0.19)';
 
 type MenuRenderPhase = 'opening' | 'open' | 'closing';
 
+const MENU_POINTER_DEFAULT_CENTER_PX = 43;
+const MENU_POINTER_HALF_WIDTH_PX = 11;
+
+type MenuAnchorStyle = CSSProperties & {
+    '--c2pa-menu-panel-offset-x'?: string;
+    '--c2pa-menu-anchor-origin-x'?: string;
+};
+
+function clamp(value: number, min: number, max: number) {
+    return Math.min(Math.max(value, min), max);
+}
+
 /**
  * Top-level React overlay layer mounted into the Video.js player container.
  * Additional player-level React UI can be added here over time while the
@@ -30,7 +42,8 @@ export function C2PAPlayerRoot({
 }: C2PAPlayerRootProps) {
     const [isMenuRendered, setIsMenuRendered] = useState(false);
     const [menuRenderPhase, setMenuRenderPhase] = useState<MenuRenderPhase>('closing');
-    const menuContentRef = useRef<HTMLDivElement | null>(null);
+    const [menuAnchorStyle, setMenuAnchorStyle] = useState<MenuAnchorStyle>({});
+    const menuShellRef = useRef<HTMLDivElement | null>(null);
     const state = useSyncExternalStore(
         controller.subscribe,
         controller.getState,
@@ -61,7 +74,7 @@ export function C2PAPlayerRoot({
     }, [isMenuRendered, state.isMenuOpen]);
 
     useEffect(() => {
-        const menuElement = menuContentRef.current;
+        const menuElement = menuShellRef.current?.querySelector('.c2pa-menu-panel') as HTMLDivElement | null;
         if (!menuElement) {
             return;
         }
@@ -131,6 +144,66 @@ export function C2PAPlayerRoot({
         menuElement.style.filter = 'blur(0)';
     }, [menuRenderPhase]);
 
+    useEffect(() => {
+        if (!isMenuRendered) {
+            setMenuAnchorStyle({});
+            return;
+        }
+
+        const updateMenuAnchor = () => {
+            const shellElement = menuShellRef.current;
+            const panelElement = shellElement?.querySelector('.c2pa-menu-panel') as HTMLDivElement | null;
+            const overlayElement = shellElement?.closest('.c2pa-player-menu-overlay') as HTMLDivElement | null;
+            const playerElement = controller.container.parentElement;
+            const iconElement = playerElement?.querySelector('.c2pa-menu-button .vjs-icon-placeholder') as HTMLSpanElement | null;
+
+            if (!shellElement || !panelElement || !overlayElement || !playerElement || !iconElement) {
+                setMenuAnchorStyle({});
+                return;
+            }
+
+            const overlayRect = overlayElement.getBoundingClientRect();
+            const panelRect = panelElement.getBoundingClientRect();
+            const iconRect = iconElement.getBoundingClientRect();
+
+            const anchorCenterX = iconRect.left + (iconRect.width / 2) - overlayRect.left;
+            const maxPanelOffsetX = Math.max(0, overlayRect.width - panelRect.width);
+            const panelOffsetX = clamp(
+                anchorCenterX - MENU_POINTER_DEFAULT_CENTER_PX,
+                0,
+                maxPanelOffsetX,
+            );
+            const anchorOriginX = clamp(
+                anchorCenterX - panelOffsetX,
+                MENU_POINTER_HALF_WIDTH_PX,
+                panelRect.width - MENU_POINTER_HALF_WIDTH_PX,
+            );
+
+            setMenuAnchorStyle({
+                '--c2pa-menu-panel-offset-x': `${panelOffsetX}px`,
+                '--c2pa-menu-anchor-origin-x': `${anchorOriginX}px`,
+            });
+        };
+
+        updateMenuAnchor();
+
+        const playerElement = controller.container.parentElement;
+        const resizeObserver = new ResizeObserver(() => {
+            updateMenuAnchor();
+        });
+
+        if (playerElement) {
+            resizeObserver.observe(playerElement);
+        }
+
+        window.addEventListener('resize', updateMenuAnchor);
+
+        return () => {
+            resizeObserver.disconnect();
+            window.removeEventListener('resize', updateMenuAnchor);
+        };
+    }, [controller.container, isMenuRendered, state.isMenuOpen]);
+
     return (
         <>
             <C2paFrictionOverlay
@@ -140,7 +213,11 @@ export function C2PAPlayerRoot({
             {isMenuRendered ? (
                 <div className={`c2pa-player-menu-overlay c2pa-player-menu-overlay--${menuRenderPhase}`}>
                     <div className="vjs-menu">
-                        <div ref={menuContentRef}>
+                        <div
+                            ref={menuShellRef}
+                            className="c2pa-menu-panel-shell"
+                            style={menuAnchorStyle}
+                        >
                             <C2paMenuRoot
                                 c2paStatus={state.c2paStatus}
                                 timeline={state.timeline}

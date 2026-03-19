@@ -39,6 +39,14 @@
   overflow: visible !important;
 }
 
+.video-js .c2pa-player-menu-overlay .vjs-menu .c2pa-menu-panel-shell {
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-start;
+  width: 100%;
+  height: 100%;
+}
+
 .video-js .c2pa-player-menu-overlay .vjs-menu .vjs-menu-content {
   font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   background: transparent;
@@ -60,9 +68,13 @@
 
 .video-js .c2pa-player-menu-overlay .vjs-menu .c2pa-menu-panel {
   position: relative;
-  width: min(32rem, calc(100% - 2rem)) !important;
-  max-width: min(32rem, calc(100% - 2rem)) !important;
-  min-width: min(32rem, calc(100% - 2rem)) !important;
+  margin-left: var(--c2pa-menu-panel-offset-x, 0) !important;
+  width: min(32rem, calc(100% - 1.5rem)) !important;
+  max-width: min(32rem, calc(100% - 1.5rem)) !important;
+  min-width: min(32rem, calc(100% - 1.5rem)) !important;
+  min-height: min(42rem, calc(100% - 1.5rem)) !important;
+  height: min(42rem, calc(100% - 1.5rem)) !important;
+  max-height: min(42rem, calc(100% - 1.5rem)) !important;
   display: flex !important;
   flex-direction: column !important;
   align-items: flex-start !important;
@@ -80,15 +92,14 @@
     0 0 2rem rgba(14, 65, 148, 0.6),
     0 0.5rem 2rem rgba(0, 0, 0, 0.5),
     0 0 0 1px rgba(255, 255, 255, 0.15) inset !important;
-  max-height: 100% !important;
   overflow: hidden !important;
-  transform-origin: 2.4rem calc(100% + 1rem);
+  transform-origin: var(--c2pa-menu-anchor-origin-x, 2.4rem) calc(100% + 1rem);
 }
 
 .video-js .c2pa-player-menu-overlay .vjs-menu .c2pa-menu-panel::after {
   content: '';
   position: absolute;
-  left: 2rem;
+  left: calc(var(--c2pa-menu-anchor-origin-x, 2.4rem) - 0.675rem);
   bottom: -0.95rem;
   width: 1.35rem;
   height: 1.35rem;
@@ -207,6 +218,9 @@
     width: calc(100% - 1rem) !important;
     max-width: calc(100% - 1rem) !important;
     min-width: calc(100% - 1rem) !important;
+    min-height: min(32rem, calc(100% - 1rem)) !important;
+    height: min(32rem, calc(100% - 1rem)) !important;
+    max-height: min(32rem, calc(100% - 1rem)) !important;
   }
 
   .video-js .c2pa-player-menu-overlay {
@@ -214,7 +228,7 @@
   }
 
   .video-js .c2pa-player-menu-overlay .vjs-menu .c2pa-menu-panel::after {
-    left: 1.4rem;
+    left: calc(var(--c2pa-menu-anchor-origin-x, 1.4rem) - 0.675rem);
   }
 
   .vjs-menu .c2pa-menu-header {
