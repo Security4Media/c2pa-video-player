@@ -35,17 +35,11 @@ export function C2paMenuContent({
   mode,
   resetKey,
 }: C2paMenuContentProps) {
-  const [cawgIdentityExpanded, setCawgIdentityExpanded] = useState(false);
   const [ingredientsExpanded, setIngredientsExpanded] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
-    setCawgIdentityExpanded(false);
     setIngredientsExpanded({});
   }, [resetKey]);
-
-  const handleToggleCawg = () => {
-    setCawgIdentityExpanded(current => !current);
-  };
 
   const handleToggleIngredient = (ingredientId: string) => {
     setIngredientsExpanded(current => ({
@@ -99,8 +93,6 @@ export function C2paMenuContent({
         <OrganizationSection
           section={sections.organization}
           title={sectionTitles.organization}
-          isExpanded={cawgIdentityExpanded}
-          onToggleCawg={handleToggleCawg}
         />
       ) : null}
       {sections.work ? (

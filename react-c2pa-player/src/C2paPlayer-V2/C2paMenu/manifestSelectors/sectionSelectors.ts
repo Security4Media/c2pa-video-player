@@ -87,15 +87,17 @@ export function selectWorkSection(
     manifestStore?: ManifestStore,
 ): WorkSectionItem | null {
     const authors = selectCreativeWorkAuthors(manifest);
+    const organization = selectCreativeWorkOrganization(manifest);
     const cawg = selectOrganizationIdentity(manifest, manifestStore);
     const role = cawg?.role ?? null;
 
-    if (authors.length === 0 && !role) {
+    if (authors.length === 0 && !role && !organization?.name) {
         return null;
     }
 
     return {
         authors,
         role,
+        organizationName: organization?.name ?? null,
     };
 }

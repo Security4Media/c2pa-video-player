@@ -91,6 +91,7 @@ export interface OrganizationSectionItem {
 export interface WorkSectionItem {
     authors: PersonAuthorItem[];
     role: CawgRole | null;
+    organizationName: string | null;
 }
 
 export interface AiOptOutEntryItem {

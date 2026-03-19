@@ -1,0 +1,79 @@
+/* Shared C2PA menu primitives */
+
+.vjs-menu li.vjs-menu-item .itemName {
+  font-weight: 600;
+  padding-bottom: 0.4rem;
+  color: #ff9800 !important;
+  font-size: 1rem;
+  letter-spacing: -0.01em;
+}
+
+.vjs-menu .url {
+  color: #7db4ff;
+  text-decoration: underline;
+  text-decoration-color: rgba(125, 180, 255, 0.4);
+  text-underline-offset: 0.15rem;
+  transition: all 0.2s ease;
+  word-break: break-all;
+}
+
+.vjs-menu .url:hover {
+  color: #a8d0ff;
+  text-decoration-color: rgba(168, 208, 255, 0.8);
+}
+
+.vjs-menu li.vjs-menu-item .validation-trusted {
+  color: var(--c2pa-trusted);
+  font-weight: 600;
+}
+
+.vjs-menu li.vjs-menu-item .validation-valid {
+  color: var(--c2pa-passed);
+  font-weight: 600;
+}
+
+.vjs-menu li.vjs-menu-item .validation-invalid,
+.vjs-menu li.vjs-menu-item .validation-failed {
+  color: var(--c2pa-failed);
+  font-weight: 600;
+}
+
+.vjs-menu li.vjs-menu-item .validation-unknown {
+  color: var(--c2pa-unknown);
+  font-weight: 600;
+}
+
+.vjs-menu li.vjs-menu-item .alert-div {
+  width: auto;
+  min-width: min(18rem, 100%);
+  max-width: 100%;
+  background-color: rgba(211, 53, 16, 0.15);
+  border: 0.15rem solid var(--c2pa-failed);
+  padding: 1rem;
+  border-radius: 0.5rem;
+  display: flex;
+  align-items: flex-start;
+  backdrop-filter: blur(0.25rem);
+  box-shadow: 0 0.25rem 0.75rem rgba(211, 53, 16, 0.2);
+}
+
+.vjs-menu li.vjs-menu-item .alert-icon {
+  content: url('/src/assets/icons/alert.svg');
+  padding-right: 0.6rem;
+  flex-shrink: 0;
+}
+
+.validation-padding {
+  padding-bottom: 0 !important;
+}
+
+@media (max-width: 768px) {
+  .vjs-menu li.vjs-menu-item .itemName {
+    font-size: 0.95rem;
+  }
+
+  .vjs-menu li.vjs-menu-item .alert-div {
+    padding: 0.8rem;
+    font-size: 0.9rem;
+  }
+}

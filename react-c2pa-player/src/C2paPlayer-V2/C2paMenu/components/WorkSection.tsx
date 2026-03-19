@@ -11,6 +11,11 @@ export function WorkSection({
     <li className="vjs-menu-item">
       <div>
         <div className="itemName">{title}</div>
+        {section.organizationName ? (
+          <div>
+            <span className="itemName">Organization:</span> {section.organizationName}
+          </div>
+        ) : null}
         {section.role ? (
           <div>
             <span className="itemName">Role:</span> {section.role}

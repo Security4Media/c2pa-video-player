@@ -1,0 +1,53 @@
+/* Organization section */
+
+.vjs-menu li.vjs-menu-item .c2pa-org-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  width: 100%;
+}
+
+.vjs-menu li.vjs-menu-item .c2pa-org-section__header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.25rem;
+}
+
+.vjs-menu li.vjs-menu-item .c2pa-org-section__title {
+  padding-bottom: 0;
+}
+
+.vjs-menu li.vjs-menu-item .c2pa-org-section__status {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.15rem;
+  line-height: 1;
+  cursor: help;
+}
+
+.vjs-menu li.vjs-menu-item .c2pa-org-section__details,
+.vjs-menu li.vjs-menu-item .c2pa-org-section__identity {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  width: 100%;
+  max-width: 100%;
+}
+
+.vjs-menu li.vjs-menu-item .c2pa-org-section__identity {
+  padding-top: 0.25rem;
+}
+
+.vjs-menu li.vjs-menu-item .c2pa-org-section__row {
+  line-height: 1.4;
+  width: auto;
+  max-width: 100%;
+}
+
+.vjs-menu li.vjs-menu-item .c2pa-org-section__row .itemName {
+  padding-bottom: 0;
+  padding-right: 0.25rem;
+}
