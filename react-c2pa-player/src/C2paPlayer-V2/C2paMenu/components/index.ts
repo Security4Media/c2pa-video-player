@@ -9,7 +9,7 @@ export {
   InvalidState,
   LoadingState,
   MenuField,
-  MenuTitle,
+  MenuHeader,
   NoManifestState,
   ValidationBadge,
   WebsiteLink,

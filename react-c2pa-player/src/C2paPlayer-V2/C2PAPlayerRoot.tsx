@@ -30,7 +30,7 @@ export function C2PAPlayerRoot({
 }: C2PAPlayerRootProps) {
     const [isMenuRendered, setIsMenuRendered] = useState(false);
     const [menuRenderPhase, setMenuRenderPhase] = useState<MenuRenderPhase>('closing');
-    const menuContentRef = useRef<HTMLUListElement | null>(null);
+    const menuContentRef = useRef<HTMLDivElement | null>(null);
     const state = useSyncExternalStore(
         controller.subscribe,
         controller.getState,
@@ -140,13 +140,13 @@ export function C2PAPlayerRoot({
             {isMenuRendered ? (
                 <div className={`c2pa-player-menu-overlay c2pa-player-menu-overlay--${menuRenderPhase}`}>
                     <div className="vjs-menu">
-                        <ul className="vjs-menu-content" role="menu" ref={menuContentRef}>
+                        <div ref={menuContentRef}>
                             <C2paMenuRoot
                                 c2paStatus={state.c2paStatus}
                                 timeline={state.timeline}
                                 resetKey={state.menuResetKey}
                             />
-                        </ul>
+                        </div>
                     </div>
                 </div>
             ) : null}

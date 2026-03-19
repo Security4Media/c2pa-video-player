@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { type ReactNode, useEffect, useState } from 'react';
 import type {
   C2paMenuMode,
   C2paMenuSections,
@@ -11,7 +11,7 @@ import {
   HistorySection,
   InvalidState,
   LoadingState,
-  MenuTitle,
+  MenuHeader,
   NoManifestState,
   OrganizationSection,
   SummarySection,
@@ -55,100 +55,118 @@ export function C2paMenuContent({
     }));
   };
 
+  let headerTitle = 'Content Credentials';
+  let headerAction: ReactNode = null;
+
   if (mode === 'loading') {
     return (
-      <>
-        <MenuTitle />
-        <LoadingState />
-      </>
+      <div className="c2pa-menu-panel">
+        <MenuHeader title={headerTitle} />
+        <ul className="vjs-menu-content c2pa-menu-content-list" role="menu">
+          <LoadingState />
+        </ul>
+      </div>
     );
   }
 
   if (mode === 'no-manifest') {
     return (
-      <>
-        <MenuTitle />
-        <NoManifestState />
-      </>
+      <div className="c2pa-menu-panel">
+        <MenuHeader title={headerTitle} />
+        <ul className="vjs-menu-content c2pa-menu-content-list" role="menu">
+          <NoManifestState />
+        </ul>
+      </div>
     );
   }
 
   if (mode === 'invalid') {
     return (
-      <>
-        <MenuTitle />
-        <InvalidState />
-      </>
+      <div className="c2pa-menu-panel">
+        <MenuHeader title={headerTitle} />
+        <ul className="vjs-menu-content c2pa-menu-content-list" role="menu">
+          <InvalidState />
+        </ul>
+      </div>
     );
   }
 
   if (!sections) {
-    return <MenuTitle />;
+    return (
+      <div className="c2pa-menu-panel">
+        <MenuHeader title={headerTitle} />
+        <ul className="vjs-menu-content c2pa-menu-content-list" role="menu" />
+      </div>
+    );
   }
 
   if (activeView === 'history' && sections.history) {
+    headerTitle = sectionTitles.history;
+    headerAction = (
+      <button
+        className="c2pa-history-section__back-button c2pa-history-section__back-button--title"
+        type="button"
+        onClick={() => setActiveView('default')}
+        aria-label="Back to Content Credentials"
+      >
+        <span className="c2pa-history-section__back-icon">‹</span>
+      </button>
+    );
+
     return (
-      <>
-        <MenuTitle
-          title={sectionTitles.history}
-          leadingAction={(
-            <button
-              className="c2pa-history-section__back-button c2pa-history-section__back-button--title"
-              type="button"
-              onClick={() => setActiveView('default')}
-              aria-label="Back to Content Credentials"
-            >
-              <span className="c2pa-history-section__back-icon">‹</span>
-            </button>
-          )}
-        />
-        <HistoryDetailView
-          section={sections.history}
-          ingredientsExpanded={ingredientsExpanded}
-          onToggleIngredient={handleToggleIngredient}
-        />
-      </>
+      <div className="c2pa-menu-panel">
+        <MenuHeader title={headerTitle} leadingAction={headerAction} />
+        <ul className="vjs-menu-content c2pa-menu-content-list" role="menu">
+          <HistoryDetailView
+            section={sections.history}
+            ingredientsExpanded={ingredientsExpanded}
+            onToggleIngredient={handleToggleIngredient}
+          />
+        </ul>
+      </div>
     );
   }
 
   return (
-    <>
-      <MenuTitle />
-      <SummarySection section={sections.summary} sectionTitles={sectionTitles} />
-      {sections.claimGenerator ? (
-        <ClaimGeneratorSection
-          section={sections.claimGenerator}
-          title={sectionTitles.claimGenerator}
-        />
-      ) : null}
-      {sections.organization ? (
-        <OrganizationSection
-          section={sections.organization}
-          title={sectionTitles.organization}
-        />
-      ) : null}
-      {sections.work ? (
-        <WorkSection
-          section={sections.work}
-          title={sectionTitles.work}
-          isExpanded={workExpanded}
-          onToggle={() => setWorkExpanded(current => !current)}
-        />
-      ) : null}
-      {sections.aiOptOut ? (
-        <AiOptOutSection
-          section={sections.aiOptOut}
-          title={sectionTitles.aiOptOut}
-          isExpanded={aiOptOutExpanded}
-          onToggle={() => setAiOptOutExpanded(current => !current)}
-        />
-      ) : null}
-      {sections.history ? (
-        <HistorySection
-          title={sectionTitles.history}
-          onOpen={() => setActiveView('history')}
-        />
-      ) : null}
-    </>
+    <div className="c2pa-menu-panel">
+      <MenuHeader title={headerTitle} />
+      <ul className="vjs-menu-content c2pa-menu-content-list" role="menu">
+        <SummarySection section={sections.summary} sectionTitles={sectionTitles} />
+        {sections.claimGenerator ? (
+          <ClaimGeneratorSection
+            section={sections.claimGenerator}
+            title={sectionTitles.claimGenerator}
+          />
+        ) : null}
+        {sections.organization ? (
+          <OrganizationSection
+            section={sections.organization}
+            title={sectionTitles.organization}
+          />
+        ) : null}
+        {sections.work ? (
+          <WorkSection
+            section={sections.work}
+            title={sectionTitles.work}
+            isExpanded={workExpanded}
+            onToggle={() => setWorkExpanded(current => !current)}
+          />
+        ) : null}
+        {sections.aiOptOut ? (
+          <AiOptOutSection
+            section={sections.aiOptOut}
+            title={sectionTitles.aiOptOut}
+            isExpanded={aiOptOutExpanded}
+            onToggle={() => setAiOptOutExpanded(current => !current)}
+          />
+        ) : null}
+        {sections.history ? (
+          <HistorySection
+            title={sectionTitles.history}
+            onOpen={() => setActiveView('history')}
+          />
+        ) : null}
+      </ul>
+    </div>
   );
 }
