@@ -22,8 +22,8 @@ export const c2paMenuSectionTitles = {
     summaryIssuer: 'Issued by',
     summaryDate: 'Issued on',
     claimGenerator: 'App or device used',
-    organization: 'Organization + Publisher Identity',
-    work: 'Work',
+    organization: 'Organization Identity',
+    work: 'Work of',
     aiOptOut: 'About AI training opt-out',
     history: 'History of provenance',
     validationStatus: 'Validation Status',
@@ -31,6 +31,7 @@ export const c2paMenuSectionTitles = {
 } as const;
 
 export type C2paMenuMode = 'ready' | 'loading' | 'no-manifest' | 'invalid';
+export type C2paMenuSectionTitleKey = keyof typeof c2paMenuSectionTitles;
 
 export interface SummarySectionItem {
     issuer: string | null;
@@ -52,7 +53,6 @@ export interface C2paMenuRenderState {
     mode: C2paMenuMode;
     manifestId: string | null;
     sections: C2paMenuSections | null;
-    isInvalid: boolean;
 }
 
 function buildAlertMessage(timeline: C2PATimelineState) {
@@ -98,7 +98,6 @@ export function buildMenuRenderState(
             mode: 'no-manifest',
             manifestId: 'no-manifest',
             sections: null,
-            isInvalid: false,
         };
     }
 
@@ -108,7 +107,6 @@ export function buildMenuRenderState(
             mode: 'loading',
             manifestId: manifestStore?.active_manifest ?? 'loading',
             sections: null,
-            isInvalid: false,
         };
     }
 
@@ -118,7 +116,6 @@ export function buildMenuRenderState(
             mode: 'invalid',
             manifestId: manifestStore.active_manifest ?? null,
             sections: null,
-            isInvalid: true,
         };
     }
 
@@ -138,6 +135,5 @@ export function buildMenuRenderState(
             aiOptOut: selectAiOptOutSection(activeManifest),
             history: selectHistorySection(activeManifest, manifestStore),
         },
-        isInvalid: false,
     };
 }

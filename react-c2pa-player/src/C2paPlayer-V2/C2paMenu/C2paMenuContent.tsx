@@ -2,17 +2,23 @@ import { useEffect, useState } from 'react';
 import type {
   C2paMenuMode,
   C2paMenuSections,
+  C2paMenuSectionTitleKey,
 } from './menuViewModel';
-import { AiOptOutSection } from './components/AiOptOutSection';
-import { ClaimGeneratorSection } from './components/ClaimGeneratorSection';
-import { HistorySection } from './components/HistorySection';
-import { OrganizationSection } from './components/OrganizationSection';
-import { SummarySection } from './components/SummarySection';
-import { InvalidState, LoadingState, MenuTitle, NoManifestState } from './components/shared';
-import { WorkSection } from './components/WorkSection';
+import {
+  AiOptOutSection,
+  ClaimGeneratorSection,
+  HistorySection,
+  InvalidState,
+  LoadingState,
+  MenuTitle,
+  NoManifestState,
+  OrganizationSection,
+  SummarySection,
+  WorkSection,
+} from './components';
 
 interface C2paMenuContentProps {
-  sectionTitles: Record<string, string>;
+  sectionTitles: Record<C2paMenuSectionTitleKey, string>;
   sections: C2paMenuSections | null;
   mode: C2paMenuMode;
   resetKey: string;
