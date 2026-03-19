@@ -35,10 +35,21 @@ function LoadingSpinner() {
   );
 }
 
-export function MenuTitle() {
+export function MenuTitle({
+  title = 'Content Credentials',
+  leadingAction,
+}: {
+  title?: string;
+  leadingAction?: ReactNode;
+}) {
   return (
     <li className="vjs-menu-title c2pa-react-menu-title">
-      Content Credentials
+      {leadingAction ? (
+        <span className="c2pa-menu-title__action">
+          {leadingAction}
+        </span>
+      ) : null}
+      <span className="c2pa-menu-title__text">{title}</span>
     </li>
   );
 }

@@ -7,6 +7,7 @@ import type {
 import {
   AiOptOutSection,
   ClaimGeneratorSection,
+  HistoryDetailView,
   HistorySection,
   InvalidState,
   LoadingState,
@@ -35,15 +36,15 @@ export function C2paMenuContent({
   mode,
   resetKey,
 }: C2paMenuContentProps) {
+  const [activeView, setActiveView] = useState<'default' | 'history'>('default');
   const [workExpanded, setWorkExpanded] = useState(false);
   const [aiOptOutExpanded, setAiOptOutExpanded] = useState(false);
-  const [historyExpanded, setHistoryExpanded] = useState(false);
   const [ingredientsExpanded, setIngredientsExpanded] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
+    setActiveView('default');
     setWorkExpanded(false);
     setAiOptOutExpanded(false);
-    setHistoryExpanded(false);
     setIngredientsExpanded({});
   }, [resetKey]);
 
@@ -85,6 +86,31 @@ export function C2paMenuContent({
     return <MenuTitle />;
   }
 
+  if (activeView === 'history' && sections.history) {
+    return (
+      <>
+        <MenuTitle
+          title={sectionTitles.history}
+          leadingAction={(
+            <button
+              className="c2pa-history-section__back-button c2pa-history-section__back-button--title"
+              type="button"
+              onClick={() => setActiveView('default')}
+              aria-label="Back to Content Credentials"
+            >
+              <span className="c2pa-history-section__back-icon">‹</span>
+            </button>
+          )}
+        />
+        <HistoryDetailView
+          section={sections.history}
+          ingredientsExpanded={ingredientsExpanded}
+          onToggleIngredient={handleToggleIngredient}
+        />
+      </>
+    );
+  }
+
   return (
     <>
       <MenuTitle />
@@ -119,12 +145,8 @@ export function C2paMenuContent({
       ) : null}
       {sections.history ? (
         <HistorySection
-          section={sections.history}
           title={sectionTitles.history}
-          isExpanded={historyExpanded}
-          onToggle={() => setHistoryExpanded(current => !current)}
-          ingredientsExpanded={ingredientsExpanded}
-          onToggleIngredient={handleToggleIngredient}
+          onOpen={() => setActiveView('history')}
         />
       ) : null}
     </>
