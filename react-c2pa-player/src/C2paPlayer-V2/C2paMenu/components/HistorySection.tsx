@@ -16,52 +16,56 @@ function IngredientNode({
   const isExpanded = ingredientsExpanded[ingredientId] || false;
 
   return (
-    <div className="ingredient-item">
+    <div className="c2pa-history-section__ingredient">
       <div
-        className="ingredient-header"
+        className="c2pa-history-section__ingredient-header"
         data-id={ingredientId}
         style={{ cursor: 'pointer' }}
         onClick={() => onToggleIngredient(ingredientId)}
       >
         <span className="itemName">Ingredient {ingredient.index}</span>
         {ingredient.ingredientCount && ingredient.ingredientCount > 0 ? (
-          <span className="ingredient-count">
+          <span className="c2pa-history-section__ingredient-count">
             ({ingredient.ingredientCount} ingredient{ingredient.ingredientCount > 1 ? 's' : ''})
           </span>
         ) : null}
-        <span className={`ingredient-toggle ${isExpanded ? 'expanded' : ''}`}>›</span>
+        <span className={`c2pa-history-section__ingredient-toggle ${isExpanded ? 'expanded' : ''}`}>›</span>
       </div>
 
-      <div id={ingredientId} className="ingredient-content" style={{ display: isExpanded ? 'flex' : 'none' }}>
+      <div
+        id={ingredientId}
+        className="c2pa-history-section__ingredient-content"
+        style={{ display: isExpanded ? 'flex' : 'none' }}
+      >
         {ingredient.title ? (
-          <div>
+          <div className="c2pa-menu-section__row">
             <span className="itemName">Title:</span> {ingredient.title}
           </div>
         ) : null}
         {ingredient.issuer ? (
-          <div>
+          <div className="c2pa-menu-section__row">
             <span className="itemName">Issued by:</span> {ingredient.issuer}
           </div>
         ) : null}
         {ingredient.claimGenerator ? (
-          <div>
+          <div className="c2pa-menu-section__row">
             <span className="itemName">App or device:</span> {ingredient.claimGenerator}
           </div>
         ) : null}
         {ingredient.date ? (
-          <div>
+          <div className="c2pa-menu-section__row">
             <span className="itemName">Issued on:</span> {ingredient.date}
           </div>
         ) : null}
         {ingredient.validationStatus ? (
-          <div>
+          <div className="c2pa-menu-section__row">
             <span className="itemName">Validation Status:</span>{' '}
             <ValidationBadge value={ingredient.validationStatus} />
           </div>
         ) : null}
         {Array.isArray(ingredient.ingredients) && ingredient.ingredients.length > 0 ? (
-          <div className="nested-ingredients">
-            <div className="nested-ingredients-header">
+          <div className="c2pa-history-section__subingredients">
+            <div className="c2pa-history-section__subingredients-header">
               <span className="itemName">Sub-Ingredients:</span>
             </div>
             {ingredient.ingredients.map((nestedIngredient) => (
@@ -93,9 +97,9 @@ export function HistorySection({
 }) {
   return (
     <li className="vjs-menu-item">
-      <div className="ingredients-container">
-        <div className="ingredients-main-header">
-          <span className="itemName">{title}</span>
+      <div className="c2pa-menu-section c2pa-history-section">
+        <div className="c2pa-menu-section__header">
+          <span className="itemName c2pa-menu-section__title">{title}</span>
         </div>
         {section.ingredients.map((ingredient) => (
           <IngredientNode

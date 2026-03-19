@@ -9,42 +9,47 @@ export function WorkSection({
 }) {
   return (
     <li className="vjs-menu-item">
-      <div>
-        <div className="itemName">{title}</div>
+      <div className="c2pa-menu-section c2pa-work-section">
+        <div className="c2pa-menu-section__header">
+          <span className="itemName c2pa-menu-section__title">{title}</span>
+        </div>
         {section.organizationName ? (
-          <div>
+          <div className="c2pa-menu-section__row">
             <span className="itemName">Organization:</span> {section.organizationName}
           </div>
         ) : null}
         {section.role ? (
-          <div>
+          <div className="c2pa-menu-section__row">
             <span className="itemName">Role:</span> {section.role}
           </div>
         ) : null}
         {section.authors.map((author, index) => (
-          <div key={`${author.identifier ?? author.email ?? author.name ?? 'author'}-${index}`} style={{ marginTop: '8px' }}>
+          <div
+            key={`${author.identifier ?? author.email ?? author.name ?? 'author'}-${index}`}
+            className="c2pa-work-section__author"
+          >
             {author.name ? (
-              <div>
+              <div className="c2pa-menu-section__row">
                 <span className="itemName">Author:</span> {author.name}
               </div>
             ) : null}
             {author.skill ? (
-              <div>
+              <div className="c2pa-menu-section__row">
                 <span className="itemName">Role:</span> {author.skill}
               </div>
             ) : null}
             {author.email ? (
-              <div>
+              <div className="c2pa-menu-section__row">
                 <span className="itemName">Email:</span> {author.email}
               </div>
             ) : null}
             {author.department ? (
-              <div>
+              <div className="c2pa-menu-section__row">
                 <span className="itemName">Department:</span> {author.department}
               </div>
             ) : null}
             {author.identifier ? (
-              <div>
+              <div className="c2pa-menu-section__row">
                 <span className="itemName">Identifier:</span> {author.identifier}
               </div>
             ) : null}

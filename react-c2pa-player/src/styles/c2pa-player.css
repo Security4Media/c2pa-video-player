@@ -2,7 +2,11 @@
 /* Based on dash-player-js/c2pa-player.css */
 @import '../C2paPlayer-V2/C2paMenu/styles/menu-shell.css';
 @import '../C2paPlayer-V2/C2paMenu/styles/menu-shared.css';
+@import '../C2paPlayer-V2/C2paMenu/styles/section-shared.css';
 @import '../C2paPlayer-V2/C2paMenu/styles/organization-section.css';
+@import '../C2paPlayer-V2/C2paMenu/styles/history-section.css';
+@import '../C2paPlayer-V2/C2paMenu/styles/work-section.css';
+@import '../C2paPlayer-V2/C2paMenu/styles/ai-optout-section.css';
 
 :root {
   --c2pa-passed: rgb(42, 122, 243);
@@ -208,126 +212,6 @@
 }
 
 /*** MENU CSS ***/
-/* Ingredients styling */
-.vjs-menu li.vjs-menu-item .ingredients-container {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-  width: 100%;
-}
-
-.vjs-menu li.vjs-menu-item .ingredients-main-header {
-  margin-bottom: 0.25rem;
-}
-
-.vjs-menu li.vjs-menu-item .ingredient-item {
-  display: flex;
-  flex-direction: column;
-  border-left: 2px solid rgba(125, 180, 255, 0.3);
-  padding-left: 0.75rem;
-  margin-left: 0.5rem;
-}
-
-.vjs-menu li.vjs-menu-item .ingredient-header {
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  gap: 0.75rem;
-  cursor: pointer;
-  padding: 0.5rem;
-  margin: -0.5rem;
-  margin-left: -0.75rem;
-  border-radius: 0.4rem;
-  transition: background-color 0.2s ease;
-}
-
-.vjs-menu li.vjs-menu-item .ingredient-header:hover {
-  background-color: rgba(255, 255, 255, 0.1);
-}
-
-.vjs-menu li.vjs-menu-item .ingredient-header .itemName {
-  padding-bottom: 0;
-  line-height: 1.5;
-  font-weight: 500;
-}
-
-.vjs-menu li.vjs-menu-item .ingredient-count {
-  font-size: 0.85rem;
-  color: rgba(125, 180, 255, 0.8);
-  font-weight: 400;
-  margin-left: 0.5rem;
-}
-
-.vjs-menu li.vjs-menu-item .ingredient-toggle {
-  font-size: 1.5rem;
-  line-height: 1.5;
-  transition: transform 0.2s ease;
-  display: inline-block;
-  user-select: none;
-  color: rgba(125, 180, 255, 0.8);
-}
-
-.vjs-menu li.vjs-menu-item .ingredient-toggle.expanded {
-  transform: rotate(90deg);
-}
-
-.vjs-menu li.vjs-menu-item .ingredient-content {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  padding-top: 0.5rem;
-  padding-left: 1.5rem;
-  width: auto;
-  max-width: 100%;
-  overflow-wrap: break-word;
-}
-
-@media (max-width: 768px) {
-  .vjs-menu li.vjs-menu-item .ingredient-content {
-    padding-left: 1rem;
-  }
-}
-
-.vjs-menu li.vjs-menu-item .ingredient-content div {
-  line-height: 1.4;
-  width: auto;
-  max-width: 100%;
-}
-
-.vjs-menu li.vjs-menu-item .ingredient-content .itemName {
-  padding-bottom: 0;
-  padding-right: 0.25rem;
-}
-
-/* Nested ingredients styling */
-.vjs-menu li.vjs-menu-item .nested-ingredients {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-  margin-top: 0.75rem;
-  padding-top: 0.75rem;
-  border-top: 1px solid rgba(125, 180, 255, 0.2);
-}
-
-.vjs-menu li.vjs-menu-item .nested-ingredients-header {
-  font-size: 0.95rem;
-  margin-bottom: 0.25rem;
-}
-
-.vjs-menu li.vjs-menu-item .nested-ingredients .ingredient-item {
-  margin-left: 0.5rem;
-  border-left-color: rgba(125, 180, 255, 0.2);
-  border-left-width: 1px;
-}
-
-.vjs-menu li.vjs-menu-item .nested-ingredients .ingredient-header {
-  font-size: 0.95rem;
-}
-
-.vjs-menu li.vjs-menu-item .nested-ingredients .ingredient-content {
-  padding-left: 1rem;
-}
-
 /*** FRICTION OVERLAY ***/
 .friction-overlay {
   position: absolute;

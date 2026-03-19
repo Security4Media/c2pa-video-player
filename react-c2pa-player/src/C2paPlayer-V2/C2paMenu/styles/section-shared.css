@@ -1,0 +1,27 @@
+/* Shared section layout primitives */
+
+.vjs-menu li.vjs-menu-item .c2pa-menu-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  width: 100%;
+}
+
+.vjs-menu li.vjs-menu-item .c2pa-menu-section__header {
+  margin-bottom: 0.25rem;
+}
+
+.vjs-menu li.vjs-menu-item .c2pa-menu-section__title {
+  padding-bottom: 0;
+}
+
+.vjs-menu li.vjs-menu-item .c2pa-menu-section__row {
+  line-height: 1.4;
+  width: auto;
+  max-width: 100%;
+}
+
+.vjs-menu li.vjs-menu-item .c2pa-menu-section__row .itemName {
+  padding-bottom: 0;
+  padding-right: 0.25rem;
+}
