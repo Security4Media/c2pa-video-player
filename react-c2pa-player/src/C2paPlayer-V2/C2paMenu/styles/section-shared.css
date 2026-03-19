@@ -12,8 +12,29 @@
   margin-bottom: 0.25rem;
 }
 
+.vjs-menu li.vjs-menu-item .c2pa-menu-section__header--collapsible {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  cursor: pointer;
+}
+
 .vjs-menu li.vjs-menu-item .c2pa-menu-section__title {
   padding-bottom: 0;
+  color: #7db4ff !important;
+}
+
+.vjs-menu li.vjs-menu-item .c2pa-menu-section__toggle {
+  margin-left: auto;
+  color: #7db4ff;
+  font-size: 1.25rem;
+  line-height: 1;
+  transition: transform 0.2s ease;
+  user-select: none;
+}
+
+.vjs-menu li.vjs-menu-item .c2pa-menu-section__toggle.expanded {
+  transform: rotate(90deg);
 }
 
 .vjs-menu li.vjs-menu-item .c2pa-menu-section__row {

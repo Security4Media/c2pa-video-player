@@ -24,7 +24,7 @@ export const c2paMenuSectionTitles = {
     claimGenerator: 'App or device used',
     organization: 'Organization Identity',
     work: 'Work of',
-    aiOptOut: 'About AI training opt-out',
+    aiOptOut: 'About Training and Data mining',
     history: 'History of provenance',
     validationStatus: 'Validation Status',
     alert: 'Alert',

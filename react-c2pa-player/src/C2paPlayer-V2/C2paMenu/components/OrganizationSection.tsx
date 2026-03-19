@@ -59,7 +59,7 @@ function IdentityDetails({ itemValue }: { itemValue: CawgOrganizationItem }) {
     <div className="c2pa-org-section__identity">
       {itemValue.issuer ? (
         <div className="c2pa-org-section__row">
-          <span className="itemName">Identity Signer:</span> {itemValue.issuer}
+          <span className="itemName">Signer:</span> {itemValue.issuer}
         </div>
       ) : null}
       {itemValue.role ? (

@@ -87,28 +87,35 @@ function IngredientNode({
 export function HistorySection({
   section,
   title,
+  isExpanded,
+  onToggle,
   ingredientsExpanded,
   onToggleIngredient,
 }: {
   section: HistorySectionItem;
   title: string;
+  isExpanded: boolean;
+  onToggle: () => void;
   ingredientsExpanded: Record<string, boolean>;
   onToggleIngredient: (id: string) => void;
 }) {
   return (
     <li className="vjs-menu-item">
       <div className="c2pa-menu-section c2pa-history-section">
-        <div className="c2pa-menu-section__header">
+        <div className="c2pa-menu-section__header c2pa-menu-section__header--collapsible" onClick={onToggle}>
           <span className="itemName c2pa-menu-section__title">{title}</span>
+          <span className={`c2pa-menu-section__toggle ${isExpanded ? 'expanded' : ''}`}>›</span>
         </div>
-        {section.ingredients.map((ingredient) => (
-          <IngredientNode
-            key={`ingredient-${ingredient.index}`}
-            ingredient={ingredient}
-            ingredientsExpanded={ingredientsExpanded}
-            onToggleIngredient={onToggleIngredient}
-          />
-        ))}
+        <div style={{ display: isExpanded ? 'flex' : 'none', flexDirection: 'column', gap: '0.75rem' }}>
+          {section.ingredients.map((ingredient) => (
+            <IngredientNode
+              key={`ingredient-${ingredient.index}`}
+              ingredient={ingredient}
+              ingredientsExpanded={ingredientsExpanded}
+              onToggleIngredient={onToggleIngredient}
+            />
+          ))}
+        </div>
       </div>
     </li>
   );

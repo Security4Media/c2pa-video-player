@@ -19,9 +19,13 @@ function formatLabelList(labels: string[]) {
 export function AiOptOutSection({
   section,
   title,
+  isExpanded,
+  onToggle,
 }: {
   section: AiOptOutSectionItem;
   title: string;
+  isExpanded: boolean;
+  onToggle: () => void;
 }) {
   const allowed = section.assertion.entries
     .filter(entry => entry.use === 'allowed')
@@ -50,10 +54,11 @@ export function AiOptOutSection({
   return (
     <li className="vjs-menu-item">
       <div className="c2pa-menu-section c2pa-ai-optout-section">
-        <div className="c2pa-menu-section__header">
+        <div className="c2pa-menu-section__header c2pa-menu-section__header--collapsible" onClick={onToggle}>
           <span className="itemName c2pa-menu-section__title">{title}</span>
+          <span className={`c2pa-menu-section__toggle ${isExpanded ? 'expanded' : ''}`}>›</span>
         </div>
-        <div className="c2pa-ai-optout-section__assertion">
+        <div className="c2pa-ai-optout-section__assertion" style={{ display: isExpanded ? 'flex' : 'none' }}>
           {policyParts.map((part, index) => (
             <div key={`${section.assertion.label}-${index}`} className="c2pa-menu-section__row">
               {part}
