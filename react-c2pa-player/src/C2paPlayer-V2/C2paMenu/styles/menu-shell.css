@@ -138,10 +138,6 @@
   margin-bottom: 0.25rem;
 }
 
-.vjs-menu li.vjs-menu-item:last-child {
-  border-top: none;
-}
-
 .vjs-menu li.vjs-menu-item:hover,
 .js-focus-visible .vjs-menu li.vjs-menu-item:hover {
   background: none;
