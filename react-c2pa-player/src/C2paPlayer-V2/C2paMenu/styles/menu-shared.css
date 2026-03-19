@@ -44,8 +44,8 @@
 }
 
 .vjs-menu li.vjs-menu-item .alert-div {
-  width: auto;
-  min-width: min(18rem, 100%);
+  width: 100%;
+  min-width: 0;
   max-width: 100%;
   background-color: rgba(211, 53, 16, 0.15);
   border: 0.15rem solid var(--c2pa-failed);
@@ -53,6 +53,8 @@
   border-radius: 0.5rem;
   display: flex;
   align-items: flex-start;
+  overflow-wrap: anywhere;
+  word-break: break-word;
   backdrop-filter: blur(0.25rem);
   box-shadow: 0 0.25rem 0.75rem rgba(211, 53, 16, 0.2);
 }

@@ -96,7 +96,9 @@ export interface WorkSectionItem {
 
 export interface AiOptOutEntryItem {
     key: string;
-    use: string | null;
+    label: string;
+    use: 'allowed' | 'notAllowed' | 'constrained';
+    description: string;
 }
 
 export interface AiOptOutAssertionItem {
@@ -105,5 +107,5 @@ export interface AiOptOutAssertionItem {
 }
 
 export interface AiOptOutSectionItem {
-    assertions: AiOptOutAssertionItem[];
+    assertion: AiOptOutAssertionItem;
 }

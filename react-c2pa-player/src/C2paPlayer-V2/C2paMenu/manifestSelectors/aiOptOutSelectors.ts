@@ -1,6 +1,7 @@
 import { Manifest } from '@contentauth/c2pa-web';
 import {
     AiOptOutAssertionItem,
+    AiOptOutEntryItem,
     AiOptOutSectionItem,
 } from '../models';
 import {
@@ -11,10 +12,41 @@ import {
     getReferencedAssertionLabels,
 } from './shared';
 
-const TRAINING_MINING_ASSERTION_LABELS = [
+const TRAINING_MINING_ASSERTION_PRIORITY = [
     CAWG_TRAINING_MINING_ASSERTION_LABEL,
     C2PA_TRAINING_MINING_ASSERTION_LABEL,
 ] as const;
+
+const ENTRY_LABELS: Record<string, string> = {
+    'cawg.ai_training': 'AI training',
+    'cawg.ai_generative_training': 'Generative AI training',
+    'cawg.ai_inference': 'AI inference',
+    'cawg.data_mining': 'Data mining',
+    'c2pa.ai_training': 'AI training',
+    'c2pa.ai_generative_training': 'Generative AI training',
+    'c2pa.ai_inference': 'AI inference',
+    'c2pa.data_mining': 'Data mining',
+};
+
+function normalizeUsage(use: string | null | undefined): AiOptOutEntryItem['use'] {
+    if (use === 'allowed' || use === 'notAllowed' || use === 'constrained') {
+        return use;
+    }
+
+    return 'constrained';
+}
+
+function buildUsageDescription(label: string, use: AiOptOutEntryItem['use']) {
+    if (use === 'allowed') {
+        return `This content may be used for ${label.toLowerCase()}.`;
+    }
+
+    if (use === 'notAllowed') {
+        return `This content may not be used for ${label.toLowerCase()}.`;
+    }
+
+    return `This content may be used for ${label.toLowerCase()}, subject to additional constraints.`;
+}
 
 function mapTrainingMiningAssertion(
     assertion: ManifestTrainingMiningAssertion,
@@ -24,10 +56,17 @@ function mapTrainingMiningAssertion(
         return null;
     }
 
-    const mappedEntries = Object.entries(entries).map(([key, value]) => ({
-        key,
-        use: value?.use ?? null,
-    }));
+    const mappedEntries = Object.entries(entries).map(([key, value]) => {
+        const use = normalizeUsage(value?.use);
+        const label = ENTRY_LABELS[key] ?? key;
+
+        return {
+            key,
+            label,
+            use,
+            description: buildUsageDescription(label, use),
+        };
+    });
 
     if (mappedEntries.length === 0) {
         return null;
@@ -56,19 +95,23 @@ export function selectAiOptOutSection(manifest: Manifest): AiOptOutSectionItem |
     }
 
     const referencedAssertionLabels = new Set(getReferencedAssertionLabels(cawgAssertion));
-    const assertions = TRAINING_MINING_ASSERTION_LABELS
+    const prioritizedAssertion = TRAINING_MINING_ASSERTION_PRIORITY
         .filter(label => referencedAssertionLabels.has(label))
         .map((label) => manifest.assertions?.find(
             assertion => assertion.label === label
         ) as ManifestTrainingMiningAssertion | undefined)
-        .map(assertion => (assertion ? mapTrainingMiningAssertion(assertion) : null))
-        .filter((assertion): assertion is AiOptOutAssertionItem => Boolean(assertion));
+        .find(Boolean);
 
-    if (assertions.length === 0) {
+    if (!prioritizedAssertion) {
+        return null;
+    }
+
+    const assertion = mapTrainingMiningAssertion(prioritizedAssertion);
+    if (!assertion) {
         return null;
     }
 
     return {
-        assertions,
+        assertion,
     };
 }

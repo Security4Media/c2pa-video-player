@@ -5,6 +5,7 @@
   flex-direction: column;
   gap: 0.75rem;
   width: 100%;
+  min-width: 0;
 }
 
 .vjs-menu li.vjs-menu-item .c2pa-menu-section__header {
@@ -17,8 +18,12 @@
 
 .vjs-menu li.vjs-menu-item .c2pa-menu-section__row {
   line-height: 1.4;
-  width: auto;
+  width: 100%;
   max-width: 100%;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  white-space: normal;
 }
 
 .vjs-menu li.vjs-menu-item .c2pa-menu-section__row .itemName {
