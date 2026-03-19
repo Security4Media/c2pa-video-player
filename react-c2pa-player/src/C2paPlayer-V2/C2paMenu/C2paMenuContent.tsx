@@ -35,11 +35,13 @@ export function C2paMenuContent({
   mode,
   resetKey,
 }: C2paMenuContentProps) {
+  const [workExpanded, setWorkExpanded] = useState(false);
   const [aiOptOutExpanded, setAiOptOutExpanded] = useState(false);
   const [historyExpanded, setHistoryExpanded] = useState(false);
   const [ingredientsExpanded, setIngredientsExpanded] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
+    setWorkExpanded(false);
     setAiOptOutExpanded(false);
     setHistoryExpanded(false);
     setIngredientsExpanded({});
@@ -103,6 +105,8 @@ export function C2paMenuContent({
         <WorkSection
           section={sections.work}
           title={sectionTitles.work}
+          isExpanded={workExpanded}
+          onToggle={() => setWorkExpanded(current => !current)}
         />
       ) : null}
       {sections.aiOptOut ? (

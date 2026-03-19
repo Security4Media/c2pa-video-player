@@ -10,6 +10,16 @@ export function SummarySection({
 }) {
   return (
     <>
+      {section.validationStatus ? (
+        <li className="vjs-menu-item">
+          <div className="c2pa-summary-section__value">
+            <MenuField
+              label={sectionTitles.validationStatus}
+              value={<ValidationBadge value={section.validationStatus} />}
+            />
+          </div>
+        </li>
+      ) : null}
       {section.issuer ? (
         <li className="vjs-menu-item">
           <div className="c2pa-summary-section__value">
@@ -24,16 +34,7 @@ export function SummarySection({
           </div>
         </li>
       ) : null}
-      {section.validationStatus ? (
-        <li className="vjs-menu-item">
-          <div className="c2pa-summary-section__value">
-            <MenuField
-              label={sectionTitles.validationStatus}
-              value={<ValidationBadge value={section.validationStatus} />}
-            />
-          </div>
-        </li>
-      ) : null}
+
       {section.alert ? <AlertItem itemValue={section.alert} /> : null}
     </>
   );

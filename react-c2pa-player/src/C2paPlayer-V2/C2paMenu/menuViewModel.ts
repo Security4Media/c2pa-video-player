@@ -23,7 +23,7 @@ export const c2paMenuSectionTitles = {
     summaryDate: 'Issued on',
     claimGenerator: 'App or device used',
     organization: 'Organization Identity',
-    work: 'Work of',
+    work: 'About the Producer',
     aiOptOut: 'About Training and Data mining',
     history: 'History of provenance',
     validationStatus: 'Validation Status',

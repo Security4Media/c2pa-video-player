@@ -29,7 +29,6 @@ function getValidationIndicator(validationStatus: CawgOrganizationItem['validati
 function OrganizationDetails({ organization }: { organization: OrganizationIdentityItem }) {
   return (
     <div className="c2pa-org-section__details">
-      {organization.name ? <div>{organization.name}</div> : null}
       {organization.website ? (
         <div className="c2pa-org-section__row">
           <span className="itemName">Website:</span> <WebsiteLink href={organization.website} />
