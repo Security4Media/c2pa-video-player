@@ -1,5 +1,6 @@
 import type { ValidationState } from '@/types/c2pa.types';
-import type { GetCompromisedRegions, VideoJsPlayerLike } from '../C2paMenu/C2paMenu.types';
+import type { C2PATimelineState } from '../C2PAPlayerRoot.types';
+import type { VideoJsPlayerLike } from '../C2paMenu/C2paMenu.types';
 
 type TimelineVerificationStatus = ValidationState | 'unknown' | 'false';
 
@@ -16,11 +17,16 @@ interface TimelineComponentLike {
 }
 
 interface TimelineVideoPlayer extends VideoJsPlayerLike {
+    currentTime(): number;
     duration(): number;
 }
 
 interface TimelineFunctions {
-    getCompromisedRegions: GetCompromisedRegions;
+    getTimelineState: (
+        isMonolithic: boolean,
+        videoPlayer: TimelineVideoPlayer,
+        currentTime?: number,
+    ) => C2PATimelineState;
     handleC2PAValidation: (
         verificationStatus: string,
         currentTime: number,
@@ -247,6 +253,45 @@ export function getTimelineFunctions(): TimelineFunctions {
         return `${String(minutes).padStart(2, '0')}:${String(remainingSeconds).padStart(2, '0')}`;
     };
 
+    const getTimelineState = function (
+        isMonolithic: boolean,
+        videoPlayer: TimelineVideoPlayer,
+        currentTime = videoPlayer.currentTime?.() ?? 0,
+    ): C2PATimelineState {
+        const compromisedRegions: string[] = [];
+        const segments = progressSegments.map((segment) => ({
+            startTime: parseFloat(segment.dataset.startTime),
+            endTime: parseFloat(segment.dataset.endTime),
+            verificationStatus: segment.dataset.verificationStatus,
+        }));
+
+        if (isMonolithic) {
+            if (
+                segments.length > 0 &&
+                isInvalidSegmentStatus(segments[0].verificationStatus)
+            ) {
+                compromisedRegions.push(`${formatTime(0.0)}-${formatTime(videoPlayer.duration())}`);
+            }
+        } else {
+            segments.forEach((segment) => {
+                if (isInvalidSegmentStatus(segment.verificationStatus)) {
+                    compromisedRegions.push(
+                        `${formatTime(segment.startTime)}-${formatTime(segment.endTime)}`,
+                    );
+                }
+            });
+        }
+
+        return {
+            currentTime,
+            compromisedRegions,
+            hasInvalidSegments: segments.some((segment) =>
+                isInvalidSegmentStatus(segment.verificationStatus),
+            ),
+            segments,
+        };
+    };
+
     const handleC2PAValidation = function (
         verificationStatus: string,
         currentTime: number,
@@ -271,34 +316,11 @@ export function getTimelineFunctions(): TimelineFunctions {
         }
     };
 
-    const getCompromisedRegions: GetCompromisedRegions = function (isMonolithic, videoPlayer) {
-        const compromisedRegions: string[] = [];
-
-        if (isMonolithic) {
-            if (
-                progressSegments.length > 0 &&
-                isInvalidSegmentStatus(progressSegments[0].dataset.verificationStatus)
-            ) {
-                compromisedRegions.push(`${formatTime(0.0)}-${formatTime(videoPlayer.duration())}`);
-            }
-        } else {
-            progressSegments.forEach((segment) => {
-                if (isInvalidSegmentStatus(segment.dataset.verificationStatus)) {
-                    const startTime = parseFloat(segment.dataset.startTime);
-                    const endTime = parseFloat(segment.dataset.endTime);
-                    compromisedRegions.push(`${formatTime(startTime)}-${formatTime(endTime)}`);
-                }
-            });
-        }
-
-        return compromisedRegions;
-    };
-
     return {
         handleOnSeeked,
         handleOnSeeking,
         handleC2PAValidation,
-        getCompromisedRegions,
+        getTimelineState,
         formatTime,
         updateC2PATimeline,
     };

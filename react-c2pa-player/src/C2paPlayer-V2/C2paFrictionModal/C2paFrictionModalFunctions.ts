@@ -24,9 +24,13 @@ function createInitialPlayerRootState(): C2PAPlayerRootState {
         isFrictionOverlayVisible: false,
         isMenuOpen: false,
         c2paStatus: null,
-        compromisedRegions: [],
+        timeline: {
+            currentTime: 0,
+            compromisedRegions: [],
+            hasInvalidSegments: false,
+            segments: [],
+        },
         menuResetKey: 'initial',
-        menuContentTarget: null,
     };
 }
 
@@ -134,17 +138,17 @@ export const disposeFrictionOverlay = function (
 };
 
 /**
- * Publish the latest validation payload and timeline-derived compromised
- * regions into the shared player-root controller.
+ * Publish the latest validation payload and timeline snapshot into the
+ * shared player-root controller.
  *
  * @param playerRoot - Player overlay controller created during initialization
  * @param c2paStatus - Latest C2PA validation payload
- * @param compromisedRegions - Timeline-derived compromised regions
+ * @param timeline - Timeline snapshot derived from the imperative timeline
  */
 export const updatePlayerRootValidationState = function (
     playerRoot: C2PAPlayerRootController | null,
     c2paStatus: C2PAPlayerRootState['c2paStatus'],
-    compromisedRegions: C2PAPlayerRootState['compromisedRegions'],
+    timeline: C2PAPlayerRootState['timeline'],
 ): void {
     if (!playerRoot) {
         return;
@@ -152,6 +156,6 @@ export const updatePlayerRootValidationState = function (
 
     playerRoot.setState({
         c2paStatus,
-        compromisedRegions,
+        timeline,
     });
 };

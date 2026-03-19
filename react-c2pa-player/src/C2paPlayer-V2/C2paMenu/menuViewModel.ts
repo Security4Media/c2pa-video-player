@@ -1,4 +1,5 @@
 import { C2PAStatus } from '@/types/c2pa.types';
+import type { C2PATimelineState } from '../C2PAPlayerRoot.types';
 import { getActiveManifest, getActiveManifestValidationStatus } from '../../services/c2pa_functions';
 import {
     selectClaimGenerator,
@@ -52,9 +53,9 @@ export interface C2paMenuRenderState {
     isInvalid: boolean;
 }
 
-function buildAlertMessage(compromisedRegions: string[]) {
-    if (compromisedRegions.length > 0) {
-        return `The segment between ${compromisedRegions.join(', ')} may have been tampered with`;
+function buildAlertMessage(timeline: C2PATimelineState) {
+    if (timeline.compromisedRegions.length > 0) {
+        return `The segment between ${timeline.compromisedRegions.join(', ')} may have been tampered with`;
     }
 
     return null;
@@ -86,12 +87,12 @@ function formatProducerNames(authors: Array<{ name: string | null }>) {
  * the mapping from manifest data to UI-facing values in one typed place.
  *
  * @param c2paStatus - Current C2PA player status payload
- * @param compromisedRegions - Human-readable compromised regions from the timeline
+ * @param timeline - Timeline snapshot from the shared player controller
  * @returns Render state describing menu mode, manifest identity, and item values
  */
 export function buildMenuRenderState(
     c2paStatus: C2PAStatus | null,
-    compromisedRegions: string[],
+    timeline: C2PATimelineState,
 ): C2paMenuRenderState {
     const manifestStore = c2paStatus?.manifestStore ?? null;
     const hasDefinitiveNoManifest =
@@ -144,7 +145,7 @@ export function buildMenuRenderState(
             TRAINING_OPTOUT: null,
             INGREDIENTS: selectIngredients(activeManifest, manifestStore),
             C2PA_VALIDATION_STATUS: validationStatus ?? 'Unknown',
-            ALERT: buildAlertMessage(compromisedRegions),
+            ALERT: buildAlertMessage(timeline),
         },
         isInvalid: false,
     };

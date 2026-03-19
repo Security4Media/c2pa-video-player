@@ -1,6 +1,7 @@
 import type { ManifestStore } from '@contentauth/c2pa-web';
 
 export type PlayerValidationState = 'Trusted' | 'Valid' | 'Invalid' | 'Unknown';
+export type ValidationState = PlayerValidationState;
 
 
 export interface C2PAStatus {

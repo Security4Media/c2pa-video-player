@@ -1,10 +1,11 @@
+import type { C2PATimelineState } from '../C2PAPlayerRoot.types';
 import { C2paMenuContent } from './C2paMenuContent';
 import { c2paMenuItems, buildMenuRenderState } from './menuViewModel';
 import { C2PAStatus } from '@/types/c2pa.types';
 
 interface C2paMenuRootProps {
   c2paStatus: C2PAStatus | null;
-  compromisedRegions: string[];
+  timeline: C2PATimelineState;
   resetKey: string;
 }
 
@@ -13,8 +14,8 @@ interface C2paMenuRootProps {
  * status payload and forwards the normalized result to the presentational
  * content component.
  */
-export function C2paMenuRoot({ c2paStatus, compromisedRegions, resetKey }: C2paMenuRootProps) {
-  const renderState = buildMenuRenderState(c2paStatus, compromisedRegions);
+export function C2paMenuRoot({ c2paStatus, timeline, resetKey }: C2paMenuRootProps) {
+  const renderState = buildMenuRenderState(c2paStatus, timeline);
 
   return (
     <C2paMenuContent

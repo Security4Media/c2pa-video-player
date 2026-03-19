@@ -25,11 +25,6 @@ export interface VideoJsMenuButtonComponentLike extends VideoJsMenuComponentLike
     buildCSSClass?(): string;
 }
 
-export type GetCompromisedRegions = (
-    isMonolithic: boolean,
-    videoPlayer: VideoJsPlayerLike,
-) => string[];
-
 export interface C2paMenuBridgeState {
     lastManifestId: string | null;
     isMenuOpen: boolean;

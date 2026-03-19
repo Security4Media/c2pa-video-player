@@ -1,13 +1,25 @@
-import type { C2PAStatus } from '@/types/c2pa.types';
+import type { C2PAStatus, ValidationState } from '@/types/c2pa.types';
 import type { Root } from 'react-dom/client';
+
+export interface C2PATimelineSegmentState {
+    startTime: number;
+    endTime: number;
+    verificationStatus: ValidationState | 'unknown' | 'false';
+}
+
+export interface C2PATimelineState {
+    currentTime: number;
+    compromisedRegions: string[];
+    hasInvalidSegments: boolean;
+    segments: C2PATimelineSegmentState[];
+}
 
 export interface C2PAPlayerRootState {
     isFrictionOverlayVisible: boolean;
     isMenuOpen: boolean;
     c2paStatus: C2PAStatus | null;
-    compromisedRegions: string[];
+    timeline: C2PATimelineState;
     menuResetKey: string;
-    menuContentTarget: Element | null;
 }
 
 export interface C2PAPlayerRootController {

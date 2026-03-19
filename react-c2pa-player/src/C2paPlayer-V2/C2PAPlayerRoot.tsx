@@ -39,7 +39,7 @@ export function C2PAPlayerRoot({
                         <ul className="vjs-menu-content" role="menu">
                             <C2paMenuRoot
                                 c2paStatus={state.c2paStatus}
-                                compromisedRegions={state.compromisedRegions}
+                                timeline={state.timeline}
                                 resetKey={state.menuResetKey}
                             />
                         </ul>

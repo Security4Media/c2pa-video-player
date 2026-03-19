@@ -3,11 +3,11 @@
  */
 
 import type { C2PAPlayerProps, C2PAStatus } from '../types/c2pa.types';
-import type { C2PAPlayerRootController } from './C2PAPlayerRoot.types';
 import type {
-    GetCompromisedRegions,
-    VideoJsPlayerLike,
-} from './C2paMenu/C2paMenu.types';
+    C2PAPlayerRootController,
+    C2PATimelineState,
+} from './C2PAPlayerRoot.types';
+import type { VideoJsPlayerLike } from './C2paMenu/C2paMenu.types';
 import { initializeC2PAControlBar } from './C2paControlBar/C2paControlBarFunctions';
 import {
     displayFrictionOverlay,
@@ -55,7 +55,11 @@ interface C2PAVideoJsPlayer extends VideoJsPlayerLike {
 }
 
 interface TimelineFunctions {
-    getCompromisedRegions: GetCompromisedRegions;
+    getTimelineState: (
+        isMonolithic: boolean,
+        videoPlayer: C2PAVideoJsPlayer,
+        currentTime?: number,
+    ) => C2PATimelineState;
     handleC2PAValidation: (
         verificationStatus: string,
         currentTime: number,
@@ -103,7 +107,7 @@ export const C2PAPlayer = function (
     let c2paMenu: TimelineComponentLike | null = null;
     let c2paControlBar: TimelineComponentLike | null = null;
     const {
-        getCompromisedRegions,
+        getTimelineState,
         handleC2PAValidation,
         handleOnSeeked,
         handleOnSeeking,
@@ -215,11 +219,11 @@ export const C2PAPlayer = function (
                     c2paControlBar,
                 );
                 updateC2PATimeline(currentTime, videoPlayer, c2paControlBar);
-                const compromisedRegions = getCompromisedRegions(isMonolithic, videoPlayer);
+                const timeline = getTimelineState(isMonolithic, videoPlayer, currentTime);
                 updatePlayerRootValidationState(
                     playerRoot,
                     c2paStatus,
-                    compromisedRegions,
+                    timeline,
                 );
                 updateC2PAMenu(
                     c2paMenu,

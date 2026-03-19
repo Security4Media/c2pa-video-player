@@ -51,10 +51,6 @@ function updateButtonValidationState(videoPlayer: VideoJsPlayerLike, isInvalid: 
     }
 }
 
-function getMenuContentTarget(c2paMenu: VideoJsMenuComponentLike | null): Element | null {
-    return c2paMenu?.el()?.querySelector('.vjs-menu-button-popup .vjs-menu .vjs-menu-content') ?? null;
-}
-
 function syncMenuStateToPlayerRoot(
     c2paStatus: C2PAStatus | null,
 ) {
@@ -66,7 +62,6 @@ function syncMenuStateToPlayerRoot(
         isMenuOpen: menuState.isMenuOpen,
         c2paStatus,
         menuResetKey: `${menuState.resetVersion}:${menuState.lastManifestId ?? 'none'}`,
-        menuContentTarget: getMenuContentTarget(menuState.menuReference),
     });
 }
 
@@ -130,15 +125,12 @@ export function handleMenuClosed() {
 }
 
 /**
- * Update the mounted React menu using the latest C2PA status and player
- * timeline state. The bridge throttles updates while the menu is closed
- * and keeps the invalid button styling synchronized with validation.
+ * Update the mounted React menu using the latest shared player-root state.
+ * The bridge keeps the invalid button styling synchronized with validation
+ * while the menu content itself is rendered from the shared React root.
  *
- * @param c2paStatus - Current C2PA status payload
  * @param c2paMenu - Video.js C2PA menu component instance
- * @param isMonolithic - Whether playback is monolithic or streaming
  * @param videoPlayer - Video.js player instance
- * @param getCompromisedRegions - Returns compromised timeline ranges
  */
 export function updateC2PAMenu(
     c2paMenu: VideoJsMenuComponentLike | null,
@@ -185,7 +177,12 @@ export function resetC2PAMenuCache() {
     playerRootController?.setState({
         isMenuOpen: false,
         c2paStatus: null,
-        compromisedRegions: [],
+        timeline: {
+            currentTime: 0,
+            compromisedRegions: [],
+            hasInvalidSegments: false,
+            segments: [],
+        },
         menuResetKey: `${menuState.resetVersion}:none`,
     });
 }
@@ -198,8 +195,12 @@ export function disposeC2PAMenu() {
     playerRootController?.setState({
         isMenuOpen: false,
         c2paStatus: null,
-        compromisedRegions: [],
-        menuContentTarget: null,
+        timeline: {
+            currentTime: 0,
+            compromisedRegions: [],
+            hasInvalidSegments: false,
+            segments: [],
+        },
         menuResetKey: `${menuState.resetVersion}:none`,
     });
     menuState.menuReference = null;
