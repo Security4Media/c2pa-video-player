@@ -1,5 +1,11 @@
 /* Work section */
 
+.vjs-menu li.vjs-menu-item .c2pa-work-section__content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
 .vjs-menu li.vjs-menu-item .c2pa-work-section__author {
   margin-top: 0.5rem;
 }

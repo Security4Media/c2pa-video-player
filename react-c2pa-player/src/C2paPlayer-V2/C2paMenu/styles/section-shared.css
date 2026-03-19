@@ -37,6 +37,35 @@
   transform: rotate(90deg);
 }
 
+.vjs-menu li.vjs-menu-item .c2pa-menu-section__content {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transition:
+    grid-template-rows 0.24s ease,
+    opacity 0.2s ease;
+}
+
+.vjs-menu li.vjs-menu-item .c2pa-menu-section__content.expanded {
+  grid-template-rows: 1fr;
+  opacity: 1;
+}
+
+.vjs-menu li.vjs-menu-item .c2pa-menu-section__content-inner {
+  overflow: hidden;
+  min-height: 0;
+  transform: translateY(-0.35rem);
+  transition:
+    transform 0.24s ease,
+    opacity 0.2s ease;
+  opacity: 0;
+}
+
+.vjs-menu li.vjs-menu-item .c2pa-menu-section__content.expanded .c2pa-menu-section__content-inner {
+  transform: translateY(0);
+  opacity: 1;
+}
+
 .vjs-menu li.vjs-menu-item .c2pa-menu-section__row {
   line-height: 1.4;
   width: 100%;

@@ -1,5 +1,8 @@
 /* AI opt-out section */
 
 .vjs-menu li.vjs-menu-item .c2pa-ai-optout-section__assertion {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
   margin-top: 0.5rem;
 }

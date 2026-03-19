@@ -1,5 +1,11 @@
 /* History / ingredients section */
 
+.vjs-menu li.vjs-menu-item .c2pa-history-section__content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
 .vjs-menu li.vjs-menu-item .c2pa-history-section__ingredient {
   display: flex;
   flex-direction: column;
@@ -49,6 +55,35 @@
 
 .vjs-menu li.vjs-menu-item .c2pa-history-section__ingredient-toggle.expanded {
   transform: rotate(90deg);
+}
+
+.vjs-menu li.vjs-menu-item .c2pa-history-section__ingredient-panel {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transition:
+    grid-template-rows 0.24s ease,
+    opacity 0.2s ease;
+}
+
+.vjs-menu li.vjs-menu-item .c2pa-history-section__ingredient-panel.expanded {
+  grid-template-rows: 1fr;
+  opacity: 1;
+}
+
+.vjs-menu li.vjs-menu-item .c2pa-history-section__ingredient-panel-inner {
+  overflow: hidden;
+  min-height: 0;
+  transform: translateY(-0.25rem);
+  transition:
+    transform 0.24s ease,
+    opacity 0.2s ease;
+  opacity: 0;
+}
+
+.vjs-menu li.vjs-menu-item .c2pa-history-section__ingredient-panel.expanded .c2pa-history-section__ingredient-panel-inner {
+  transform: translateY(0);
+  opacity: 1;
 }
 
 .vjs-menu li.vjs-menu-item .c2pa-history-section__ingredient-content {

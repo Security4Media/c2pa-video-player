@@ -56,22 +56,24 @@ export function WorkSection({
           <span className="itemName c2pa-menu-section__title">{title}</span>
           <span className={`c2pa-menu-section__toggle ${isExpanded ? 'expanded' : ''}`}>›</span>
         </div>
-        <div style={{ display: isExpanded ? 'flex' : 'none', flexDirection: 'column', gap: '0.75rem' }}>
-          {section.authors.map((author, index) => (
-            <div
-              key={`${author.identifier ?? author.email ?? author.name ?? 'author'}-${index}`}
-              className="c2pa-work-section__author"
-            >
-              <div className="c2pa-menu-section__row">
-                {buildAuthorCreditText(author, section.organizationName)}
-              </div>
-              {author.identifier ? (
+        <div className={`c2pa-menu-section__content ${isExpanded ? 'expanded' : ''}`}>
+          <div className="c2pa-menu-section__content-inner c2pa-work-section__content">
+            {section.authors.map((author, index) => (
+              <div
+                key={`${author.identifier ?? author.email ?? author.name ?? 'author'}-${index}`}
+                className="c2pa-work-section__author"
+              >
                 <div className="c2pa-menu-section__row">
-                  <span className="itemName">Identifier:</span> {author.identifier}
+                  {buildAuthorCreditText(author, section.organizationName)}
                 </div>
-              ) : null}
-            </div>
-          ))}
+                {author.identifier ? (
+                  <div className="c2pa-menu-section__row">
+                    <span className="itemName">Identifier:</span> {author.identifier}
+                  </div>
+                ) : null}
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </li>

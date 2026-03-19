@@ -58,12 +58,14 @@ export function AiOptOutSection({
           <span className="itemName c2pa-menu-section__title">{title}</span>
           <span className={`c2pa-menu-section__toggle ${isExpanded ? 'expanded' : ''}`}>›</span>
         </div>
-        <div className="c2pa-ai-optout-section__assertion" style={{ display: isExpanded ? 'flex' : 'none' }}>
-          {policyParts.map((part, index) => (
-            <div key={`${section.assertion.label}-${index}`} className="c2pa-menu-section__row">
-              {part}
-            </div>
-          ))}
+        <div className={`c2pa-menu-section__content ${isExpanded ? 'expanded' : ''}`}>
+          <div className="c2pa-menu-section__content-inner c2pa-ai-optout-section__assertion">
+            {policyParts.map((part, index) => (
+              <div key={`${section.assertion.label}-${index}`} className="c2pa-menu-section__row">
+                {part}
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </li>
