@@ -84,29 +84,51 @@ function IngredientNode({
 }
 
 export function HistorySection({
+  title,
+  onOpen,
+}: {
+  title: string;
+  onOpen: () => void;
+}) {
+  return (
+    <li className="vjs-menu-item">
+      <div className="c2pa-menu-section c2pa-history-section">
+        <div className="c2pa-menu-section__header c2pa-menu-section__header--collapsible" onClick={onOpen}>
+          <span className="itemName c2pa-menu-section__title">{title}</span>
+          <span className="c2pa-menu-section__toggle">›</span>
+        </div>
+      </div>
+    </li>
+  );
+}
+
+export function HistoryDetailView({
   section,
   title,
-  isExpanded,
-  onToggle,
+  onBack,
   ingredientsExpanded,
   onToggleIngredient,
 }: {
   section: HistorySectionItem;
   title: string;
-  isExpanded: boolean;
-  onToggle: () => void;
+  onBack: () => void;
   ingredientsExpanded: Record<string, boolean>;
   onToggleIngredient: (id: string) => void;
 }) {
   return (
-    <li className="vjs-menu-item">
-      <div className="c2pa-menu-section c2pa-history-section">
-        <div className="c2pa-menu-section__header c2pa-menu-section__header--collapsible" onClick={onToggle}>
-          <span className="itemName c2pa-menu-section__title">{title}</span>
-          <span className={`c2pa-menu-section__toggle ${isExpanded ? 'expanded' : ''}`}>›</span>
-        </div>
-        <div className={`c2pa-menu-section__content ${isExpanded ? 'expanded' : ''}`}>
-          <div className="c2pa-menu-section__content-inner c2pa-history-section__content">
+    <>
+      <li className="vjs-menu-item c2pa-history-section__view-nav">
+        <button className="c2pa-history-section__back-button" type="button" onClick={onBack}>
+          <span className="c2pa-history-section__back-icon">‹</span>
+          <span>Back</span>
+        </button>
+      </li>
+      <li className="vjs-menu-item c2pa-history-section__view-title-row">
+        <div className="c2pa-menu-section c2pa-history-section">
+          <div className="c2pa-menu-section__header">
+            <span className="itemName c2pa-menu-section__title">{title}</span>
+          </div>
+          <div className="c2pa-history-section__content c2pa-history-section__content--detail">
             {section.ingredients.map((ingredient) => (
               <IngredientNode
                 key={`ingredient-${ingredient.index}`}
@@ -117,7 +139,7 @@ export function HistorySection({
             ))}
           </div>
         </div>
-      </div>
-    </li>
+      </li>
+    </>
   );
 }

@@ -6,6 +6,42 @@
   gap: 0.75rem;
 }
 
+.vjs-menu li.vjs-menu-item.c2pa-history-section__view-nav {
+  border-top: none;
+  padding-top: 0;
+  padding-bottom: 0.5rem;
+}
+
+.vjs-menu li.vjs-menu-item.c2pa-history-section__view-title-row {
+  align-items: stretch;
+}
+
+.vjs-menu li.vjs-menu-item .c2pa-history-section__back-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0;
+  border: none;
+  background: none;
+  color: #7db4ff;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.vjs-menu li.vjs-menu-item .c2pa-history-section__back-button:hover {
+  color: #a8d0ff;
+}
+
+.vjs-menu li.vjs-menu-item .c2pa-history-section__back-icon {
+  font-size: 1.4rem;
+  line-height: 1;
+}
+
+.vjs-menu li.vjs-menu-item .c2pa-history-section__content--detail {
+  margin-top: 0.25rem;
+}
+
 .vjs-menu li.vjs-menu-item .c2pa-history-section__ingredient {
   display: flex;
   flex-direction: column;
