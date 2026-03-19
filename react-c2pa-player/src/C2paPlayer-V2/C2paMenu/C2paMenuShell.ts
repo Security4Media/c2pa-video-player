@@ -1,7 +1,6 @@
 import { handleMenuClosed, handleMenuOpened, setMenuReference } from './C2paMenuBridge';
 import type {
     VideoJsMenuButtonComponentLike,
-    VideoJsMenuComponentLike,
     VideoJsPlayerLike,
 } from './C2paMenu.types';
 
@@ -114,19 +113,4 @@ export const initializeC2PAMenu = function (videoPlayer: VideoJsPlayerLike) {
 
     console.log('[C2PAMenu] C2PA menu button added to control bar');
     console.log('[C2PAMenu] Control bar children:', videoPlayer.controlBar.children());
-};
-
-/**
- * Compatibility no-op retained while menu sizing is handled through CSS.
- *
- * @param c2paMenu - Video.js C2PA menu component instance
- * @param videoElement - Root video player element
- * @param c2paMenuHeightOffset - Height reserved for the control bar
- */
-export const adjustC2PAMenu = function (
-    _c2paMenu: VideoJsMenuComponentLike | null,
-    _videoElement: HTMLElement,
-    _c2paMenuHeightOffset: number,
-) {
-    return;
 };

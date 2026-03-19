@@ -19,23 +19,21 @@ function createInitialMenuState(): C2paMenuBridgeState {
 const menuState: C2paMenuBridgeState = createInitialMenuState();
 let playerRootController: C2PAPlayerRootController | null = null;
 
+function createEmptyTimelineState() {
+    return {
+        currentTime: 0,
+        compromisedRegions: [],
+        hasInvalidSegments: false,
+        segments: [],
+    };
+}
+
 function resetMenuState() {
     menuState.lastManifestId = null;
     menuState.isMenuOpen = false;
     menuState.isInvalid = false;
     menuState.resetVersion = 0;
-}
-
-/**
- * Legacy compatibility hook for the pre-React menu renderer API.
- * Custom item renderers are no longer consumed by the menu module,
- * so this function only emits a deprecation warning.
- *
- * @param itemKey - Legacy menu item identifier
- * @param renderer - Legacy renderer callback
- */
-export function registerMenuItemRenderer(itemKey: string, renderer: (...args: unknown[]) => unknown) {
-    console.warn('[C2PA] registerMenuItemRenderer is deprecated during the React menu migration', itemKey, renderer);
+    menuState.menuReference = null;
 }
 
 function updateButtonValidationState(videoPlayer: VideoJsPlayerLike, isInvalid: boolean) {
@@ -66,9 +64,7 @@ function syncMenuStateToPlayerRoot(
 }
 
 /**
- * Store the Video.js menu component reference used by the React bridge.
- * The bridge mounts the React tree into the menu popup content owned by
- * this component.
+ * Store the Video.js menu component reference used by the menu shell/bridge.
  *
  * @param c2paMenu - Video.js C2PA menu component instance
  */
@@ -167,27 +163,6 @@ export function updateC2PAMenu(
 }
 
 /**
- * Clear cached bridge state so the next menu update behaves like a fresh
- * session.
- */
-export function resetC2PAMenuCache() {
-    console.log('[C2PA] Manually resetting menu state');
-    resetMenuState();
-    menuState.resetVersion += 1;
-    playerRootController?.setState({
-        isMenuOpen: false,
-        c2paStatus: null,
-        timeline: {
-            currentTime: 0,
-            compromisedRegions: [],
-            hasInvalidSegments: false,
-            segments: [],
-        },
-        menuResetKey: `${menuState.resetVersion}:none`,
-    });
-}
-
-/**
  * Unmount the React menu root and release all state associated with the
  * current Video.js menu instance.
  */
@@ -195,15 +170,9 @@ export function disposeC2PAMenu() {
     playerRootController?.setState({
         isMenuOpen: false,
         c2paStatus: null,
-        timeline: {
-            currentTime: 0,
-            compromisedRegions: [],
-            hasInvalidSegments: false,
-            segments: [],
-        },
+        timeline: createEmptyTimelineState(),
         menuResetKey: `${menuState.resetVersion}:none`,
     });
-    menuState.menuReference = null;
     playerRootController = null;
     resetMenuState();
 }
