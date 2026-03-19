@@ -73,7 +73,8 @@ export async function c2pa_init(player: HTMLVideoElement, onPlaybackTimeUpdated:
           // HACK the validation state due to CAWG trust validation error.
           // Keep the SDK field untouched when our local status is Unknown,
           // because the SDK type does not accept that value.
-          manifestStore.validation_state =  getActiveManifestValidationStatus(manifestStore);
+            manifestStore.validation_state = getActiveManifestValidationStatus(manifestStore);
+            
         }
         console.log('[C2PA Init] Extracted manifest:', manifestStore);
       }

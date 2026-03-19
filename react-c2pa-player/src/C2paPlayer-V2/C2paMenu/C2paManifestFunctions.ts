@@ -1,10 +1,15 @@
 export {
+    selectAiOptOutSection,
     selectClaimGenerator,
+    selectClaimGeneratorSection,
     selectCreativeWorkAuthors,
     selectCreativeWorkContent,
     selectCreativeWorkOrganization,
     selectIngredients,
+    selectHistorySection,
     selectOrganizationIdentity,
+    selectOrganizationSection,
     selectSignatureIssuer,
     selectSignatureTime,
+    selectWorkSection,
 } from './manifestSelectors';

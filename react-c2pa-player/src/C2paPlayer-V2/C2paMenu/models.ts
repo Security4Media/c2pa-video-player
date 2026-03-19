@@ -54,6 +54,10 @@ export interface ClaimGeneratorItem {
     version: string | null;
 }
 
+export interface ClaimGeneratorSectionItem {
+    products: ClaimGeneratorItem[];
+}
+
 export interface IngredientDisplayItem {
     index: number;
     title: string;
@@ -67,10 +71,38 @@ export interface IngredientDisplayItem {
     ingredientCount?: number;
 }
 
+export interface HistorySectionItem {
+    ingredients: IngredientDisplayItem[];
+}
+
 export interface CawgOrganizationItem {
     issuer: string;
     role?: CawgRole | null;
     creativeWork: CreativeWorkContentItem | null;
     authors: PersonAuthorItem[];
     validationStatus: ValidationState;
+}
+
+export interface OrganizationSectionItem {
+    organization: OrganizationIdentityItem | null;
+    cawg: CawgOrganizationItem | null;
+}
+
+export interface WorkSectionItem {
+    authors: PersonAuthorItem[];
+    role: CawgRole | null;
+}
+
+export interface AiOptOutEntryItem {
+    key: string;
+    use: string | null;
+}
+
+export interface AiOptOutAssertionItem {
+    label: string;
+    entries: AiOptOutEntryItem[];
+}
+
+export interface AiOptOutSectionItem {
+    assertions: AiOptOutAssertionItem[];
 }

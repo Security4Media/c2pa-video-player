@@ -3,6 +3,19 @@ import { ManifestCawgAssertion } from '../models';
 
 export const CAWG_ASSERTION_LABEL = 'cawg.identity';
 export const CREATIVE_WORK_ASSERTION_LABEL = 'stds.schema-org.CreativeWork';
+export const CAWG_TRAINING_MINING_ASSERTION_LABEL = 'cawg.training-mining';
+export const C2PA_TRAINING_MINING_ASSERTION_LABEL = 'c2pa.training-mining';
+
+export interface TrainingMiningEntryValue {
+    use?: string | null;
+}
+
+export interface ManifestTrainingMiningAssertion extends ManifestAssertion {
+    label: typeof CAWG_TRAINING_MINING_ASSERTION_LABEL | typeof C2PA_TRAINING_MINING_ASSERTION_LABEL;
+    data: {
+        entries?: Record<string, TrainingMiningEntryValue> | null;
+    } | null;
+}
 
 export interface SchemaDateTimeValue {
     value?: string | null;
@@ -50,6 +63,18 @@ export function getReferencedAssertionLabels(cawgAssertion: ManifestCawgAssertio
         .filter(assertion => !assertion.url.includes('hash'))
         .map(assertion => assertion.url.split('/').pop()?.split('#')[0])
         .filter((label): label is string => Boolean(label)) ?? [];
+}
+
+export function selectCawgAssertion(manifest: Manifest): ManifestCawgAssertion | null {
+    const cawgAssertion = manifest.assertions?.find(
+        assertion => assertion.label === CAWG_ASSERTION_LABEL
+    ) as ManifestCawgAssertion | undefined;
+
+    if (!cawgAssertion?.data) {
+        return null;
+    }
+
+    return cawgAssertion;
 }
 
 export function selectCreativeWorkAssertion(manifest: Manifest): ManifestCreativeWorkAssertion | null {
