@@ -15,6 +15,9 @@
  */
 
 export { ValidationAdapterRegistry } from './registry';
+export { createC2PAStatusFromResult, normalizeManifestStore } from './c2paResult';
+export { createDefaultValidationAdapterRegistry } from './defaultRegistry';
+export { MonolithicC2PAAdapter } from './monolithicAdapter';
 export {
   createMediaSourceDescriptor,
   detectAdapterKind,
@@ -34,4 +37,3 @@ export type {
   ValidationStatusSnapshot,
   ValidationTimelineSegment,
 } from './types';
-

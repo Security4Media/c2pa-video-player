@@ -21,9 +21,12 @@ import type { C2PAPlayerInstance } from '../C2paPlayer-V2/main';
 
 // Import the C2PAPlayer from the V2 module
 import { C2PAPlayer } from '../C2paPlayer-V2/main';
-
-// Import C2PA validation from monolithic service (matches HTML plugin pattern)
-import { c2pa_init } from '../services/c2pa-v2-monolithic';
+import {
+  createC2PAStatusFromResult,
+  createDefaultValidationAdapterRegistry,
+  createMediaSourceDescriptor,
+  type ValidationSession,
+} from '../validation';
 
 interface UseC2PAPlayerOptions {
   isMonolithic?: boolean;
@@ -44,6 +47,7 @@ export function useC2PAPlayer({
   onError
 }: UseC2PAPlayerOptions = {}) {
   const c2paPlayerRef = useRef<C2PAPlayerInstance | null>(null);
+  const validationSessionRef = useRef<ValidationSession | null>(null);
   const isInitializingRef = useRef(false);
   const [state, setState] = useState<UseC2PAPlayerState>({
     isInitialized: false,
@@ -51,6 +55,9 @@ export function useC2PAPlayer({
   });
 
   const disposePlayer = useCallback(() => {
+    validationSessionRef.current?.dispose();
+    validationSessionRef.current = null;
+
     if (c2paPlayerRef.current && typeof c2paPlayerRef.current.dispose === 'function') {
       try {
         c2paPlayerRef.current.dispose();
@@ -115,11 +122,25 @@ export function useC2PAPlayer({
   const initializeValidation = useCallback(
     async (videoElement: HTMLVideoElement) => {
       try {
-        console.log('[useC2PAPlayer] Initializing C2PA validation via c2pa_init');
+        console.log('[useC2PAPlayer] Initializing C2PA validation via adapter');
+        const sourceUrl = videoElement.currentSrc || videoElement.src;
+        const source = createMediaSourceDescriptor({
+          url: sourceUrl,
+          displayName: sourceUrl,
+          mimeType: sourceUrl.startsWith('blob:') ? 'video/mp4' : null,
+        });
+        const registry = createDefaultValidationAdapterRegistry();
+        const adapter = registry.resolve(source);
+        const validationSession = adapter.createSession({
+          videoElement,
+          source,
+          policy: {
+            enableTrustVerification: true,
+          },
+        });
 
         // Playback update callback - matches the HTML implementation
-        const playbackUpdate = (event: { c2pa_status?: C2PAStatus }) => {
-          const c2paStatus = event.c2pa_status;
+        const playbackUpdate = (c2paStatus: C2PAStatus) => {
 
           if (!c2paStatus) {
             return;
@@ -138,9 +159,15 @@ export function useC2PAPlayer({
           }));
         };
 
-        // Initialize C2PA validation using c2pa_init
-        // This extracts manifest, validates, and sets up timeupdate listener
-        await c2pa_init(videoElement, playbackUpdate);
+        validationSessionRef.current = validationSession;
+        validationSession.subscribe((snapshot) => {
+          if (!snapshot.result) {
+            return;
+          }
+
+          playbackUpdate(createC2PAStatusFromResult(snapshot.result));
+        });
+        await validationSession.load();
         
         console.log('[useC2PAPlayer] C2PA validation initialized successfully');
       } catch (error) {

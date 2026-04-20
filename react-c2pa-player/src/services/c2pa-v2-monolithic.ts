@@ -41,7 +41,12 @@ import { getActiveManifestValidationStatus } from './c2pa_functions';
  * @param player - The HTML video element
  * @param onPlaybackTimeUpdated - Callback function that receives c2pa_status updates
  */
-export async function c2pa_init(player: HTMLVideoElement, onPlaybackTimeUpdated: (e: any) => void) {
+export type C2PACleanup = () => void;
+
+export async function c2pa_init(
+  player: HTMLVideoElement,
+  onPlaybackTimeUpdated: (e: any) => void
+): Promise<C2PACleanup> {
   try {
     
     // Fetch trust configuration files
@@ -111,12 +116,19 @@ export async function c2pa_init(player: HTMLVideoElement, onPlaybackTimeUpdated:
 
     // Update C2PA UI during timeupdate events
     // This is the key integration point - attaching c2pa_status to the event
-    player.addEventListener('timeupdate', function (e: any) {
+    const handleTimeUpdate = function (e: any) {
       e['c2pa_status'] = updateEvent;
       onPlaybackTimeUpdated(e);
-    });
+    };
+
+    player.addEventListener('timeupdate', handleTimeUpdate);
 
     console.log('[C2PA Init] Initialization complete, timeupdate listener added');
+
+    return () => {
+      player.removeEventListener('timeupdate', handleTimeUpdate);
+      c2pa.dispose?.();
+    };
   } catch (error) {
     console.error('[C2PA Init] Initialization error:', error);
     throw error;
