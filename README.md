@@ -1,4 +1,7 @@
-# EBU C2PA Player
+<h1>
+  EBU C2PA Player
+  <img src="react-c2pa-player/src/assets/logos/ebu-logo-dark.svg" alt="EBU logo" width="180" align="right">
+</h1>
 
 EBU C2PA Player is a React and Video.js based player prototype for inspecting C2PA Content Credentials in video workflows. It provides a standalone Vite application and reusable React components for loading media, validating C2PA manifests, and displaying trust, provenance, and attribution information in the player UI.
 
