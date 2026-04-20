@@ -25,11 +25,13 @@ import {
   createC2PAStatusFromSnapshot,
   createDefaultValidationAdapterRegistry,
   createMediaSourceDescriptor,
+  type MediaSourceDescriptor,
   type ValidationSession,
 } from '../validation';
 
 interface UseC2PAPlayerOptions {
   isMonolithic?: boolean;
+  source?: MediaSourceDescriptor | null;
   onError?: (error: string) => void;
 }
 
@@ -44,6 +46,7 @@ interface UseC2PAPlayerState {
  */
 export function useC2PAPlayer({
   isMonolithic = true,
+  source: validationSource = null,
   onError
 }: UseC2PAPlayerOptions = {}) {
   const c2paPlayerRef = useRef<C2PAPlayerInstance | null>(null);
@@ -124,7 +127,7 @@ export function useC2PAPlayer({
       try {
         console.log('[useC2PAPlayer] Initializing C2PA validation via adapter');
         const sourceUrl = videoElement.currentSrc || videoElement.src;
-        const source = createMediaSourceDescriptor({
+        const source = validationSource ?? createMediaSourceDescriptor({
           url: sourceUrl,
           displayName: sourceUrl,
           mimeType: sourceUrl.startsWith('blob:') ? 'video/mp4' : null,
@@ -177,7 +180,7 @@ export function useC2PAPlayer({
         onError?.(error instanceof Error ? error.message : 'Unknown validation error');
       }
     },
-    [onError]
+    [onError, validationSource]
   );
 
   /**

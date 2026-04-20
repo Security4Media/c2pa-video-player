@@ -19,10 +19,12 @@ import VideoJS, { type VideoJSOptions } from './VideoJS';
 import { useC2PAPlayer } from '../hooks/useC2PAPlayer';
 import './VideoPlayerSection.css';
 import { PlayerStatus } from '@/types/player.types';
+import { detectAdapterKind, type MediaSourceDescriptor } from '@/validation';
 
 
 interface VideoPlayerSectionProps {
   videoJsOptions: VideoJSOptions;
+  mediaSource: MediaSourceDescriptor | null;
   onTimeUpdate: (currentTime: number) => void;
   onDurationChange: (duration: number) => void;
   onStatusUpdate: (type: PlayerStatus, message: string) => void;
@@ -32,6 +34,7 @@ interface VideoPlayerSectionProps {
 
 export const VideoPlayerSection = memo(function VideoPlayerSection({
   videoJsOptions,
+  mediaSource,
   onTimeUpdate,
   onDurationChange,
   onStatusUpdate,
@@ -44,11 +47,14 @@ export const VideoPlayerSection = memo(function VideoPlayerSection({
   const [videoKey, setVideoKey] = useState(0);
   
   // Get current source for key generation
-  const currentSource = videoJsOptions.sources?.[0]?.src || '';
+  const currentSource = mediaSource?.url || videoJsOptions.sources?.[0]?.src || '';
+  const adapterKind = mediaSource ? detectAdapterKind(mediaSource) : 'unsupported';
+  const validationOwnsPlayback = adapterKind === 'hls-fragmented-fmp4';
   
   // Initialize C2PA Player V2
   const { initialize: initializeC2PA, reset: resetC2PA, isInitialized: c2paInitialized, manifestStore } = useC2PAPlayer({
-    isMonolithic: true,
+    isMonolithic: adapterKind === 'monolithic',
+    source: mediaSource,
     onError: (error) => {
       console.error('[VideoPlayerSection] C2PA error:', error);
       onStatusUpdate('error', `C2PA Error: ${error}`);
@@ -82,6 +88,24 @@ export const VideoPlayerSection = memo(function VideoPlayerSection({
       const videoEl = player.el().querySelector('video');
       if (videoEl) {
         console.log('[VideoPlayerSection] Setting up event listeners');
+
+        const initializeC2PAForPlayer = (status: PlayerStatus, message: string) => {
+          if (playerReadyRef.current) {
+            return;
+          }
+
+          console.log('[VideoPlayerSection] Initializing C2PA Player V2, isInitialized:', c2paFunctionsRef.current.c2paInitialized);
+          playerReadyRef.current = true;
+          onStatusUpdate(status, message);
+
+          try {
+            c2paFunctionsRef.current.initializeC2PA(player, videoEl);
+            onStreamInfo(`C2PA Player V2 initialized (${adapterKind})`);
+          } catch (error) {
+            console.error('[VideoPlayerSection] Error during C2PA initialization:', error);
+            onStatusUpdate('error', `C2PA init failed: ${error}`);
+          }
+        };
         
         // Setup video event listeners
         player.on('loadstart', () => {
@@ -90,22 +114,12 @@ export const VideoPlayerSection = memo(function VideoPlayerSection({
         });
         
         player.on('canplay', () => {
-          if (!playerReadyRef.current) {
-            console.log('[VideoPlayerSection] Video canplay event - first time for this video');
-            playerReadyRef.current = true;
-            onStatusUpdate('ready', 'Ready to Play');
-            
-            // Initialize C2PA Player V2 when video is ready
-              console.log('[VideoPlayerSection] Initializing C2PA Player V2, isInitialized:', c2paFunctionsRef.current.c2paInitialized);
-              try {
-                c2paFunctionsRef.current.initializeC2PA(player, videoEl);
-                onStreamInfo('C2PA Player V2 initialized');
-              } catch (error) {
-                console.error('[VideoPlayerSection] Error during C2PA initialization:', error);
-                onStatusUpdate('error', `C2PA init failed: ${error}`);
-              }
-            }
+          initializeC2PAForPlayer('ready', 'Ready to Play');
         });
+
+        if (validationOwnsPlayback) {
+          initializeC2PAForPlayer('loading', 'Loading HLS Playlist');
+        }
         
         player.on('playing', () => onStatusUpdate('ready', 'Playing'));
         player.on('pause', () => onStatusUpdate('ready', 'Paused'));
@@ -120,7 +134,7 @@ export const VideoPlayerSection = memo(function VideoPlayerSection({
         console.error('[VideoPlayerSection] Video element not found in player');
       }
     },
-    [onStatusUpdate, onStreamInfo]
+    [adapterKind, onStatusUpdate, onStreamInfo, validationOwnsPlayback]
   );
 
   return (

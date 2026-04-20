@@ -21,6 +21,7 @@ export {
   normalizeManifestStore,
 } from './c2paResult';
 export { createDefaultValidationAdapterRegistry } from './defaultRegistry';
+export { HlsFragmentedFmp4Adapter } from './hlsAdapter';
 export { MonolithicC2PAAdapter } from './monolithicAdapter';
 export {
   createMediaSourceDescriptor,

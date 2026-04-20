@@ -7,7 +7,7 @@
     "homepage": "https://Security4Media.github.io/c2pa-player/",
     "scripts": {
         "dev-server": "concurrently -n http,vite -c blue,green vite",
-        "dev" : "vite --",
+        "dev": "vite --",
         "build": "tsc && vite build",
         "build-deploy": "tsc && vite build --config vite.config.deploy.ts",
         "preview": "vite preview",
@@ -15,6 +15,8 @@
     },
     "dependencies": {
         "@contentauth/c2pa-web": "^0.6.1",
+        "@nettrek/c2pa-hls-bridge": "^0.1.0",
+        "hls.js": "^1.6.16",
         "http-server": "^14.1.1",
         "jsx-runtime": "^1.2.0",
         "react": "^19.0.0",

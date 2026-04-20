@@ -14,12 +14,13 @@
  * limitations under the License.
  */
 
+import { HlsFragmentedFmp4Adapter } from './hlsAdapter';
 import { MonolithicC2PAAdapter } from './monolithicAdapter';
 import { ValidationAdapterRegistry } from './registry';
 
 export function createDefaultValidationAdapterRegistry(): ValidationAdapterRegistry {
   return new ValidationAdapterRegistry([
+    new HlsFragmentedFmp4Adapter(),
     new MonolithicC2PAAdapter(),
   ]);
 }
-
