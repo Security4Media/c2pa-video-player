@@ -20,6 +20,7 @@ import {
   type C2paManifestHelper,
 } from '@nettrek/c2pa-hls-bridge';
 import Hls from 'hls.js';
+import { loadHlsLocalTrustSettings } from './hlsLocalTrustSettings';
 import { detectAdapterKind } from './sourceDetection';
 import type {
   MediaSourceDescriptor,
@@ -32,6 +33,12 @@ import type {
   ValidationTimelineSegment,
 } from './types';
 import type { PlayerValidationState } from '@/types/c2pa.types';
+
+interface PatchableC2paHlsBridgePrototype {
+  getToolkitSettings?: () => Promise<unknown>;
+}
+
+let localTrustPatchInstalled = false;
 
 export class HlsFragmentedFmp4Adapter implements MediaValidationAdapter {
   readonly kind = 'hls-fragmented-fmp4' as const;
@@ -78,6 +85,8 @@ class HlsFragmentedFmp4Session implements ValidationSession {
       this.#emit();
       return;
     }
+
+    installLocalTrustSettingsPatch();
 
     const hls = new Hls({ enableWorker: true });
     const bridge = new C2paHlsBridge(
@@ -213,6 +222,17 @@ class HlsFragmentedFmp4Session implements ValidationSession {
   #emit(): void {
     this.#listeners.forEach((listener) => listener(this.#snapshot));
   }
+}
+
+function installLocalTrustSettingsPatch(): void {
+  if (localTrustPatchInstalled) {
+    return;
+  }
+
+  const bridgePrototype = C2paHlsBridge.prototype as unknown as PatchableC2paHlsBridgePrototype;
+  bridgePrototype.getToolkitSettings = () =>
+    loadHlsLocalTrustSettings();
+  localTrustPatchInstalled = true;
 }
 
 function normalizeHlsReader(reader: C2paManifestHelper): NormalizedC2PAResult {
