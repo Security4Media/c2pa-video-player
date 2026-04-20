@@ -17,14 +17,33 @@
 import type { ManifestStore } from '@contentauth/c2pa-web';
 import type { C2PAStatus } from '@/types/c2pa.types';
 import { getActiveManifest, getActiveManifestValidationStatus } from '@/services/c2pa_functions';
-import type { NormalizedC2PAResult } from './types';
+import type { NormalizedC2PAResult, ValidationStatusSnapshot } from './types';
 
-export function createC2PAStatusFromResult(result: NormalizedC2PAResult): C2PAStatus {
+export function createC2PAStatusFromResult(
+  result: NormalizedC2PAResult,
+  metadata: Pick<C2PAStatus, 'adapterKind' | 'timelineSegments' | 'message'> = {}
+): C2PAStatus {
   return {
     manifestStore: result.manifestStore,
     verificationStatus: result.validationState,
     validationState: result.validationState,
+    normalizedResult: result,
+    ...metadata,
   };
+}
+
+export function createC2PAStatusFromSnapshot(
+  snapshot: ValidationStatusSnapshot
+): C2PAStatus | null {
+  if (!snapshot.result) {
+    return null;
+  }
+
+  return createC2PAStatusFromResult(snapshot.result, {
+    adapterKind: snapshot.adapterKind,
+    timelineSegments: snapshot.timelineSegments,
+    message: snapshot.message,
+  });
 }
 
 export function normalizeManifestStore(
@@ -49,4 +68,3 @@ export function normalizeManifestStore(
     reason,
   };
 }
-

@@ -23,6 +23,7 @@ import type {
     C2PAPlayerRootController,
     C2PATimelineState,
 } from './C2PAPlayerRoot.types';
+import type { C2PATimelineSegmentUpdate } from '../types/c2pa.types';
 import type { VideoJsPlayerLike } from './C2paMenu/C2paMenu.types';
 import { initializeC2PAControlBar } from './C2paControlBar/C2paControlBarFunctions';
 import {
@@ -95,6 +96,20 @@ interface TimelineFunctions {
         videoPlayer: C2PAVideoJsPlayer,
         c2paControlBar: TimelineComponentLike,
     ) => void;
+    replaceC2PATimelineSegments: (
+        segments: C2PATimelineSegmentUpdate[],
+        videoPlayer: C2PAVideoJsPlayer,
+        c2paControlBar: TimelineComponentLike,
+    ) => void;
+}
+
+function getValidationState(c2paStatus: C2PAStatus | null): string {
+    return (
+        c2paStatus?.validationState ??
+        c2paStatus?.manifestStore?.validation_state ??
+        c2paStatus?.normalizedResult?.validationState ??
+        'Unknown'
+    );
 }
 
 export interface C2PAPlayerInstance {
@@ -128,6 +143,7 @@ export const C2PAPlayer = function (
         handleOnSeeked,
         handleOnSeeking,
         updateC2PATimeline,
+        replaceC2PATimelineSegments,
     } = getTimelineFunctions() as TimelineFunctions;
 
     let playerRoot: C2PAPlayerRootController | null = null;
@@ -229,13 +245,23 @@ export const C2PAPlayer = function (
                 c2paControlBar
             ) {
                 console.log('[C2PA] Validation update: ', lastPlaybackTime, currentTime);
-                handleC2PAValidation(
-                    c2paStatus?.manifestStore?.validation_state ?? 'Unknown',
-                    currentTime,
-                    c2paControlBar,
-                );
-                updateC2PATimeline(currentTime, videoPlayer, c2paControlBar);
+                if (c2paStatus?.timelineSegments && c2paStatus.timelineSegments.length > 0) {
+                    replaceC2PATimelineSegments(
+                        c2paStatus.timelineSegments,
+                        videoPlayer,
+                        c2paControlBar,
+                    );
+                } else {
+                    handleC2PAValidation(
+                        getValidationState(c2paStatus),
+                        currentTime,
+                        c2paControlBar,
+                    );
+                    updateC2PATimeline(currentTime, videoPlayer, c2paControlBar);
+                }
+
                 const timeline = getTimelineState(isMonolithic, videoPlayer, currentTime);
+                isManifestInvalid = getValidationState(c2paStatus) === 'Invalid' || timeline.hasInvalidSegments;
                 updatePlayerRootValidationState(
                     playerRoot,
                     c2paStatus,

@@ -14,7 +14,8 @@
  * limitations under the License.
  */
 
-import { C2PAStatus } from '@/types/c2pa.types';
+import type { Manifest, ManifestStore } from '@contentauth/c2pa-web';
+import type { C2PAStatus, PlayerValidationState } from '@/types/c2pa.types';
 import type { C2PATimelineState } from '../C2PAPlayerRoot.types';
 import { getActiveManifest, getActiveManifestValidationStatus } from '../../services/c2pa_functions';
 import {
@@ -91,6 +92,39 @@ function formatSignatureDate(timeValue: string | null) {
         : null;
 }
 
+function getManifestId(activeManifest: Manifest | null, c2paStatus: C2PAStatus | null) {
+    const manifestId =
+        c2paStatus?.manifestStore?.active_manifest ??
+        activeManifest?.id ??
+        null;
+
+    return typeof manifestId === 'string' ? manifestId : null;
+}
+
+function createAdapterManifestStore(
+    c2paStatus: C2PAStatus | null,
+    manifestId: string | null,
+    validationStatus: PlayerValidationState,
+): ManifestStore | null {
+    const normalizedResult = c2paStatus?.normalizedResult ?? null;
+
+    if (!normalizedResult || !manifestId || !normalizedResult.activeManifest) {
+        return null;
+    }
+
+    return {
+        active_manifest: manifestId,
+        manifests: normalizedResult.manifests,
+        validation_state: validationStatus,
+        validation_results: {
+            activeManifest: {
+                success: validationStatus === 'Invalid' ? [] : [{}],
+                failure: validationStatus === 'Invalid' ? normalizedResult.validationErrors : [],
+            },
+        },
+    } as ManifestStore;
+}
+
 /**
  * Build the normalized section-based render state consumed by the React menu tree.
  * The bridge passes raw player status into React, and this helper keeps
@@ -105,8 +139,12 @@ export function buildMenuRenderState(
     timeline: C2PATimelineState,
 ): C2paMenuRenderState {
     const manifestStore = c2paStatus?.manifestStore ?? null;
+    const normalizedResult = c2paStatus?.normalizedResult ?? null;
+    const activeManifest = manifestStore
+        ? getActiveManifest(manifestStore)
+        : normalizedResult?.activeManifest ?? null;
     const hasDefinitiveNoManifest =
-        (c2paStatus && !manifestStore) ||
+        (c2paStatus && !activeManifest && normalizedResult?.containsSignature === false) ||
         (manifestStore?.manifests && Object.keys(manifestStore.manifests).length === 0);
 
     if (hasDefinitiveNoManifest) {
@@ -117,8 +155,7 @@ export function buildMenuRenderState(
         };
     }
 
-    const activeManifest = manifestStore ? getActiveManifest(manifestStore) : null;
-    if (!manifestStore || !activeManifest) {
+    if (!activeManifest) {
         return {
             mode: 'loading',
             manifestId: manifestStore?.active_manifest ?? 'loading',
@@ -126,18 +163,24 @@ export function buildMenuRenderState(
         };
     }
 
-    const validationStatus = getActiveManifestValidationStatus(manifestStore);
+    const validationStatus = manifestStore
+        ? getActiveManifestValidationStatus(manifestStore)
+        : normalizedResult?.validationState ?? 'Unknown';
+    const manifestId = getManifestId(activeManifest, c2paStatus);
+    const selectorManifestStore =
+        manifestStore ?? createAdapterManifestStore(c2paStatus, manifestId, validationStatus);
+
     if (validationStatus === 'Invalid') {
         return {
             mode: 'invalid',
-            manifestId: manifestStore.active_manifest ?? null,
+            manifestId,
             sections: null,
         };
     }
 
     return {
         mode: 'ready',
-        manifestId: manifestStore.active_manifest ?? null,
+        manifestId,
         sections: {
             summary: {
                 issuer: selectSignatureIssuer(activeManifest),
@@ -146,10 +189,12 @@ export function buildMenuRenderState(
                 alert: buildAlertMessage(timeline),
             },
             claimGenerator: selectClaimGeneratorSection(activeManifest),
-            organization: selectOrganizationSection(activeManifest, manifestStore),
-            work: selectWorkSection(activeManifest, manifestStore),
+            organization: selectOrganizationSection(activeManifest, selectorManifestStore ?? undefined),
+            work: selectWorkSection(activeManifest, selectorManifestStore ?? undefined),
             aiOptOut: selectAiOptOutSection(activeManifest),
-            history: selectHistorySection(activeManifest, manifestStore),
+            history: selectorManifestStore
+                ? selectHistorySection(activeManifest, selectorManifestStore)
+                : null,
         },
     };
 }

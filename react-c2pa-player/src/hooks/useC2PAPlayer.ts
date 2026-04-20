@@ -22,7 +22,7 @@ import type { C2PAPlayerInstance } from '../C2paPlayer-V2/main';
 // Import the C2PAPlayer from the V2 module
 import { C2PAPlayer } from '../C2paPlayer-V2/main';
 import {
-  createC2PAStatusFromResult,
+  createC2PAStatusFromSnapshot,
   createDefaultValidationAdapterRegistry,
   createMediaSourceDescriptor,
   type ValidationSession,
@@ -161,11 +161,13 @@ export function useC2PAPlayer({
 
         validationSessionRef.current = validationSession;
         validationSession.subscribe((snapshot) => {
-          if (!snapshot.result) {
+          const c2paStatus = createC2PAStatusFromSnapshot(snapshot);
+
+          if (!c2paStatus) {
             return;
           }
 
-          playbackUpdate(createC2PAStatusFromResult(snapshot.result));
+          playbackUpdate(c2paStatus);
         });
         await validationSession.load();
         

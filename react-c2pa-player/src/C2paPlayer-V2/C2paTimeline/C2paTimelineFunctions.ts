@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-import type { ValidationState } from '@/types/c2pa.types';
+import type { C2PATimelineSegmentUpdate, ValidationState } from '@/types/c2pa.types';
 import type { C2PATimelineState } from '../C2PAPlayerRoot.types';
 import type { VideoJsPlayerLike } from '../C2paMenu/C2paMenu.types';
 
@@ -60,6 +60,11 @@ interface TimelineFunctions {
     formatTime: (seconds: number) => string;
     updateC2PATimeline: (
         currentTime: number,
+        videoPlayer: TimelineVideoPlayer,
+        c2paControlBar: TimelineComponentLike,
+    ) => void;
+    replaceC2PATimelineSegments: (
+        segments: C2PATimelineSegmentUpdate[],
         videoPlayer: TimelineVideoPlayer,
         c2paControlBar: TimelineComponentLike,
     ) => void;
@@ -137,6 +142,13 @@ export function getTimelineFunctions(): TimelineFunctions {
         segment.dataset.verificationStatus = verificationStatus;
         segment.style.backgroundColor = getSegmentColor(verificationStatus, isManifestInvalid);
         return segment;
+    };
+
+    const removeProgressSegments = function () {
+        progressSegments.forEach((segment) => {
+            segment.remove();
+        });
+        progressSegments = [];
     };
 
     const updateC2PATimeline = function (
@@ -245,11 +257,7 @@ export function getTimelineFunctions(): TimelineFunctions {
 
         if (time === 0) {
             console.log('[C2PA] Player resetting');
-            progressSegments.forEach((segment) => {
-                segment.remove();
-            });
-
-            progressSegments = [];
+            removeProgressSegments();
             seeking = false;
 
             updateC2PAButton(videoPlayer);
@@ -332,6 +340,41 @@ export function getTimelineFunctions(): TimelineFunctions {
         }
     };
 
+    const replaceC2PATimelineSegments = function (
+        segments: C2PATimelineSegmentUpdate[],
+        videoPlayer: TimelineVideoPlayer,
+        c2paControlBar: TimelineComponentLike,
+    ) {
+        removeProgressSegments();
+
+        const duration = videoPlayer.duration();
+        const sortedSegments = [...segments]
+            .filter((segment) => Number.isFinite(segment.startTime) && Number.isFinite(segment.endTime))
+            .filter((segment) => segment.endTime >= segment.startTime)
+            .sort((a, b) => a.startTime - b.startTime);
+
+        sortedSegments.forEach((segment) => {
+            const verificationStatus = segment.pending
+                ? 'unknown'
+                : normalizeVerificationStatus(segment.validationState);
+            const timelineSegment = createTimelineSegment(
+                segment.startTime,
+                segment.endTime,
+                verificationStatus,
+            );
+
+            if (Number.isFinite(duration) && duration > 0) {
+                const width = Math.min(100, Math.max(0, (segment.endTime / duration) * 100));
+                timelineSegment.style.width = `${width}%`;
+            }
+
+            c2paControlBar.el().appendChild(timelineSegment);
+            progressSegments.push(timelineSegment);
+        });
+
+        updateC2PATimeline(videoPlayer.currentTime(), videoPlayer, c2paControlBar);
+    };
+
     return {
         handleOnSeeked,
         handleOnSeeking,
@@ -339,5 +382,6 @@ export function getTimelineFunctions(): TimelineFunctions {
         getTimelineState,
         formatTime,
         updateC2PATimeline,
+        replaceC2PATimelineSegments,
     };
 }

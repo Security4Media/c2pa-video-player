@@ -15,7 +15,11 @@
  */
 
 export { ValidationAdapterRegistry } from './registry';
-export { createC2PAStatusFromResult, normalizeManifestStore } from './c2paResult';
+export {
+  createC2PAStatusFromResult,
+  createC2PAStatusFromSnapshot,
+  normalizeManifestStore,
+} from './c2paResult';
 export { createDefaultValidationAdapterRegistry } from './defaultRegistry';
 export { MonolithicC2PAAdapter } from './monolithicAdapter';
 export {
