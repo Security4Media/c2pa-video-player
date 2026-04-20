@@ -1,0 +1,187 @@
+/*
+ * Copyright 2026 European Broadcasting Union
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+/* Enhanced Video.js Control Bar Styling */
+
+/* Make control bar bigger and more prominent */
+.video-js .vjs-control-bar {
+  height: 4.5em !important;
+  font-size: 1.2em;
+  background: linear-gradient(180deg, rgba(10, 46, 106, 0.92) 0%, rgba(14, 65, 148, 0.88) 100%) !important;
+  backdrop-filter: blur(8px);
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Standard controls sizing */
+.video-js .vjs-control {
+  width: 4em !important;
+}
+
+/* Button icons sizing - exclude C2PA button */
+.video-js .vjs-button:not(.c2pa-menu-button) > .vjs-icon-placeholder:before {
+  font-size: 2em;
+  line-height: 2.25;
+}
+
+/* Play button sizing */
+.video-js .vjs-play-control {
+  width: 4em !important;
+}
+
+/* Time controls styling */
+.video-js .vjs-time-control {
+  font-size: 1.1em;
+  line-height: 4.5em;
+  padding: 0 1em;
+  min-width: 3em;
+}
+
+/* Progress control styling */
+.video-js .vjs-progress-control {
+  font-size: 1.1em;
+}
+
+/* C2PA Control Button - positioned BEFORE play button */
+.video-js .vjs-control-bar .vjs-control.vjs-button[title="Content Credentials"] {
+  width: 4.5em !important;
+  order: -1; /* Position before play button */
+}
+
+/* Play button gets default order: 0 */
+.video-js .vjs-play-control {
+  order: 0;
+}
+
+/* Volume panel adjustments - fixed layout */
+.video-js .vjs-volume-panel {
+  width: auto !important;
+  display: flex !important;
+  align-items: center !important;
+}
+
+/* Always use horizontal layout */
+.video-js.vjs-has-started .vjs-volume-panel {
+  width: auto !important;
+}
+
+/* Volume control button */
+.video-js .vjs-volume-panel .vjs-mute-control {
+  width: 4em !important;
+}
+
+/* Volume bar container - always visible and fixed position */
+.video-js .vjs-volume-panel .vjs-volume-control {
+  width: 5em !important;
+  display: flex !important;
+  align-items: center !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  position: relative !important;
+  transition: none !important;
+  pointer-events: auto !important;
+}
+
+/* Force horizontal volume control to always show with fixed dimensions */
+.video-js .vjs-volume-panel.vjs-volume-panel-horizontal .vjs-volume-control {
+  opacity: 1 !important;
+  width: 5em !important;
+  height: auto !important;
+  transition: none !important;
+}
+
+/* Disable vertical volume control */
+.video-js .vjs-volume-panel.vjs-volume-panel-vertical {
+  display: none !important;
+}
+
+/* Override all hover and active states to maintain fixed position */
+.video-js .vjs-volume-panel .vjs-volume-control.vjs-slider-active,
+.video-js .vjs-volume-panel:hover .vjs-volume-control,
+.video-js .vjs-volume-panel:focus .vjs-volume-control,
+.video-js .vjs-volume-panel.vjs-slider-active .vjs-volume-control,
+.video-js .vjs-volume-panel.vjs-hover .vjs-volume-control,
+.video-js .vjs-volume-panel .vjs-volume-control:hover,
+.video-js.vjs-user-inactive .vjs-volume-panel .vjs-volume-control {
+  opacity: 1 !important;
+  width: 5em !important;
+  transition: none !important;
+}
+
+/* Volume slider - fixed dimensions */
+.video-js .vjs-volume-bar {
+  height: 0.5em !important;
+  margin: 0 0.5em !important;
+}
+
+/* Volume level indicator */
+.video-js .vjs-volume-level {
+  height: 0.5em !important;
+}
+
+/* Hide volume level handle/knob for cleaner display */
+.video-js .vjs-volume-level::before {
+  display: none !important;
+}
+
+/* Make video player container larger */
+.video-js {
+  font-size: 16px;
+  min-height: 500px;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .video-js .vjs-control-bar {
+    height: 3.5em !important;
+    font-size: 1em;
+  }
+
+  .video-js .vjs-control {
+    width: 3em !important;
+  }
+
+  .video-js .vjs-button:not(.c2pa-menu-button) > .vjs-icon-placeholder:before {
+    font-size: 1.5em;
+  }
+
+  /* Keep C2PA button size consistent on mobile */
+  .video-js .vjs-chapters-button.c2pa-menu-button {
+    width: 4em !important;
+    min-width: 4em !important;
+  }
+
+  .video-js {
+    min-height: 300px;
+  }
+}
+
+/* C2PA Timeline Styling */
+.video-js .vjs-progress-control {
+  color: var(--c2pa-unknown);
+}
+
+.video-js .vjs-progress-holder .vjs-play-progress {
+  background-color: var(--c2pa-unknown);
+}
+
+/* C2PA Timeline Segments */
+.seekbar-play-c2pa {
+  position: absolute;
+  height: 100%;
+  left: 0;
+  top: 0;
+  pointer-events: none;
+}

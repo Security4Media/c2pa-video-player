@@ -1,0 +1,269 @@
+/*
+ * Copyright 2026 European Broadcasting Union
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+/* C2PA menu shell and overlay layout */
+
+.video-js .vjs-menu-button-popup.c2pa-menu-button {
+  position: static !important;
+  overflow: visible !important;
+}
+
+.video-js .vjs-menu-button-popup.c2pa-menu-button > .vjs-menu {
+  display: none !important;
+}
+
+.video-js .c2pa-player-menu-overlay {
+  position: absolute !important;
+  inset: 0 !important;
+  margin: 0 !important;
+  z-index: 10 !important;
+  pointer-events: auto !important;
+  transform: none !important;
+  width: auto !important;
+  height: auto !important;
+  display: flex !important;
+  align-items: flex-end !important;
+  justify-content: flex-start !important;
+  padding: 1rem 1rem 4.5rem 1rem !important;
+  box-sizing: border-box !important;
+  overflow: visible !important;
+}
+
+.video-js .c2pa-player-menu-overlay--closing {
+  pointer-events: none !important;
+}
+
+.video-js .c2pa-player-menu-overlay .vjs-menu {
+  display: flex !important;
+  align-items: flex-end !important;
+  justify-content: flex-start !important;
+  width: 100% !important;
+  height: 100% !important;
+  overflow: visible !important;
+}
+
+.video-js .c2pa-player-menu-overlay .vjs-menu .c2pa-menu-panel-shell {
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-start;
+  width: 100%;
+  height: 100%;
+}
+
+.video-js .c2pa-player-menu-overlay .vjs-menu .vjs-menu-content {
+  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: transparent;
+  padding: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  box-sizing: border-box;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-start;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  border: none;
+  box-shadow: none;
+}
+
+.video-js .c2pa-player-menu-overlay .vjs-menu .c2pa-menu-panel {
+  position: relative;
+  margin-left: var(--c2pa-menu-panel-offset-x, 0) !important;
+  width: min(32rem, calc(100% - 1.5rem)) !important;
+  max-width: min(32rem, calc(100% - 1.5rem)) !important;
+  min-width: min(32rem, calc(100% - 1.5rem)) !important;
+  min-height: min(42rem, calc(100% - 1.5rem)) !important;
+  height: min(42rem, calc(100% - 1.5rem)) !important;
+  max-height: min(42rem, calc(100% - 1.5rem)) !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: flex-start !important;
+  justify-content: flex-start !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  background: linear-gradient(135deg, rgba(14, 65, 148, 0.85) 0%, rgba(10, 46, 106, 0.90) 100%) !important;
+  border: 0.3rem solid #1256c2 !important;
+  border-radius: 1rem !important;
+  box-sizing: border-box !important;
+  animation: ebu-blue-border-pulse 4s ease-in-out infinite !important;
+  backdrop-filter: blur(0.5rem) !important;
+  box-shadow:
+    0 1.2rem 2rem rgba(14, 65, 148, 0.3),
+    0 0 2rem rgba(14, 65, 148, 0.6),
+    0 0.5rem 2rem rgba(0, 0, 0, 0.5),
+    0 0 0 1px rgba(255, 255, 255, 0.15) inset !important;
+  overflow: hidden !important;
+  transform-origin: var(--c2pa-menu-anchor-origin-x, 2.4rem) calc(100% + 1rem);
+}
+
+.video-js .c2pa-player-menu-overlay .vjs-menu .c2pa-menu-panel::after {
+  content: '';
+  position: absolute;
+  left: calc(var(--c2pa-menu-anchor-origin-x, 2.4rem) - 0.675rem);
+  bottom: -0.95rem;
+  width: 1.35rem;
+  height: 1.35rem;
+  background: linear-gradient(135deg, rgba(14, 65, 148, 0.92) 0%, rgba(10, 46, 106, 0.96) 100%);
+  border-right: 0.3rem solid #1256c2;
+  border-bottom: 0.3rem solid #1256c2;
+  transform: rotate(45deg);
+  box-sizing: border-box;
+  box-shadow: 0 0.6rem 1rem rgba(0, 0, 0, 0.25);
+  z-index: 0;
+}
+
+.video-js .c2pa-player-menu-overlay .vjs-menu .c2pa-menu-content-list {
+  width: 100%;
+  margin: 0 !important;
+  padding: 0 2rem 2rem 2rem !important;
+  list-style: none !important;
+  box-sizing: border-box;
+  overflow-y: auto !important;
+  overflow-x: hidden;
+  min-height: 0;
+  flex: 1 1 auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.video-js .c2pa-player-menu-overlay .vjs-menu .c2pa-menu-content-list::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+.vjs-menu .c2pa-menu-header {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 2 !important;
+  text-transform: uppercase !important;
+  border-bottom: 0.2rem solid rgba(255, 255, 255, 0.4) !important;
+  padding-left: 2rem !important;
+  padding-right: 2rem !important;
+  padding-bottom: 1rem !important;
+  padding-top: 0.75rem !important;
+  margin: 0 0 1.5rem 0 !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  font-family: 'Plus Jakarta Sans', sans-serif !important;
+  font-weight: 800 !important;
+  font-size: 1.5rem !important;
+  color: #ffffff !important;
+  line-height: 1.3 !important;
+  text-shadow: 0 0.2rem 0.5rem rgba(0, 0, 0, 0.3) !important;
+  letter-spacing: -0.03em !important;
+  background: linear-gradient(135deg, rgba(14, 65, 148, 0.85) 0%, rgba(10, 46, 106, 0.90) 100%) !important;
+  border-top-left-radius: 0.85rem !important;
+  border-top-right-radius: 0.85rem !important;
+  box-sizing: border-box;
+}
+
+.vjs-menu .c2pa-menu-header .c2pa-menu-title__action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  position: absolute;
+  left: 2rem;
+  flex-shrink: 0;
+}
+
+.vjs-menu .c2pa-menu-header .c2pa-menu-title__text {
+  display: block;
+  margin: 0 auto;
+  min-width: 0;
+  text-align: center;
+}
+
+.vjs-menu li.vjs-menu-item {
+  display: inline-flex;
+  flex-direction: column;
+  justify-content: left;
+  text-transform: none;
+  border-top: 1px solid rgba(255, 255, 255, 0.15);
+  padding: 0.9rem 0.5rem;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  cursor: default;
+  white-space: normal;
+  text-align: left;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-weight: 400;
+  font-size: 0.95rem;
+  word-wrap: break-word;
+  overflow-wrap: anywhere;
+  color: rgba(255, 255, 255, 0.95);
+  line-height: 1.6;
+  transition: background-color 0.2s ease;
+  border-radius: 0.4rem;
+  margin-bottom: 0.25rem;
+}
+
+.vjs-menu li.vjs-menu-item:hover,
+.js-focus-visible .vjs-menu li.vjs-menu-item:hover {
+  background: none;
+}
+
+.video-js .vjs-control-bar {
+  z-index: 100 !important;
+  position: relative;
+}
+
+@media (max-width: 768px) {
+  .video-js .c2pa-player-menu-overlay .vjs-menu .c2pa-menu-panel {
+    width: calc(100% - 1rem) !important;
+    max-width: calc(100% - 1rem) !important;
+    min-width: calc(100% - 1rem) !important;
+    min-height: min(32rem, calc(100% - 1rem)) !important;
+    height: min(32rem, calc(100% - 1rem)) !important;
+    max-height: min(32rem, calc(100% - 1rem)) !important;
+  }
+
+  .video-js .c2pa-player-menu-overlay {
+    padding: 0.75rem 0.5rem 4rem 0.5rem !important;
+  }
+
+  .video-js .c2pa-player-menu-overlay .vjs-menu .c2pa-menu-panel::after {
+    left: calc(var(--c2pa-menu-anchor-origin-x, 1.4rem) - 0.675rem);
+  }
+
+  .vjs-menu .c2pa-menu-header {
+    font-size: 1.3rem !important;
+    margin-bottom: 1.2rem !important;
+    padding-left: 1.5rem !important;
+    padding-right: 1.5rem !important;
+  }
+
+  .video-js .c2pa-player-menu-overlay .vjs-menu .c2pa-menu-content-list {
+    padding: 0 1.5rem 1.5rem 1.5rem !important;
+  }
+
+  .vjs-menu .c2pa-menu-header .c2pa-menu-title__action {
+    left: 1.5rem;
+  }
+
+  .vjs-menu li.vjs-menu-item {
+    font-size: 0.9rem;
+    padding: 0.8rem 0.4rem;
+  }
+}

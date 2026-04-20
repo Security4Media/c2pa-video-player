@@ -1,0 +1,113 @@
+/*
+ * Copyright 2026 European Broadcasting Union
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+/* StandalonePlayerPage - Page-level Styles Only */
+
+/* Global Reset for this page */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+/* Page Container */
+.standalone-player-page {
+  font-family: var(--font-family-base);
+  background: var(--color-background);
+  min-height: 100vh;
+  padding: var(--space-lg);
+  color: var(--color-foreground);
+}
+
+/* Header Section */
+.standalone-player-page .header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: var(--space-2xl);
+  gap: var(--space-lg);
+}
+
+.standalone-player-page .logos {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2xl);
+  width: 100%;
+  max-width: 900px;
+  padding: var(--space-xl);
+  border-radius: var(--radius-lg);
+  background: var(--color-background);
+  box-shadow: var(--shadow-lg);
+}
+
+.standalone-player-page .logos .ebu-logo {
+  height: 80px;
+  width: auto;
+  object-fit: contain;
+}
+
+.standalone-player-page .logos .nab-logo {
+  height: 110px;
+  width: auto;
+  object-fit: contain;
+  padding-top: var(--space-lg);
+}
+
+.standalone-player-page h1 {
+  font-size: var(--font-size-3xl);
+  color: var(--color-foreground);
+  font-weight: var(--font-weight-bold);
+}
+
+.standalone-player-page h2 {
+  font-size: var(--font-size-2xl);
+  color: var(--color-foreground);
+  font-weight: var(--font-weight-semibold);
+  text-align: center;
+}
+
+/* Main Container */
+.standalone-player-page .container {
+  max-width: 1500px;
+  margin: 0 auto;
+  background: var(--color-surface);
+  border-radius: var(--radius-xl);
+  padding: var(--space-2xl);
+  box-shadow: var(--shadow-xl);
+  border: 1px solid var(--color-border);
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .standalone-player-page {
+    padding: var(--space-md);
+  }
+  
+  .standalone-player-page .container {
+    padding: var(--space-lg);
+  }
+  
+  .standalone-player-page h1 {
+    font-size: var(--font-size-2xl);
+  }
+  
+  .standalone-player-page h2 {
+    font-size: var(--font-size-xl);
+  }
+}
+

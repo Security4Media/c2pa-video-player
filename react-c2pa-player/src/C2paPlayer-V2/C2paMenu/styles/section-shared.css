@@ -1,0 +1,98 @@
+/*
+ * Copyright 2026 European Broadcasting Union
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+/* Shared section layout primitives */
+
+.vjs-menu li.vjs-menu-item .c2pa-menu-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  width: 100%;
+  min-width: 0;
+}
+
+.vjs-menu li.vjs-menu-item .c2pa-menu-section__header {
+  margin-bottom: 0.25rem;
+}
+
+.vjs-menu li.vjs-menu-item .c2pa-menu-section__header--collapsible {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  cursor: pointer;
+}
+
+.vjs-menu li.vjs-menu-item .c2pa-menu-section__title {
+  padding-bottom: 0;
+  color: #7db4ff !important;
+}
+
+.vjs-menu li.vjs-menu-item .c2pa-menu-section__toggle {
+  margin-left: auto;
+  color: #7db4ff;
+  font-size: 1.25rem;
+  line-height: 1;
+  transition: transform 0.2s ease;
+  user-select: none;
+}
+
+.vjs-menu li.vjs-menu-item .c2pa-menu-section__toggle.expanded {
+  transform: rotate(90deg);
+}
+
+.vjs-menu li.vjs-menu-item .c2pa-menu-section__content {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transition:
+    grid-template-rows 0.24s ease,
+    opacity 0.2s ease;
+}
+
+.vjs-menu li.vjs-menu-item .c2pa-menu-section__content.expanded {
+  grid-template-rows: 1fr;
+  opacity: 1;
+}
+
+.vjs-menu li.vjs-menu-item .c2pa-menu-section__content-inner {
+  overflow: hidden;
+  min-height: 0;
+  transform: translateY(-0.35rem);
+  transition:
+    transform 0.24s ease,
+    opacity 0.2s ease;
+  opacity: 0;
+}
+
+.vjs-menu li.vjs-menu-item .c2pa-menu-section__content.expanded .c2pa-menu-section__content-inner {
+  transform: translateY(0);
+  opacity: 1;
+}
+
+.vjs-menu li.vjs-menu-item .c2pa-menu-section__row {
+  line-height: 1.4;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  white-space: normal;
+}
+
+.vjs-menu li.vjs-menu-item .c2pa-menu-section__row .itemName {
+  padding-bottom: 0;
+  padding-right: 0.25rem;
+}

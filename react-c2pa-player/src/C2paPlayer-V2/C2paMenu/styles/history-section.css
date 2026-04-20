@@ -1,0 +1,189 @@
+/*
+ * Copyright 2026 European Broadcasting Union
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+/* History / ingredients section */
+
+.vjs-menu li.vjs-menu-item .c2pa-history-section__content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.vjs-menu li.vjs-menu-item .c2pa-history-section__back-button {
+  display: inline-flex;
+  align-items: center;
+  padding: 0;
+  border: none;
+  background: none;
+  color: #7db4ff;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.vjs-menu li.vjs-menu-item .c2pa-history-section__back-button:hover {
+  color: #a8d0ff;
+}
+
+.vjs-menu li.vjs-menu-item .c2pa-history-section__back-button--title {
+  width: 1.75rem;
+  height: 1.75rem;
+  justify-content: center;
+}
+
+.vjs-menu li.vjs-menu-item .c2pa-history-section__back-icon {
+  font-size: 1.4rem;
+  line-height: 1;
+}
+
+.vjs-menu li.vjs-menu-item.c2pa-history-section__view-content {
+  border-top: none;
+  padding-top: 0;
+}
+
+.vjs-menu li.vjs-menu-item .c2pa-history-section__content--detail {
+  margin-top: 0;
+}
+
+.vjs-menu li.vjs-menu-item .c2pa-history-section__ingredient {
+  display: flex;
+  flex-direction: column;
+  border-left: 2px solid rgba(125, 180, 255, 0.3);
+  padding-left: 0.75rem;
+  margin-left: 0.5rem;
+}
+
+.vjs-menu li.vjs-menu-item .c2pa-history-section__ingredient-header {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.75rem;
+  cursor: pointer;
+  padding: 0.5rem;
+  margin: -0.5rem;
+  margin-left: -0.75rem;
+  border-radius: 0.4rem;
+  transition: background-color 0.2s ease;
+}
+
+.vjs-menu li.vjs-menu-item .c2pa-history-section__ingredient-header:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.vjs-menu li.vjs-menu-item .c2pa-history-section__ingredient-header .itemName {
+  padding-bottom: 0;
+  line-height: 1.5;
+  font-weight: 500;
+}
+
+.vjs-menu li.vjs-menu-item .c2pa-history-section__ingredient-count {
+  font-size: 0.85rem;
+  color: rgba(125, 180, 255, 0.8);
+  font-weight: 400;
+  margin-left: 0.5rem;
+}
+
+.vjs-menu li.vjs-menu-item .c2pa-history-section__ingredient-toggle {
+  font-size: 1.5rem;
+  line-height: 1.5;
+  transition: transform 0.2s ease;
+  display: inline-block;
+  user-select: none;
+  color: rgba(125, 180, 255, 0.8);
+}
+
+.vjs-menu li.vjs-menu-item .c2pa-history-section__ingredient-toggle.expanded {
+  transform: rotate(90deg);
+}
+
+.vjs-menu li.vjs-menu-item .c2pa-history-section__ingredient-panel {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transition:
+    grid-template-rows 0.24s ease,
+    opacity 0.2s ease;
+}
+
+.vjs-menu li.vjs-menu-item .c2pa-history-section__ingredient-panel.expanded {
+  grid-template-rows: 1fr;
+  opacity: 1;
+}
+
+.vjs-menu li.vjs-menu-item .c2pa-history-section__ingredient-panel-inner {
+  overflow: hidden;
+  min-height: 0;
+  transform: translateY(-0.25rem);
+  transition:
+    transform 0.24s ease,
+    opacity 0.2s ease;
+  opacity: 0;
+}
+
+.vjs-menu li.vjs-menu-item .c2pa-history-section__ingredient-panel.expanded .c2pa-history-section__ingredient-panel-inner {
+  transform: translateY(0);
+  opacity: 1;
+}
+
+.vjs-menu li.vjs-menu-item .c2pa-history-section__ingredient-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding-top: 0.5rem;
+  padding-left: 1.5rem;
+  width: auto;
+  max-width: 100%;
+  overflow-wrap: break-word;
+}
+
+.vjs-menu li.vjs-menu-item .c2pa-history-section__ingredient-content .itemName {
+  padding-bottom: 0;
+  padding-right: 0.25rem;
+}
+
+.vjs-menu li.vjs-menu-item .c2pa-history-section__subingredients {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid rgba(125, 180, 255, 0.2);
+}
+
+.vjs-menu li.vjs-menu-item .c2pa-history-section__subingredients-header {
+  font-size: 0.95rem;
+  margin-bottom: 0.25rem;
+}
+
+.vjs-menu li.vjs-menu-item .c2pa-history-section__subingredients .c2pa-history-section__ingredient {
+  margin-left: 0.5rem;
+  border-left-color: rgba(125, 180, 255, 0.2);
+  border-left-width: 1px;
+}
+
+.vjs-menu li.vjs-menu-item .c2pa-history-section__subingredients .c2pa-history-section__ingredient-header {
+  font-size: 0.95rem;
+}
+
+.vjs-menu li.vjs-menu-item .c2pa-history-section__subingredients .c2pa-history-section__ingredient-content {
+  padding-left: 1rem;
+}
+
+@media (max-width: 768px) {
+  .vjs-menu li.vjs-menu-item .c2pa-history-section__ingredient-content {
+    padding-left: 1rem;
+  }
+}

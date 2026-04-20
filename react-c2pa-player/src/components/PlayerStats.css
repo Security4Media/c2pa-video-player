@@ -1,0 +1,90 @@
+/*
+ * Copyright 2026 European Broadcasting Union
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+/* PlayerStats Component Styles */
+
+.info-panel {
+  background: var(--color-background);
+  border-radius: var(--radius-lg);
+  padding: var(--space-xl);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-sm);
+}
+
+.info-panel h3 {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  margin-bottom: var(--space-lg);
+  color: var(--color-foreground);
+}
+
+/* Status Badge */
+.status {
+  padding: var(--space-xs) var(--space-md);
+  border-radius: var(--radius-sm);
+  font-weight: var(--font-weight-medium);
+  font-size: var(--font-size-sm);
+}
+
+.status.ready {
+  background: var(--color-valid);
+  color: white;
+}
+
+.status.loading {
+  background: var(--color-unknown);
+  color: var(--color-foreground);
+}
+
+.status.error {
+  background: var(--color-invalid);
+  color: white;
+}
+
+/* Stream Info Log */
+#streamInfo {
+  font-family: 'Courier New', monospace;
+  font-size: var(--font-size-sm);
+  background: var(--color-surface);
+  padding: var(--space-md);
+  border-radius: var(--radius-md);
+  max-height: 200px;
+  overflow-y: auto;
+  margin: var(--space-lg) 0;
+  border: 1px solid var(--color-border);
+}
+
+#streamInfo > div {
+  padding: var(--space-xs) 0;
+  color: var(--color-foreground-muted);
+}
+
+/* Player Stats Grid */
+#playerStats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: var(--space-md);
+  margin-top: var(--space-lg);
+}
+
+#playerStats > div {
+  background: var(--color-surface);
+  padding: var(--space-md);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  border: 1px solid var(--color-border);
+}
