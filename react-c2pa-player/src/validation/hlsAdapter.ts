@@ -15,12 +15,13 @@
  */
 
 import type { Manifest, ManifestStore } from '@contentauth/c2pa-web';
+import c2paWasmSrc from '@contentauth/c2pa-web/resources/c2pa.wasm?url';
 import {
   C2paHlsBridge,
   type C2paManifestHelper,
 } from '@nettrek/c2pa-hls-bridge';
 import Hls from 'hls.js';
-import { loadHlsLocalTrustSettings } from './hlsLocalTrustSettings';
+import { loadHlsLocalTrustConfiguration } from './hlsLocalTrustSettings';
 import { detectAdapterKind } from './sourceDetection';
 import type {
   MediaSourceDescriptor,
@@ -33,12 +34,6 @@ import type {
   ValidationTimelineSegment,
 } from './types';
 import type { PlayerValidationState } from '@/types/c2pa.types';
-
-interface PatchableC2paHlsBridgePrototype {
-  getToolkitSettings?: () => Promise<unknown>;
-}
-
-let localTrustPatchInstalled = false;
 
 export class HlsFragmentedFmp4Adapter implements MediaValidationAdapter {
   readonly kind = 'hls-fragmented-fmp4' as const;
@@ -86,12 +81,16 @@ class HlsFragmentedFmp4Session implements ValidationSession {
       return;
     }
 
-    installLocalTrustSettingsPatch();
+    const trustConfiguration = this.#context.policy.enableTrustVerification
+      ? await loadHlsLocalTrustConfiguration()
+      : null;
 
     const hls = new Hls({ enableWorker: true });
     const bridge = new C2paHlsBridge(
       {
         enableTrustListVerification: this.#context.policy.enableTrustVerification,
+        wasmSrc: c2paWasmSrc,
+        ...(trustConfiguration ?? {}),
       },
       hls,
     );
@@ -222,17 +221,6 @@ class HlsFragmentedFmp4Session implements ValidationSession {
   #emit(): void {
     this.#listeners.forEach((listener) => listener(this.#snapshot));
   }
-}
-
-function installLocalTrustSettingsPatch(): void {
-  if (localTrustPatchInstalled) {
-    return;
-  }
-
-  const bridgePrototype = C2paHlsBridge.prototype as unknown as PatchableC2paHlsBridgePrototype;
-  bridgePrototype.getToolkitSettings = () =>
-    loadHlsLocalTrustSettings();
-  localTrustPatchInstalled = true;
 }
 
 function normalizeHlsReader(reader: C2paManifestHelper): NormalizedC2PAResult {

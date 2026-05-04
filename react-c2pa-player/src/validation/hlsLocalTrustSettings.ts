@@ -14,30 +14,20 @@
  * limitations under the License.
  */
 
+import type { TrustSettings } from '@nettrek/c2pa-hls-bridge';
 import cawgAllowedList from '/trust/cawg_allowed_extended.pem?url';
 import c2paAllowedList from '/trust/c2pa_allowed_extended.pem?url';
 import c2paTrustAnchors from '/trust/c2pa_anchors_extended.pem?url';
 import c2paTrustConfig from '/trust/c2pa_store.cfg?url';
 
-interface HlsBridgeTrustSettings {
-  cawgTrust: {
-    trustAnchors: string;
-    allowedList: string;
-    trustConfig: string;
-  };
-  trust: {
-    trustAnchors: string;
-    allowedList: string;
-    trustConfig: string;
-  };
-  verify: {
-    verifyTrust: boolean;
-  };
+export interface HlsBridgeTrustConfiguration {
+  cawgTrust: TrustSettings;
+  trust: TrustSettings;
 }
 
-let localTrustSettingsPromise: Promise<HlsBridgeTrustSettings> | null = null;
+let localTrustSettingsPromise: Promise<HlsBridgeTrustConfiguration> | null = null;
 
-export function loadHlsLocalTrustSettings(): Promise<HlsBridgeTrustSettings> {
+export function loadHlsLocalTrustConfiguration(): Promise<HlsBridgeTrustConfiguration> {
   localTrustSettingsPromise ??= Promise.all([
     fetchText(c2paTrustAnchors),
     fetchText(cawgAllowedList),
@@ -53,9 +43,6 @@ export function loadHlsLocalTrustSettings(): Promise<HlsBridgeTrustSettings> {
       trustAnchors,
       allowedList: c2paAllowed,
       trustConfig,
-    },
-    verify: {
-      verifyTrust: true,
     },
   }));
 

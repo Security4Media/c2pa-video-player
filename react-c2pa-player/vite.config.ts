@@ -20,6 +20,9 @@ import react from '@vitejs/plugin-react';
 export default defineConfig({
   base: '/server/',
   plugins: [react()],
+  optimizeDeps: {
+    exclude: ['@nettrek/c2pa-hls-bridge'],
+  },
   resolve: {
     alias: {
       '@': '/src/',
