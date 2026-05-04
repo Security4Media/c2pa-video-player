@@ -16,7 +16,7 @@
 
 import type { ManifestStore } from '@contentauth/c2pa-web';
 import type { C2PAStatus } from '@/types/c2pa.types';
-import { getActiveManifest, getActiveManifestValidationStatus } from '@/services/c2pa_functions';
+import { normalizeMonolithicManifestStore } from './normalization';
 import type { NormalizedC2PAResult, ValidationStatusSnapshot } from './types';
 
 export function createC2PAStatusFromResult(
@@ -33,9 +33,9 @@ export function createC2PAStatusFromResult(
 }
 
 export function createC2PAStatusFromSnapshot(
-  snapshot: ValidationStatusSnapshot
+  snapshot: ValidationStatusSnapshot | null
 ): C2PAStatus | null {
-  if (!snapshot.result) {
+  if (!snapshot?.result) {
     return null;
   }
 
@@ -50,21 +50,5 @@ export function normalizeManifestStore(
   manifestStore: ManifestStore | null,
   reason?: string
 ): NormalizedC2PAResult {
-  const activeManifest = manifestStore ? getActiveManifest(manifestStore) : null;
-  const manifests = manifestStore?.manifests ?? {};
-  const validationState = manifestStore
-    ? getActiveManifestValidationStatus(manifestStore)
-    : 'Unknown';
-  const validationResults = manifestStore?.validation_results?.activeManifest;
-
-  return {
-    manifestStore,
-    validationState,
-    containsSignature: activeManifest !== null,
-    containsAIGeneratedContent: false,
-    validationErrors: validationResults?.failure ?? [],
-    activeManifest,
-    manifests,
-    reason,
-  };
+  return normalizeMonolithicManifestStore(manifestStore, reason);
 }

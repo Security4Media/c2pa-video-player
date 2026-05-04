@@ -14,10 +14,9 @@
  * limitations under the License.
  */
 
-import type { C2PAStatus } from '@/types/c2pa.types';
-import { c2pa_init, type C2PACleanup } from '@/services/c2pa-v2-monolithic';
+import { normalizeMonolithicManifestStore } from './normalization';
+import { MonolithicBridgeRuntime } from './runtimes';
 import { detectAdapterKind } from './sourceDetection';
-import { normalizeManifestStore } from './c2paResult';
 import type {
   MediaSourceDescriptor,
   MediaValidationAdapter,
@@ -27,24 +26,32 @@ import type {
   ValidationStatusSnapshot,
 } from './types';
 
+const MONOLITHIC_CAPABILITIES = {
+  ownsPlayback: false,
+  providesTimelineSegments: false,
+  supportsLookupByTime: false,
+  supportsTrustVerification: true,
+} as const;
+
 export class MonolithicC2PAAdapter implements MediaValidationAdapter {
   readonly kind = 'monolithic' as const;
+  readonly capabilities = MONOLITHIC_CAPABILITIES;
 
   canHandle(source: MediaSourceDescriptor): boolean {
     return detectAdapterKind(source) === this.kind;
   }
 
   createSession(context: ValidationAdapterContext): ValidationSession {
-    return new MonolithicC2PASession(context.videoElement);
+    return new MonolithicC2PASession(context);
   }
 }
 
 class MonolithicC2PASession implements ValidationSession {
   readonly adapterKind = 'monolithic' as const;
 
-  readonly #videoElement: HTMLVideoElement;
+  readonly #runtime: MonolithicBridgeRuntime;
   readonly #listeners = new Set<ValidationSessionListener>();
-  #cleanup: C2PACleanup | null = null;
+  #unsubscribeRuntime: (() => void) | null = null;
   #snapshot: ValidationStatusSnapshot = {
     adapterKind: this.adapterKind,
     result: null,
@@ -52,26 +59,25 @@ class MonolithicC2PASession implements ValidationSession {
     message: 'Monolithic C2PA validation pending',
   };
 
-  constructor(videoElement: HTMLVideoElement) {
-    this.#videoElement = videoElement;
+  constructor(context: ValidationAdapterContext) {
+    this.#runtime = new MonolithicBridgeRuntime(context);
   }
 
   async load(): Promise<void> {
-    this.#cleanup = await c2pa_init(this.#videoElement, (event: { c2pa_status?: C2PAStatus }) => {
-      const manifestStore = event.c2pa_status?.manifestStore ?? null;
-      this.#snapshot = {
-        adapterKind: this.adapterKind,
-        result: normalizeManifestStore(manifestStore),
-        timelineSegments: [],
-        message: 'Monolithic C2PA validation active',
-      };
+    this.#unsubscribeRuntime = this.#runtime.subscribe(() => {
+      this.#snapshot = this.#buildSnapshot();
       this.#emit();
     });
+
+    await this.#runtime.load();
+    this.#snapshot = this.#buildSnapshot();
+    this.#emit();
   }
 
   dispose(): void {
-    this.#cleanup?.();
-    this.#cleanup = null;
+    this.#unsubscribeRuntime?.();
+    this.#unsubscribeRuntime = null;
+    this.#runtime.dispose();
     this.#listeners.clear();
   }
 
@@ -88,8 +94,19 @@ class MonolithicC2PASession implements ValidationSession {
     };
   }
 
+  #buildSnapshot(): ValidationStatusSnapshot {
+    return {
+      adapterKind: this.adapterKind,
+      result: normalizeMonolithicManifestStore(
+        this.#runtime.getManifestStore(),
+        this.#runtime.getErrorReason() ?? undefined,
+      ),
+      timelineSegments: [],
+      message: this.#runtime.getMessage(),
+    };
+  }
+
   #emit(): void {
     this.#listeners.forEach((listener) => listener(this.#snapshot));
   }
 }
-

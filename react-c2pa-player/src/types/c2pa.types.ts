@@ -14,35 +14,17 @@
  * limitations under the License.
  */
 
-import type { Manifest, ManifestStore } from '@contentauth/c2pa-web';
+import type { ManifestStore } from '@contentauth/c2pa-web';
+import type {
+  AdapterKind as C2PAAdapterKind,
+  NormalizedC2PAResult as C2PANormalizedResult,
+  PlayerValidationState,
+  ValidationTimelineSegment as C2PATimelineSegmentUpdate,
+} from '@/validation';
 
-export type PlayerValidationState = 'Trusted' | 'Valid' | 'Invalid' | 'Unknown';
+export type { PlayerValidationState };
 export type ValidationState = PlayerValidationState;
-export type C2PAAdapterKind =
-  | 'monolithic'
-  | 'hls-fragmented-fmp4'
-  | 'dash-fragmented-fmp4'
-  | 'unsupported';
-
-export interface C2PANormalizedResult {
-  manifestStore: ManifestStore | null;
-  validationState: PlayerValidationState;
-  containsSignature: boolean;
-  containsAIGeneratedContent: boolean;
-  validationErrors: unknown[];
-  activeManifest: Manifest | null;
-  manifests: Record<string, Manifest>;
-  reason?: string;
-}
-
-export interface C2PATimelineSegmentUpdate {
-  startTime: number;
-  endTime: number;
-  validationState: PlayerValidationState;
-  sourceSegmentId?: string;
-  pending?: boolean;
-}
-
+export type { C2PAAdapterKind, C2PANormalizedResult, C2PATimelineSegmentUpdate };
 
 export interface C2PAStatus {
   manifestStore: ManifestStore | null;
@@ -55,7 +37,7 @@ export interface C2PAStatus {
 }
 
 export interface C2PAPlayerProps {
-  videoPlayer: any; // videojs player instance
+  videoPlayer: any;
   videoElement: HTMLVideoElement;
   isMonolithic?: boolean;
 }

@@ -25,6 +25,12 @@ import type {
 
 export class UnsupportedValidationAdapter implements MediaValidationAdapter {
   readonly kind = 'unsupported' as const;
+  readonly capabilities = {
+    ownsPlayback: false,
+    providesTimelineSegments: false,
+    supportsLookupByTime: false,
+    supportsTrustVerification: false,
+  } as const;
 
   canHandle(): boolean {
     return true;
@@ -77,4 +83,3 @@ class UnsupportedValidationSession implements ValidationSession {
     };
   }
 }
-

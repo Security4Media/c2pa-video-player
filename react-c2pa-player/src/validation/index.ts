@@ -24,17 +24,32 @@ export { createDefaultValidationAdapterRegistry } from './defaultRegistry';
 export { HlsFragmentedFmp4Adapter } from './hlsAdapter';
 export { MonolithicC2PAAdapter } from './monolithicAdapter';
 export {
+  createCompatibilityManifestStore,
+  createUnknownResult,
+  normalizeHlsManifestHelper,
+  normalizeMonolithicManifestStore,
+} from './normalization';
+export { createDefaultValidationPolicy, LocalTrustMaterialProvider } from './policy';
+export { getActiveManifest, getHlsValidationState, getManifestStoreValidationState } from './rules';
+export { HlsBridgeRuntime, MonolithicBridgeRuntime } from './runtimes';
+export {
   createMediaSourceDescriptor,
   detectAdapterKind,
   type CreateMediaSourceDescriptorInput,
 } from './sourceDetection';
+export { FragmentedTimelineProjector } from './timeline';
 export { UnsupportedValidationAdapter } from './unsupportedAdapter';
 export type {
+  AdapterCapabilities,
   AdapterKind,
   MediaSourceDescriptor,
   MediaSourceOrigin,
   MediaValidationAdapter,
   NormalizedC2PAResult,
+  PlayerValidationState,
+  TimeInterval,
+  TrustMaterial,
+  TrustMaterialProvider,
   ValidationAdapterContext,
   ValidationPolicy,
   ValidationSession,

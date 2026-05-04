@@ -14,23 +14,20 @@
  * limitations under the License.
  */
 
-import { useEffect, useRef, useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ManifestStore } from '@contentauth/c2pa-web';
-import type { C2PAStatus } from '../types/c2pa.types';
 import type { C2PAPlayerInstance } from '../C2paPlayer-V2/main';
-
-// Import the C2PAPlayer from the V2 module
 import { C2PAPlayer } from '../C2paPlayer-V2/main';
 import {
-  createC2PAStatusFromSnapshot,
-  createDefaultValidationAdapterRegistry,
-  createMediaSourceDescriptor,
+  createDefaultValidationPolicy,
   type MediaSourceDescriptor,
+  type MediaValidationAdapter,
   type ValidationSession,
+  type ValidationStatusSnapshot,
 } from '../validation';
 
 interface UseC2PAPlayerOptions {
-  isMonolithic?: boolean;
+  adapter: MediaValidationAdapter | null;
   source?: MediaSourceDescriptor | null;
   onError?: (error: string) => void;
 }
@@ -40,26 +37,35 @@ interface UseC2PAPlayerState {
   manifestStore: ManifestStore | null;
 }
 
-/**
- * Hook to manage C2PAPlayer V2 integration with Video.js player
- * This handles both the UI (C2PAPlayer V2) and validation (c2pa-monolithic)
- */
+type PlaybackEventName = 'play' | 'timeupdate' | 'seeking' | 'seeked';
+
 export function useC2PAPlayer({
-  isMonolithic = true,
+  adapter,
   source: validationSource = null,
-  onError
-}: UseC2PAPlayerOptions = {}) {
+  onError,
+}: UseC2PAPlayerOptions) {
   const c2paPlayerRef = useRef<C2PAPlayerInstance | null>(null);
   const validationSessionRef = useRef<ValidationSession | null>(null);
+  const videoElementRef = useRef<HTMLVideoElement | null>(null);
+  const validationCleanupRef = useRef<(() => void) | null>(null);
   const isInitializingRef = useRef(false);
+  const latestSnapshotRef = useRef<ValidationStatusSnapshot | null>(null);
   const [state, setState] = useState<UseC2PAPlayerState>({
     isInitialized: false,
     manifestStore: null,
   });
 
+  const removeValidationBindings = useCallback(() => {
+    validationCleanupRef.current?.();
+    validationCleanupRef.current = null;
+  }, []);
+
   const disposePlayer = useCallback(() => {
+    removeValidationBindings();
     validationSessionRef.current?.dispose();
     validationSessionRef.current = null;
+    latestSnapshotRef.current = null;
+    videoElementRef.current = null;
 
     if (c2paPlayerRef.current && typeof c2paPlayerRef.current.dispose === 'function') {
       try {
@@ -71,41 +77,55 @@ export function useC2PAPlayer({
 
     c2paPlayerRef.current = null;
     isInitializingRef.current = false;
+  }, [removeValidationBindings]);
+
+  const publishSnapshot = useCallback((snapshot: ValidationStatusSnapshot | null) => {
+    latestSnapshotRef.current = snapshot;
+    c2paPlayerRef.current?.playbackUpdate(snapshot);
+    setState((currentState) => ({
+      ...currentState,
+      manifestStore: snapshot?.result?.manifestStore ?? null,
+    }));
   }, []);
 
-  /**
-   * Initialize the C2PAPlayer V2 instance
-   */
+  const resolveSnapshotAtCurrentTime = useCallback(() => {
+    const session = validationSessionRef.current;
+    const videoElement = videoElementRef.current;
+
+    if (!session || !videoElement) {
+      return;
+    }
+
+    publishSnapshot(session.getStatusAt(videoElement.currentTime ?? 0));
+  }, [publishSnapshot]);
+
   const initializePlayer = useCallback(
     async (videoJsPlayer: any, videoElement: HTMLVideoElement): Promise<boolean> => {
       try {
-        if (!videoJsPlayer || !videoElement) {
-          onError?.('Missing video player or element');
+        if (!videoJsPlayer || !videoElement || !adapter) {
+          onError?.('Missing video player, element, or validation adapter');
           return false;
         }
 
-        // Guard against multiple initializations
         if (isInitializingRef.current || c2paPlayerRef.current) {
-          console.log('[useC2PAPlayer] Already initialized or initializing, skipping');
           return true;
         }
 
         isInitializingRef.current = true;
-        console.log('[useC2PAPlayer] Initializing C2PAPlayer V2');
+        const c2paPlayer = C2PAPlayer(
+          videoJsPlayer,
+          videoElement,
+          adapter.capabilities,
+        ) as C2PAPlayerInstance;
 
-        // Create C2PAPlayer V2 instance
-        const c2paPlayer = C2PAPlayer(videoJsPlayer, videoElement, isMonolithic) as C2PAPlayerInstance;
-
-        // Initialize the player (sets up UI components)
         c2paPlayer.initialize();
-
         c2paPlayerRef.current = c2paPlayer;
+        videoElementRef.current = videoElement;
         setState((currentState) => ({
           ...currentState,
           isInitialized: true,
         }));
 
-        console.log('[useC2PAPlayer] C2PAPlayer V2 initialized successfully');
         return true;
       } catch (error) {
         console.error('[useC2PAPlayer] Error initializing C2PAPlayer:', error);
@@ -115,101 +135,66 @@ export function useC2PAPlayer({
         isInitializingRef.current = false;
       }
     },
-    [isMonolithic, onError]
+    [adapter, onError]
   );
 
-  /**
-   * Initialize C2PA validation for the video
-   * This is equivalent to c2pa_init in the HTML version
-   */
   const initializeValidation = useCallback(
     async (videoElement: HTMLVideoElement) => {
+      if (!adapter || !validationSource) {
+        return;
+      }
+
       try {
-        console.log('[useC2PAPlayer] Initializing C2PA validation via adapter');
-        const sourceUrl = videoElement.currentSrc || videoElement.src;
-        const source = validationSource ?? createMediaSourceDescriptor({
-          url: sourceUrl,
-          displayName: sourceUrl,
-          mimeType: sourceUrl.startsWith('blob:') ? 'video/mp4' : null,
-        });
-        const registry = createDefaultValidationAdapterRegistry();
-        const adapter = registry.resolve(source);
         const validationSession = adapter.createSession({
           videoElement,
-          source,
-          policy: {
-            enableTrustVerification: true,
-          },
+          source: validationSource,
+          policy: createDefaultValidationPolicy(),
+        });
+        const playbackEvents: PlaybackEventName[] = ['play', 'timeupdate', 'seeking', 'seeked'];
+        const handlePlaybackEvent = () => {
+          resolveSnapshotAtCurrentTime();
+        };
+        const unsubscribe = validationSession.subscribe((snapshot) => {
+          latestSnapshotRef.current = snapshot;
+          resolveSnapshotAtCurrentTime();
         });
 
-        // Playback update callback - matches the HTML implementation
-        const playbackUpdate = (c2paStatus: C2PAStatus) => {
+        playbackEvents.forEach((eventName) => {
+          videoElement.addEventListener(eventName, handlePlaybackEvent);
+        });
 
-          if (!c2paStatus) {
-            return;
-          }
-
-          console.log('[useC2PAPlayer] Playback update received', c2paStatus);
-
-          if (c2paPlayerRef.current) {
-            // Update the C2PAPlayer V2 UI with validation status
-            c2paPlayerRef.current.playbackUpdate(c2paStatus);
-          }
-
-          setState((currentState) => ({
-            ...currentState,
-            manifestStore: c2paStatus.manifestStore ?? null,
-          }));
+        validationCleanupRef.current = () => {
+          unsubscribe();
+          playbackEvents.forEach((eventName) => {
+            videoElement.removeEventListener(eventName, handlePlaybackEvent);
+          });
         };
 
         validationSessionRef.current = validationSession;
-        validationSession.subscribe((snapshot) => {
-          const c2paStatus = createC2PAStatusFromSnapshot(snapshot);
-
-          if (!c2paStatus) {
-            return;
-          }
-
-          playbackUpdate(c2paStatus);
-        });
         await validationSession.load();
-        
-        console.log('[useC2PAPlayer] C2PA validation initialized successfully');
+        resolveSnapshotAtCurrentTime();
       } catch (error) {
         console.error('[useC2PAPlayer] Error initializing C2PA validation:', error);
         onError?.(error instanceof Error ? error.message : 'Unknown validation error');
       }
     },
-    [onError, validationSource]
+    [adapter, onError, resolveSnapshotAtCurrentTime, validationSource]
   );
 
-  /**
-   * Full initialization - both player and validation
-   * Called from VideoPlayerSection on canplay event
-   */
   const initialize = useCallback(
     async (videoJsPlayer: any, videoElement: HTMLVideoElement) => {
-      // Initialize UI first
       const didInitializePlayer = await initializePlayer(videoJsPlayer, videoElement);
 
       if (!didInitializePlayer) {
         return;
       }
 
-      // Then initialize validation (don't wait for another canplay event)
-      // The canplay event is already handled by VideoPlayerSection
       await initializeValidation(videoElement);
     },
     [initializePlayer, initializeValidation]
   );
 
-  /**
-   * Reset initialization state when needed
-   * This is called when loading a new video
-   */
   const reset = useCallback(() => {
-    console.log('[useC2PAPlayer] Resetting C2PA player');
-
     disposePlayer();
     setState({
       isInitialized: false,
@@ -217,9 +202,6 @@ export function useC2PAPlayer({
     });
   }, [disposePlayer]);
 
-  /**
-   * Cleanup on unmount
-   */
   useEffect(() => {
     return () => {
       disposePlayer();

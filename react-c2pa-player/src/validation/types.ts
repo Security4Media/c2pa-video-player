@@ -14,8 +14,9 @@
  * limitations under the License.
  */
 
-import type { Manifest, ManifestStore } from '@contentauth/c2pa-web';
-import type { PlayerValidationState } from '@/types/c2pa.types';
+import type { Manifest, ManifestStore, TrustSettings } from '@contentauth/c2pa-web';
+
+export type PlayerValidationState = 'Trusted' | 'Valid' | 'Invalid' | 'Unknown';
 
 export type AdapterKind =
   | 'monolithic'
@@ -33,11 +34,29 @@ export interface MediaSourceDescriptor {
   origin: MediaSourceOrigin;
 }
 
-export interface ValidationPolicy {
-  enableTrustVerification: boolean;
+export interface AdapterCapabilities {
+  ownsPlayback: boolean;
+  providesTimelineSegments: boolean;
+  supportsLookupByTime: boolean;
+  supportsTrustVerification: boolean;
 }
 
-export interface NormalizedC2PAResult {
+export interface TrustMaterial {
+  wasmSrc: string;
+  trust: TrustSettings;
+  cawgTrust: TrustSettings;
+}
+
+export interface TrustMaterialProvider {
+  load(): Promise<TrustMaterial>;
+}
+
+export interface ValidationPolicy {
+  enableTrustVerification: boolean;
+  trustMaterialProvider: TrustMaterialProvider;
+}
+
+export interface NormalizedValidationResult {
   manifestStore: ManifestStore | null;
   validationState: PlayerValidationState;
   containsSignature: boolean;
@@ -48,6 +67,8 @@ export interface NormalizedC2PAResult {
   reason?: string;
 }
 
+export type NormalizedC2PAResult = NormalizedValidationResult;
+
 export interface ValidationTimelineSegment {
   startTime: number;
   endTime: number;
@@ -56,9 +77,14 @@ export interface ValidationTimelineSegment {
   pending?: boolean;
 }
 
+export interface TimeInterval {
+  startTime: number;
+  endTime: number;
+}
+
 export interface ValidationStatusSnapshot {
   adapterKind: AdapterKind;
-  result: NormalizedC2PAResult | null;
+  result: NormalizedValidationResult | null;
   timelineSegments: ValidationTimelineSegment[];
   message: string;
 }
@@ -81,7 +107,7 @@ export interface ValidationAdapterContext {
 
 export interface MediaValidationAdapter {
   readonly kind: AdapterKind;
+  readonly capabilities: AdapterCapabilities;
   canHandle(source: MediaSourceDescriptor): boolean;
   createSession(context: ValidationAdapterContext): ValidationSession;
 }
-

@@ -28,7 +28,6 @@ import nabLogo from '@/assets/logos/nab-logo.png';
 import { PlayerStatus, VideoMode } from '@/types/player.types';
 import {
   createMediaSourceDescriptor,
-  detectAdapterKind,
   type MediaSourceDescriptor,
 } from '@/validation';
 
@@ -131,22 +130,8 @@ export function StandalonePlayerPage() {
         displayName,
         mimeType: inferMimeType(url, displayName),
       });
-      const adapterKind = detectAdapterKind(sourceDescriptor);
-      const validationOwnsPlayback = adapterKind === 'hls-fragmented-fmp4';
-
       setMediaSource(sourceDescriptor);
-
-      setVideoJsOptions((prev) => ({
-        ...prev,
-        sources: validationOwnsPlayback ? [] : [
-          {
-            src: url,
-            type: sourceDescriptor.mimeType ?? 'video/mp4',
-          },
-        ],
-      }));
-
-      updateStreamInfo(`Video source updated (${adapterKind})`);
+      updateStreamInfo(`Video source updated (${sourceDescriptor.displayName})`);
     },
     [updateStatus, updateStreamInfo]
   );

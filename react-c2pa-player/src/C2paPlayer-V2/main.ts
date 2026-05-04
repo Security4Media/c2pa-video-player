@@ -14,17 +14,17 @@
  * limitations under the License.
  */
 
-/**
- * @module c2pa-player
- */
-
-import type { C2PAPlayerProps, C2PAStatus } from '../types/c2pa.types';
+import type { C2PAPlayerProps } from '../types/c2pa.types';
 import type {
     C2PAPlayerRootController,
     C2PATimelineState,
 } from './C2PAPlayerRoot.types';
-import type { C2PATimelineSegmentUpdate } from '../types/c2pa.types';
 import type { VideoJsPlayerLike } from './C2paMenu/C2paMenu.types';
+import type {
+    AdapterCapabilities,
+    ValidationStatusSnapshot,
+} from '../validation';
+import { createC2PAStatusFromSnapshot } from '../validation';
 import { initializeC2PAControlBar } from './C2paControlBar/C2paControlBarFunctions';
 import {
     displayFrictionOverlay,
@@ -73,7 +73,7 @@ interface C2PAVideoJsPlayer extends VideoJsPlayerLike {
 
 interface TimelineFunctions {
     getTimelineState: (
-        isMonolithic: boolean,
+        useStaticTimelineFallback: boolean,
         videoPlayer: C2PAVideoJsPlayer,
         currentTime?: number,
     ) => C2PATimelineState;
@@ -87,7 +87,7 @@ interface TimelineFunctions {
         time: number,
         playbackStarted: boolean,
         lastPlaybackTime: number,
-        isMonolithic: boolean,
+        useStaticTimelineFallback: boolean,
         c2paControlBar: TimelineComponentLike,
         videoPlayer: C2PAVideoJsPlayer,
     ) => [boolean, number];
@@ -97,43 +97,29 @@ interface TimelineFunctions {
         c2paControlBar: TimelineComponentLike,
     ) => void;
     replaceC2PATimelineSegments: (
-        segments: C2PATimelineSegmentUpdate[],
+        segments: NonNullable<ValidationStatusSnapshot['timelineSegments']>,
         videoPlayer: C2PAVideoJsPlayer,
         c2paControlBar: TimelineComponentLike,
     ) => void;
 }
 
-function getValidationState(c2paStatus: C2PAStatus | null): string {
-    return (
-        c2paStatus?.validationState ??
-        c2paStatus?.manifestStore?.validation_state ??
-        c2paStatus?.normalizedResult?.validationState ??
-        'Unknown'
-    );
+function getValidationState(snapshot: ValidationStatusSnapshot | null): string {
+    return snapshot?.result?.validationState ?? 'Unknown';
 }
 
 export interface C2PAPlayerInstance {
     initialize: () => void;
     dispose: () => void;
-    playbackUpdate: (status: C2PAStatus | null) => void;
+    playbackUpdate: (snapshot: ValidationStatusSnapshot | null) => void;
 }
 
-/**
- * Create the C2PA player V2 runtime that wires Video.js events, the menu,
- * the validation timeline, and the friction overlay together.
- *
- * @param videoJsPlayer - Video.js player instance
- * @param videoHtml - Video element hosted by the player
- * @param isMonolithic - Whether the content uses monolithic C2PA validation
- * @returns Player lifecycle and playback update API
- */
 export const C2PAPlayer = function (
     videoJsPlayer: C2PAVideoJsPlayer,
-    videoHtml: C2PAPlayerProps['videoElement'],
-    isMonolithic = false,
+    _videoHtml: C2PAPlayerProps['videoElement'],
+    capabilities: AdapterCapabilities,
 ): C2PAPlayerInstance {
     const videoPlayer = videoJsPlayer;
-    const videoElement = videoHtml;
+    const useStaticTimelineFallback = !capabilities.providesTimelineSegments;
 
     let c2paMenu: TimelineComponentLike | null = null;
     let c2paControlBar: TimelineComponentLike | null = null;
@@ -148,7 +134,6 @@ export const C2PAPlayer = function (
 
     let playerRoot: C2PAPlayerRootController | null = null;
     let isManifestInvalid = false;
-
     let seeking = false;
     let playbackStarted = false;
     let lastPlaybackTime = 0.0;
@@ -161,9 +146,6 @@ export const C2PAPlayer = function (
 
     return {
         initialize: function () {
-            console.log('[C2PA] Initializing C2PAPlayer', videoPlayer, videoElement);
-            console.log('[C2PA] videoPlayer.controlBar:', videoPlayer.controlBar);
-
             initializeC2PAControlBar(videoPlayer);
             initializeC2PAMenu(videoPlayer);
             playerRoot = initializeFrictionOverlay(videoPlayer, setPlaybackStarted);
@@ -172,11 +154,8 @@ export const C2PAPlayer = function (
             c2paMenu = videoPlayer.controlBar.getChild('C2PAMenuButton');
             c2paControlBar = videoPlayer.controlBar.progressControl.seekBar.getChild('C2PALoadProgressBar');
 
-            console.log('[C2PA] Components retrieved - c2paMenu:', c2paMenu, 'c2paControlBar:', c2paControlBar);
-
             videoPlayer.on('play', function () {
                 if (isManifestInvalid && !playbackStarted && playerRoot) {
-                    console.log('[C2PA] Manifest invalid, displaying friction overlay');
                     displayFrictionOverlay(playbackStarted, videoPlayer, playerRoot);
                 } else {
                     setPlaybackStarted();
@@ -196,20 +175,16 @@ export const C2PAPlayer = function (
                     videoPlayer.currentTime(),
                     playbackStarted,
                     lastPlaybackTime,
-                    isMonolithic,
+                    useStaticTimelineFallback,
                     c2paControlBar,
                     videoPlayer,
                 );
                 seeking = nextSeeking;
                 lastPlaybackTime = nextPlaybackTime;
             });
-
-            console.log('[C2PA] Initialization complete');
         },
 
         dispose: function () {
-            console.log('[C2PA] Disposing C2PAPlayer');
-
             disposeC2PAMenu();
             disposeFrictionOverlay(playerRoot);
 
@@ -231,12 +206,11 @@ export const C2PAPlayer = function (
             playbackStarted = false;
             lastPlaybackTime = 0.0;
             isManifestInvalid = false;
-
-            console.log('[C2PA] Disposal complete');
         },
 
-        playbackUpdate: function (c2paStatus) {
+        playbackUpdate: function (snapshot) {
             const currentTime = videoPlayer.currentTime();
+            const c2paStatus = createC2PAStatusFromSnapshot(snapshot);
 
             if (
                 !seeking &&
@@ -244,24 +218,23 @@ export const C2PAPlayer = function (
                 currentTime - lastPlaybackTime < minSeekTime &&
                 c2paControlBar
             ) {
-                console.log('[C2PA] Validation update: ', lastPlaybackTime, currentTime);
-                if (c2paStatus?.timelineSegments && c2paStatus.timelineSegments.length > 0) {
+                if (snapshot?.timelineSegments && snapshot.timelineSegments.length > 0) {
                     replaceC2PATimelineSegments(
-                        c2paStatus.timelineSegments,
+                        snapshot.timelineSegments,
                         videoPlayer,
                         c2paControlBar,
                     );
                 } else {
                     handleC2PAValidation(
-                        getValidationState(c2paStatus),
+                        getValidationState(snapshot),
                         currentTime,
                         c2paControlBar,
                     );
                     updateC2PATimeline(currentTime, videoPlayer, c2paControlBar);
                 }
 
-                const timeline = getTimelineState(isMonolithic, videoPlayer, currentTime);
-                isManifestInvalid = getValidationState(c2paStatus) === 'Invalid' || timeline.hasInvalidSegments;
+                const timeline = getTimelineState(useStaticTimelineFallback, videoPlayer, currentTime);
+                isManifestInvalid = getValidationState(snapshot) === 'Invalid' || timeline.hasInvalidSegments;
                 updatePlayerRootValidationState(
                     playerRoot,
                     c2paStatus,

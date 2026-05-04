@@ -14,12 +14,15 @@
  * limitations under the License.
  */
 
-import { memo, useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import VideoJS, { type VideoJSOptions } from './VideoJS';
 import { useC2PAPlayer } from '../hooks/useC2PAPlayer';
 import './VideoPlayerSection.css';
 import { PlayerStatus } from '@/types/player.types';
-import { detectAdapterKind, type MediaSourceDescriptor } from '@/validation';
+import {
+  createDefaultValidationAdapterRegistry,
+  type MediaSourceDescriptor,
+} from '@/validation';
 
 
 interface VideoPlayerSectionProps {
@@ -45,15 +48,32 @@ export const VideoPlayerSection = memo(function VideoPlayerSection({
   const currentSourceRef = useRef<string>('');
   const playerReadyRef = useRef(false);
   const [videoKey, setVideoKey] = useState(0);
-  
-  // Get current source for key generation
+  const adapterRegistry = useMemo(() => createDefaultValidationAdapterRegistry(), []);
+  const adapter = useMemo(
+    () => (mediaSource ? adapterRegistry.resolve(mediaSource) : null),
+    [adapterRegistry, mediaSource]
+  );
+  const adapterKind = adapter?.kind ?? 'unsupported';
+  const capabilities = adapter?.capabilities ?? {
+    ownsPlayback: false,
+    providesTimelineSegments: false,
+    supportsLookupByTime: false,
+    supportsTrustVerification: false,
+  };
   const currentSource = mediaSource?.url || videoJsOptions.sources?.[0]?.src || '';
-  const adapterKind = mediaSource ? detectAdapterKind(mediaSource) : 'unsupported';
-  const validationOwnsPlayback = adapterKind === 'hls-fragmented-fmp4';
-  
+  const resolvedVideoJsOptions = useMemo(() => ({
+    ...videoJsOptions,
+    sources: mediaSource && !capabilities.ownsPlayback ? [
+      {
+        src: mediaSource.url,
+        type: mediaSource.mimeType ?? 'video/mp4',
+      },
+    ] : [],
+  }), [capabilities.ownsPlayback, mediaSource, videoJsOptions]);
+
   // Initialize C2PA Player V2
   const { initialize: initializeC2PA, reset: resetC2PA, isInitialized: c2paInitialized, manifestStore } = useC2PAPlayer({
-    isMonolithic: adapterKind === 'monolithic',
+    adapter,
     source: mediaSource,
     onError: (error) => {
       console.error('[VideoPlayerSection] C2PA error:', error);
@@ -117,7 +137,7 @@ export const VideoPlayerSection = memo(function VideoPlayerSection({
           initializeC2PAForPlayer('ready', 'Ready to Play');
         });
 
-        if (validationOwnsPlayback) {
+        if (capabilities.ownsPlayback) {
           initializeC2PAForPlayer('loading', 'Loading HLS Playlist');
         }
         
@@ -134,14 +154,14 @@ export const VideoPlayerSection = memo(function VideoPlayerSection({
         console.error('[VideoPlayerSection] Video element not found in player');
       }
     },
-    [adapterKind, onStatusUpdate, onStreamInfo, validationOwnsPlayback]
+    [adapterKind, capabilities.ownsPlayback, onStatusUpdate, onStreamInfo]
   );
 
   return (
     <div className="player-section">
-      <VideoJS
+        <VideoJS
         key={videoKey}
-        options={videoJsOptions}
+        options={resolvedVideoJsOptions}
         onReady={handlePlayerReady}
         onTimeUpdate={onTimeUpdate}
         onDurationChange={onDurationChange}
