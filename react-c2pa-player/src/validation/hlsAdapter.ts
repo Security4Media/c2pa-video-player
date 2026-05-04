@@ -109,7 +109,7 @@ class HlsFragmentedFmp4Session implements ValidationSession {
     const result = reader
       ? normalizeHlsManifestHelper(reader)
       : this.#runtime.getErrorReason()
-        ? createUnknownResult(this.#runtime.getErrorReason() ?? 'HLS validation failed')
+        ? createUnknownResult()
         : this.#snapshot.result;
 
     if (reader && result) {

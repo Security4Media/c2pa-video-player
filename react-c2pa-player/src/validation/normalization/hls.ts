@@ -36,10 +36,6 @@ export function normalizeHlsManifestHelper(reader: C2paManifestHelper): Normaliz
   return {
     manifestStore,
     validationState,
-    containsSignature,
-    containsAIGeneratedContent: reader.containsAIGeneratedContent(),
-    validationErrors,
     activeManifest,
-    manifests,
   };
 }

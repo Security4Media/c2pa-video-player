@@ -107,19 +107,22 @@ function createAdapterManifestStore(
     validationStatus: PlayerValidationState,
 ): ManifestStore | null {
     const normalizedResult = c2paStatus?.normalizedResult ?? null;
+    const sourceManifestStore = normalizedResult?.manifestStore ?? null;
 
-    if (!normalizedResult || !manifestId || !normalizedResult.activeManifest) {
+    if (!normalizedResult || !sourceManifestStore || !manifestId || !normalizedResult.activeManifest) {
         return null;
     }
 
     return {
         active_manifest: manifestId,
-        manifests: normalizedResult.manifests,
+        manifests: sourceManifestStore.manifests,
         validation_state: validationStatus,
         validation_results: {
             activeManifest: {
                 success: validationStatus === 'Invalid' ? [] : [{}],
-                failure: validationStatus === 'Invalid' ? normalizedResult.validationErrors : [],
+                failure: validationStatus === 'Invalid'
+                    ? (sourceManifestStore.validation_results?.activeManifest?.failure ?? [])
+                    : [],
             },
         },
     } as ManifestStore;
@@ -144,7 +147,7 @@ export function buildMenuRenderState(
         ? getActiveManifest(manifestStore)
         : normalizedResult?.activeManifest ?? null;
     const hasDefinitiveNoManifest =
-        (c2paStatus && !activeManifest && normalizedResult?.containsSignature === false) ||
+        (c2paStatus && !activeManifest && !manifestStore && !normalizedResult?.manifestStore) ||
         (manifestStore?.manifests && Object.keys(manifestStore.manifests).length === 0);
 
     if (hasDefinitiveNoManifest) {

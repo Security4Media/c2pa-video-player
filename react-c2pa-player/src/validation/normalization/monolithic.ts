@@ -20,26 +20,18 @@ import type { NormalizedValidationResult } from '../types';
 import { createUnknownResult } from './shared';
 
 export function normalizeMonolithicManifestStore(
-  manifestStore: ManifestStore | null,
-  reason?: string
+  manifestStore: ManifestStore | null
 ): NormalizedValidationResult {
   if (!manifestStore) {
-    return createUnknownResult(reason ?? 'No C2PA manifest available');
+    return createUnknownResult();
   }
 
   const activeManifest = getActiveManifest(manifestStore);
-  const manifests = manifestStore.manifests ?? {};
   const validationState = getManifestStoreValidationState(manifestStore);
-  const validationErrors = manifestStore.validation_results?.activeManifest?.failure ?? [];
 
   return {
     manifestStore,
     validationState,
-    containsSignature: activeManifest !== null,
-    containsAIGeneratedContent: false,
-    validationErrors,
     activeManifest,
-    manifests,
-    reason,
   };
 }

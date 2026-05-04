@@ -52,12 +52,7 @@ class UnsupportedValidationSession implements ValidationSession {
       result: {
         manifestStore: null,
         validationState: 'Unknown',
-        containsSignature: false,
-        containsAIGeneratedContent: false,
-        validationErrors: [],
         activeManifest: null,
-        manifests: {},
-        reason: `Unsupported source type for ${source.displayName}`,
       },
       timelineSegments: [],
       message: `Unsupported source type for ${source.displayName}`,

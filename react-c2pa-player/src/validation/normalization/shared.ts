@@ -17,16 +17,11 @@
 import type { Manifest, ManifestStore } from '@contentauth/c2pa-web';
 import type { NormalizedValidationResult, PlayerValidationState } from '../types';
 
-export function createUnknownResult(reason: string): NormalizedValidationResult {
+export function createUnknownResult(): NormalizedValidationResult {
   return {
     manifestStore: null,
     validationState: 'Unknown',
-    containsSignature: false,
-    containsAIGeneratedContent: false,
-    validationErrors: [],
     activeManifest: null,
-    manifests: {},
-    reason,
   };
 }
 

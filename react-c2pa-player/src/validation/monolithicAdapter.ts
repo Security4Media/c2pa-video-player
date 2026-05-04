@@ -97,10 +97,7 @@ class MonolithicC2PASession implements ValidationSession {
   #buildSnapshot(): ValidationStatusSnapshot {
     return {
       adapterKind: this.adapterKind,
-      result: normalizeMonolithicManifestStore(
-        this.#runtime.getManifestStore(),
-        this.#runtime.getErrorReason() ?? undefined,
-      ),
+      result: normalizeMonolithicManifestStore(this.#runtime.getManifestStore()),
       timelineSegments: [],
       message: this.#runtime.getMessage(),
     };

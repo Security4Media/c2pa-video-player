@@ -47,8 +47,7 @@ export function createC2PAStatusFromSnapshot(
 }
 
 export function normalizeManifestStore(
-  manifestStore: ManifestStore | null,
-  reason?: string
+  manifestStore: ManifestStore | null
 ): NormalizedC2PAResult {
-  return normalizeMonolithicManifestStore(manifestStore, reason);
+  return normalizeMonolithicManifestStore(manifestStore);
 }

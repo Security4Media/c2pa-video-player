@@ -59,12 +59,7 @@ export interface ValidationPolicy {
 export interface NormalizedValidationResult {
   manifestStore: ManifestStore | null;
   validationState: PlayerValidationState;
-  containsSignature: boolean;
-  containsAIGeneratedContent: boolean;
-  validationErrors: unknown[];
   activeManifest: Manifest | null;
-  manifests: Record<string, Manifest>;
-  reason?: string;
 }
 
 export type NormalizedC2PAResult = NormalizedValidationResult;
