@@ -14,7 +14,7 @@
         "start": "http-server -p 9000 -c-1 -d false -g"
     },
     "dependencies": {
-        "@contentauth/c2pa-web": "^0.6.1",
+        "@contentauth/c2pa-web": "^0.7.1",
         "@nettrek/c2pa-hls-bridge": "file:../vendor/c2pa-hls-bridge-fix",
         "hls.js": "^1.6.16",
         "http-server": "^14.1.1",
