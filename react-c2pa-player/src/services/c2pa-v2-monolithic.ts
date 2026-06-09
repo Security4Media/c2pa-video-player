@@ -59,7 +59,7 @@ export async function c2pa_init(player: HTMLVideoElement, onPlaybackTimeUpdated:
         cawgTrust: {
           trustAnchors: [cawg_anchors, 'https://raw.githubusercontent.com/contentauth/verify-site/refs/heads/main/static/trust/anchors.pem'],
           allowedList: [cawg_allowed, 'https://raw.githubusercontent.com/contentauth/verify-site/refs/heads/main/static/trust/allowed.pem'],
-          trustConfig: c2pa_store,
+          trustConfig: cawg_store,
         },
         trust: {
           trustAnchors: [
