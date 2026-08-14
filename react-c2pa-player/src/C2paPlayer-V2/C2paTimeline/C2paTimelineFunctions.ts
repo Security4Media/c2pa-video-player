@@ -86,6 +86,24 @@ function normalizeVerificationStatus(status: string): TimelineVerificationStatus
     return 'unknown';
 }
 
+/**
+ * Live sources report an indefinite/growing `duration()` (Infinity or NaN).
+ * Falling back to the current playhead (or the latest known segment
+ * boundary, whichever is larger) keeps the bar reading as "filled to the
+ * live edge" instead of leaving every segment at its default 0% width.
+ */
+function getEffectiveTimelineDuration(
+    rawDuration: number,
+    currentTime: number,
+    latestKnownEndTime: number,
+): number {
+    if (Number.isFinite(rawDuration) && rawDuration > 0) {
+        return rawDuration;
+    }
+
+    return Math.max(currentTime, latestKnownEndTime, 1);
+}
+
 function getSegmentColor(verificationStatus: TimelineVerificationStatus, isManifestInvalid = false) {
     if (isManifestInvalid || verificationStatus === 'Invalid' || verificationStatus === 'false') {
         return getComputedStyle(document.documentElement).getPropertyValue('--c2pa-failed').trim();
@@ -175,6 +193,12 @@ export function getTimelineFunctions(): TimelineFunctions {
             playProgressControl.style.color = lastSegment.style.backgroundColor;
         }
 
+        const effectiveDuration = getEffectiveTimelineDuration(
+            videoPlayer.duration(),
+            currentTime,
+            parseFloat(lastSegment.dataset.endTime),
+        );
+
         let numSegments = progressSegments.length;
         let isVideoSegmentInvalid = false;
 
@@ -184,9 +208,9 @@ export function getTimelineFunctions(): TimelineFunctions {
 
             let segmentProgressPercentage = 0;
             if (currentTime >= segmentStartTime && currentTime <= segmentEndTime) {
-                segmentProgressPercentage = (currentTime / videoPlayer.duration()) * 100;
+                segmentProgressPercentage = (currentTime / effectiveDuration) * 100;
             } else if (currentTime >= segmentEndTime) {
-                segmentProgressPercentage = (segmentEndTime / videoPlayer.duration()) * 100;
+                segmentProgressPercentage = (segmentEndTime / effectiveDuration) * 100;
             }
 
             console.log('[C2PA] Segment progress percentage: ', segmentProgressPercentage);
@@ -347,11 +371,20 @@ export function getTimelineFunctions(): TimelineFunctions {
     ) {
         removeProgressSegments();
 
-        const duration = videoPlayer.duration();
         const sortedSegments = [...segments]
             .filter((segment) => Number.isFinite(segment.startTime) && Number.isFinite(segment.endTime))
             .filter((segment) => segment.endTime >= segment.startTime)
             .sort((a, b) => a.startTime - b.startTime);
+
+        const latestKnownEndTime = sortedSegments.reduce(
+            (max, segment) => Math.max(max, segment.endTime),
+            0,
+        );
+        const effectiveDuration = getEffectiveTimelineDuration(
+            videoPlayer.duration(),
+            videoPlayer.currentTime(),
+            latestKnownEndTime,
+        );
 
         sortedSegments.forEach((segment) => {
             const verificationStatus = segment.pending
@@ -363,10 +396,8 @@ export function getTimelineFunctions(): TimelineFunctions {
                 verificationStatus,
             );
 
-            if (Number.isFinite(duration) && duration > 0) {
-                const width = Math.min(100, Math.max(0, (segment.endTime / duration) * 100));
-                timelineSegment.style.width = `${width}%`;
-            }
+            const width = Math.min(100, Math.max(0, (segment.endTime / effectiveDuration) * 100));
+            timelineSegment.style.width = `${width}%`;
 
             c2paControlBar.el().appendChild(timelineSegment);
             progressSegments.push(timelineSegment);

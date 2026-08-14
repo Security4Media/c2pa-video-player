@@ -20,18 +20,25 @@ export {
   createC2PAStatusFromSnapshot,
   normalizeManifestStore,
 } from './c2paResult';
+export { DashFragmentedFmp4Adapter } from './dashAdapter';
 export { createDefaultValidationAdapterRegistry } from './defaultRegistry';
 export { HlsFragmentedFmp4Adapter } from './hlsAdapter';
 export { MonolithicC2PAAdapter } from './monolithicAdapter';
 export {
   createCompatibilityManifestStore,
   createUnknownResult,
+  normalizeDashSegmentRecord,
   normalizeHlsManifestHelper,
   normalizeMonolithicManifestStore,
 } from './normalization';
 export { createDefaultValidationPolicy, LocalTrustMaterialProvider } from './policy';
-export { getActiveManifest, getHlsValidationState, getManifestStoreValidationState } from './rules';
-export { HlsBridgeRuntime, MonolithicBridgeRuntime } from './runtimes';
+export {
+  getActiveManifest,
+  getDashSegmentValidationState,
+  getHlsValidationState,
+  getManifestStoreValidationState,
+} from './rules';
+export { DashBridgeRuntime, HlsBridgeRuntime, MonolithicBridgeRuntime } from './runtimes';
 export {
   createMediaSourceDescriptor,
   detectAdapterKind,
@@ -48,6 +55,7 @@ export type {
   NormalizedC2PAResult,
   PlayerValidationState,
   TimeInterval,
+  TimelineSegmentDiagnostic,
   TrustMaterial,
   TrustMaterialProvider,
   ValidationAdapterContext,

@@ -14,13 +14,22 @@
  * limitations under the License.
  */
 
-import type { PlayerValidationState, TimeInterval, ValidationTimelineSegment } from '../types';
+import type {
+  PlayerValidationState,
+  TimeInterval,
+  TimelineSegmentDiagnostic,
+  ValidationTimelineSegment,
+} from '../types';
 
 export class FragmentedTimelineProjector {
   #segments: ValidationTimelineSegment[] = [];
   #lastObservedTime = 0;
 
-  observe(time: number, validationState: PlayerValidationState): void {
+  observe(
+    time: number,
+    validationState: PlayerValidationState,
+    diagnostics?: TimelineSegmentDiagnostic[]
+  ): void {
     if (!Number.isFinite(time)) {
       return;
     }
@@ -37,9 +46,14 @@ export class FragmentedTimelineProjector {
         startTime,
         endTime: time,
         validationState,
+        diagnostics,
       });
     } else {
       lastSegment.endTime = Math.max(lastSegment.endTime, time);
+
+      if (diagnostics?.length) {
+        lastSegment.diagnostics = [...(lastSegment.diagnostics ?? []), ...diagnostics];
+      }
     }
 
     this.#lastObservedTime = time;

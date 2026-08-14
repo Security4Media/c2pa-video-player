@@ -89,3 +89,25 @@ export function getHlsValidationState(
 
   return reader.isValid() ? 'Valid' : 'Invalid';
 }
+
+/**
+ * @svta/cml-c2pa (behind @qualabs/c2pa-live-dashjs-plugin) only performs
+ * cryptographic/structural validation (COSE signature, hash, continuity) —
+ * it does not check the signing certificate against a trust anchor list.
+ * 'valid' is therefore mapped to 'Valid', never 'Trusted'.
+ */
+export function getDashSegmentValidationState(status: string): PlayerValidationState {
+  switch (status) {
+    case 'invalid':
+    case 'replayed':
+    case 'reordered':
+      return 'Invalid';
+    case 'missing':
+    case 'unverified':
+      return 'Unknown';
+    case 'valid':
+    case 'warning':
+    default:
+      return 'Valid';
+  }
+}

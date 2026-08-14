@@ -64,12 +64,23 @@ export interface NormalizedValidationResult {
 
 export type NormalizedC2PAResult = NormalizedValidationResult;
 
+export interface TimelineSegmentDiagnostic {
+  segmentNumber: number;
+  mediaType: string;
+  status: string;
+  sequenceReason?: string;
+  errorCodes?: string[];
+  quality?: string;
+  timestamp: number;
+}
+
 export interface ValidationTimelineSegment {
   startTime: number;
   endTime: number;
   validationState: PlayerValidationState;
   sourceSegmentId?: string;
   pending?: boolean;
+  diagnostics?: TimelineSegmentDiagnostic[];
 }
 
 export interface TimeInterval {

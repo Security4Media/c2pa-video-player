@@ -14,5 +14,6 @@
  * limitations under the License.
  */
 
+export { DashBridgeRuntime } from './dashBridgeRuntime';
 export { HlsBridgeRuntime } from './hlsBridgeRuntime';
 export { MonolithicBridgeRuntime } from './monolithicBridgeRuntime';

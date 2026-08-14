@@ -31,9 +31,12 @@ import type {
     AiOptOutSectionItem,
     ClaimGeneratorSectionItem,
     HistorySectionItem,
+    LiveSegmentDiagnosticsSectionItem,
     OrganizationSectionItem,
     WorkSectionItem,
 } from './models';
+
+const MAX_LIVE_SEGMENT_DIAGNOSTICS = 20;
 
 export const c2paMenuSectionTitles = {
     summaryIssuer: 'Issued by',
@@ -43,6 +46,7 @@ export const c2paMenuSectionTitles = {
     work: 'About the Producer',
     aiOptOut: 'About Training and Data mining',
     history: 'History of provenance',
+    liveSegments: 'Segment issues',
     validationStatus: 'Validation Status',
     alert: 'Alert',
 } as const;
@@ -64,12 +68,40 @@ export interface C2paMenuSections {
     work: WorkSectionItem | null;
     aiOptOut: AiOptOutSectionItem | null;
     history: HistorySectionItem | null;
+    liveSegments: LiveSegmentDiagnosticsSectionItem | null;
 }
 
 export interface C2paMenuRenderState {
     mode: C2paMenuMode;
     manifestId: string | null;
     sections: C2paMenuSections | null;
+}
+
+function selectLiveSegmentsSection(
+    timelineSegments: C2PAStatus['timelineSegments'],
+): LiveSegmentDiagnosticsSectionItem | null {
+    const diagnostics = (timelineSegments ?? [])
+        .flatMap((segment) => segment.diagnostics ?? [])
+        // Every valid segment would otherwise flood this list; only the
+        // anomalies the user asked to see are worth surfacing here.
+        .filter((diagnostic) => diagnostic.status !== 'valid')
+        .sort((a, b) => b.timestamp - a.timestamp);
+
+    if (diagnostics.length === 0) {
+        return null;
+    }
+
+    return {
+        entries: diagnostics.slice(0, MAX_LIVE_SEGMENT_DIAGNOSTICS).map((diagnostic) => ({
+            segmentNumber: diagnostic.segmentNumber,
+            mediaType: diagnostic.mediaType,
+            status: diagnostic.status,
+            sequenceReason: diagnostic.sequenceReason,
+            errorCodes: diagnostic.errorCodes,
+            quality: diagnostic.quality,
+        })),
+        truncatedCount: Math.max(0, diagnostics.length - MAX_LIVE_SEGMENT_DIAGNOSTICS),
+    };
 }
 
 function buildAlertMessage(timeline: C2PATimelineState) {
@@ -198,6 +230,7 @@ export function buildMenuRenderState(
             history: selectorManifestStore
                 ? selectHistorySection(activeManifest, selectorManifestStore)
                 : null,
+            liveSegments: selectLiveSegmentsSection(c2paStatus?.timelineSegments),
         },
     };
 }
