@@ -205,16 +205,11 @@ export function buildMenuRenderState(
     const selectorManifestStore =
         manifestStore ?? createAdapterManifestStore(c2paStatus, manifestId, validationStatus);
 
-    if (validationStatus === 'Invalid') {
-        return {
-            mode: 'invalid',
-            manifestId,
-            sections: null,
-        };
-    }
-
+    // Still build sections when invalid: the manifest parsed and its claimed
+    // content (issuer, CAWG identity, actions) is worth showing to the user
+    // alongside the invalid warning, even though it couldn't be verified.
     return {
-        mode: 'ready',
+        mode: validationStatus === 'Invalid' ? 'invalid' : 'ready',
         manifestId,
         sections: {
             summary: {

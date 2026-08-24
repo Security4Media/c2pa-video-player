@@ -19,6 +19,7 @@ import { ManifestCawgAssertion } from '../models';
 
 export const CAWG_ASSERTION_LABEL = 'cawg.identity';
 export const CREATIVE_WORK_ASSERTION_LABEL = 'stds.schema-org.CreativeWork';
+export const CAWG_METADATA_ASSERTION_LABEL = 'cawg.metadata';
 export const CAWG_TRAINING_MINING_ASSERTION_LABEL = 'cawg.training-mining';
 export const C2PA_TRAINING_MINING_ASSERTION_LABEL = 'c2pa.training-mining';
 
@@ -74,11 +75,43 @@ export interface ManifestCreativeWorkAssertion extends ManifestAssertion {
     } | null;
 }
 
+/**
+ * `cawg.metadata` is a Dublin Core (dc:*) key-value assertion, distinct from
+ * the schema.org-based `stds.schema-org.CreativeWork` assertion. Live
+ * streams (e.g. via the C2PA Live Video spec) commonly reference this
+ * simpler assertion instead of CreativeWork.
+ */
+export interface ManifestDublinCoreAssertion extends ManifestAssertion {
+    label: typeof CAWG_METADATA_ASSERTION_LABEL;
+    data: Record<string, unknown> | null;
+}
+
 export function getReferencedAssertionLabels(cawgAssertion: ManifestCawgAssertion): string[] {
-    return cawgAssertion.data?.signer_payload.referenced_assertions
-        .filter(assertion => !assertion.url.includes('hash'))
+    return cawgAssertion.data?.signer_payload?.referenced_assertions
+        ?.filter(assertion => !assertion.url.includes('hash'))
         .map(assertion => assertion.url.split('/').pop()?.split('#')[0])
         .filter((label): label is string => Boolean(label)) ?? [];
+}
+
+export function selectDublinCoreAssertion(manifest: Manifest): ManifestDublinCoreAssertion | null {
+    const cawgAssertion = selectCawgAssertion(manifest);
+    const referencedAssertionLabels = cawgAssertion
+        ? getReferencedAssertionLabels(cawgAssertion)
+        : [];
+
+    if (!referencedAssertionLabels.includes(CAWG_METADATA_ASSERTION_LABEL)) {
+        return null;
+    }
+
+    const dublinCoreAssertion = manifest.assertions?.find(
+        assertion => assertion.label === CAWG_METADATA_ASSERTION_LABEL
+    ) as ManifestDublinCoreAssertion | undefined;
+
+    if (!dublinCoreAssertion?.data) {
+        return null;
+    }
+
+    return dublinCoreAssertion;
 }
 
 export function selectCawgAssertion(manifest: Manifest): ManifestCawgAssertion | null {

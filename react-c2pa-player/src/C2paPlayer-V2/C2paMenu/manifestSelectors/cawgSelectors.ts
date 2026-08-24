@@ -18,8 +18,10 @@ import { Manifest, ManifestStore } from '@contentauth/c2pa-web';
 import { getCAWGValidationStatus } from '../../../services/c2pa_functions';
 import { CawgOrganizationItem, ManifestCawgAssertion } from '../models';
 import { selectCreativeWorkContent } from './creativeWorkSelectors';
+import { selectDublinCoreMetadata } from './dublinCoreSelectors';
 import {
     CAWG_ASSERTION_LABEL,
+    CAWG_METADATA_ASSERTION_LABEL,
     CREATIVE_WORK_ASSERTION_LABEL,
     getReferencedAssertionLabels,
 } from './shared';
@@ -49,30 +51,35 @@ export function selectOrganizationIdentity(manifest: Manifest, manifestStore?: M
 
     const cawgItemBuilder: Partial<CawgOrganizationItem> = {};
 
-    cawgItemBuilder.issuer = cawgAssertion.data.signature_info.issuer;
+    // signature_info is only present when the reader has parsed the
+    // embedded certificate out of the COSE signature (monolithic, HLS).
+    // Live DASH manifests (@svta/cml-c2pa) don't do that extraction, so
+    // this is routinely absent there — not an error.
+    cawgItemBuilder.issuer = cawgAssertion.data.signature_info?.issuer ?? null;
     cawgItemBuilder.role = cawgAssertion.data.role ?? null;
     cawgItemBuilder.validationStatus = manifestStore
         ? getCAWGValidationStatus(manifestStore)
         : 'Unknown';
     cawgItemBuilder.creativeWork = null;
+    cawgItemBuilder.dublinCore = null;
 
     const referencedAssertionLabels = getReferencedAssertionLabels(cawgAssertion);
-    if (!referencedAssertionLabels.includes(CREATIVE_WORK_ASSERTION_LABEL)) {
-        console.warn(
-            `[C2PA] CAWG assertion does not reference '${CREATIVE_WORK_ASSERTION_LABEL}', returning CAWG-only organization identity`
-        );
-        return cawgItemBuilder as CawgOrganizationItem;
+
+    if (referencedAssertionLabels.includes(CREATIVE_WORK_ASSERTION_LABEL)) {
+        cawgItemBuilder.creativeWork = selectCreativeWorkContent(manifest);
     }
 
-    const creativeWorkContent = selectCreativeWorkContent(manifest);
-    if (!creativeWorkContent) {
-        console.warn(
-            `[C2PA] Referenced CreativeWork assertion '${CREATIVE_WORK_ASSERTION_LABEL}' is missing or malformed`
-        );
-        return cawgItemBuilder as CawgOrganizationItem;
+    // Live streams (C2PA Live Video spec) commonly reference the simpler
+    // Dublin Core `cawg.metadata` assertion instead of CreativeWork.
+    if (referencedAssertionLabels.includes(CAWG_METADATA_ASSERTION_LABEL)) {
+        cawgItemBuilder.dublinCore = selectDublinCoreMetadata(manifest);
     }
 
-    cawgItemBuilder.creativeWork = creativeWorkContent;
+    if (!cawgItemBuilder.creativeWork && !cawgItemBuilder.dublinCore) {
+        console.warn(
+            `[C2PA] CAWG assertion references neither '${CREATIVE_WORK_ASSERTION_LABEL}' nor '${CAWG_METADATA_ASSERTION_LABEL}', returning CAWG-only organization identity`
+        );
+    }
 
     return cawgItemBuilder as CawgOrganizationItem;
 }

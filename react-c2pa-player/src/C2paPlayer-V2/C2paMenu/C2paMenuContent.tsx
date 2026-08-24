@@ -99,17 +99,6 @@ export function C2paMenuContent({
     );
   }
 
-  if (mode === 'invalid') {
-    return (
-      <div className="c2pa-menu-panel">
-        <MenuHeader title={headerTitle} />
-        <ul className="vjs-menu-content c2pa-menu-content-list" role="menu">
-          <InvalidState />
-        </ul>
-      </div>
-    );
-  }
-
   if (!sections) {
     return (
       <div className="c2pa-menu-panel">
@@ -150,6 +139,7 @@ export function C2paMenuContent({
     <div className="c2pa-menu-panel">
       <MenuHeader title={headerTitle} />
       <ul className="vjs-menu-content c2pa-menu-content-list" role="menu">
+        {mode === 'invalid' ? <InvalidState /> : null}
         <SummarySection section={sections.summary} sectionTitles={sectionTitles} />
         {sections.claimGenerator ? (
           <ClaimGeneratorSection

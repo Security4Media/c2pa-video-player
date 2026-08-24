@@ -19,27 +19,12 @@ import type { C2paManifest, SegmentRecord } from '@qualabs/c2pa-live-dashjs-plug
 import { getDashSegmentValidationState } from '../rules';
 import type { NormalizedValidationResult, TimelineSegmentDiagnostic } from '../types';
 
-// Menu selectors read specific nested shapes out of these labels (e.g.
-// cawgSelectors.ts reads `data.signer_payload.referenced_assertions` without
-// an extra optional-chain). The live plugin's assertion `data` is typed
-// `unknown`, so a differently-shaped payload under one of these labels could
-// throw inside otherwise adapter-agnostic menu code. Strip them until real
-// stream data confirms the shapes line up.
-const SELECTOR_SENSITIVE_ASSERTION_LABELS = new Set([
-  'cawg.identity',
-  'stds.schema-org.CreativeWork',
-  'cawg.training-mining',
-  'c2pa.training-mining',
-]);
-
 function toCompatibilityAssertions(assertions: C2paManifest['assertions']): ManifestAssertion[] {
   if (!assertions) {
     return [];
   }
 
-  return assertions
-    .filter((assertion) => !SELECTOR_SENSITIVE_ASSERTION_LABELS.has(assertion.label))
-    .map((assertion) => ({ label: assertion.label, data: assertion.data }));
+  return assertions.map((assertion) => ({ label: assertion.label, data: assertion.data }));
 }
 
 function toCompatibilityManifest(manifest: C2paManifest | null | undefined): Manifest | null {

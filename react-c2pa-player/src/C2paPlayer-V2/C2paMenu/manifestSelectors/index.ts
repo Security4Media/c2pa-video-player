@@ -20,6 +20,7 @@ export {
     selectCreativeWorkContent,
     selectCreativeWorkOrganization,
 } from './creativeWorkSelectors';
+export { selectDublinCoreMetadata } from './dublinCoreSelectors';
 export { selectIngredients } from './ingredientSelectors';
 export { selectClaimGenerator } from './claimGeneratorSelectors';
 export { selectAiOptOutSection } from './aiOptOutSelectors';
