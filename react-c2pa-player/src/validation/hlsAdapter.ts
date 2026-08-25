@@ -105,13 +105,15 @@ class HlsFragmentedFmp4Session implements ValidationSession {
   }
 
   #rebuildSnapshot(time: number, shouldEmit: boolean): void {
+    const liveSignal = this.#runtime.isLive();
+
+    if (liveSignal !== null) {
+      this.#timelineProjector.setLiveMode(liveSignal);
+    }
+
     const isBackwardSeek = Number.isFinite(time) && time < this.#lastPlaybackTime;
     const isForwardSeek =
       Number.isFinite(time) && time > this.#lastPlaybackTime + SEEK_JUMP_THRESHOLD_SECONDS;
-
-    if (isBackwardSeek) {
-      this.#timelineProjector.resetOnBackwardSeek(time);
-    }
 
     if (Number.isFinite(time)) {
       this.#lastPlaybackTime = time;

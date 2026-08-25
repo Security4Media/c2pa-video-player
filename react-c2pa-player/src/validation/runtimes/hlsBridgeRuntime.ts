@@ -32,6 +32,11 @@ export class HlsBridgeRuntime {
   #message = 'HLS C2PA fragment validation pending';
   #errorReason: string | null = null;
   #disposed = false;
+  // null until the first media playlist ("level") loads - that's the
+  // earliest point HLS itself knows whether the stream is live or VOD (the
+  // master-playlist-level MANIFEST_LOADED/MANIFEST_PARSED events don't carry
+  // this; see Hls.Events.LEVEL_LOADED's LevelLoadedData.details.live).
+  #isLive: boolean | null = null;
 
   constructor(context: ValidationAdapterContext) {
     this.#context = context;
@@ -95,6 +100,14 @@ export class HlsBridgeRuntime {
         this.#emit();
       }
     });
+    hls.on(Hls.Events.LEVEL_LOADED, (_event, data) => {
+      const isLive = Boolean(data?.details?.live);
+
+      if (this.#isLive !== isLive) {
+        this.#isLive = isLive;
+        this.#emit();
+      }
+    });
 
     hls.attachMedia(this.#context.videoElement);
     this.#emit();
@@ -129,6 +142,11 @@ export class HlsBridgeRuntime {
 
   getErrorReason(): string | null {
     return this.#errorReason;
+  }
+
+  /** `null` until the first level loads and reveals whether this is live or VOD. */
+  isLive(): boolean | null {
+    return this.#isLive;
   }
 
   #emit(): void {
