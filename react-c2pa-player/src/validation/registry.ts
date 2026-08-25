@@ -14,7 +14,6 @@
  * limitations under the License.
  */
 
-import { detectAdapterKind } from './sourceDetection';
 import type { MediaSourceDescriptor, MediaValidationAdapter } from './types';
 import { UnsupportedValidationAdapter } from './unsupportedAdapter';
 
@@ -26,11 +25,14 @@ export class ValidationAdapterRegistry {
     this.#adapters = adapters;
   }
 
+  // Every current adapter's canHandle() is itself exactly
+  // `detectAdapterKind(source) === this.kind`, so pre-filtering on
+  // `candidate.kind === detectAdapterKind(source)` here re-did the same
+  // check canHandle() already makes. Delegating entirely to canHandle()
+  // also lets a future adapter route on more than just kind (e.g. codec
+  // support within a kind) without the registry getting in the way.
   resolve(source: MediaSourceDescriptor): MediaValidationAdapter {
-    const adapterKind = detectAdapterKind(source);
-    const adapter = this.#adapters.find(
-      (candidate) => candidate.kind === adapterKind && candidate.canHandle(source)
-    );
+    const adapter = this.#adapters.find((candidate) => candidate.canHandle(source));
 
     return adapter ?? this.#fallbackAdapter;
   }
