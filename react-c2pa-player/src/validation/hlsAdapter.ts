@@ -27,6 +27,14 @@ import type {
   ValidationStatusSnapshot,
 } from './types';
 
+// A jump larger than this between consecutive #rebuildSnapshot calls is
+// treated as a seek rather than ordinary playback progression (timeupdate
+// ticks are much smaller and continuous). Used only to decide whether a
+// missing reader means "seeked into not-yet-validated territory" (show
+// unknown/pending) vs. "briefly between fragments during normal playback"
+// (keep showing the last known result to avoid flicker).
+const SEEK_JUMP_THRESHOLD_SECONDS = 2;
+
 const HLS_CAPABILITIES = {
   ownsPlayback: true,
   providesTimelineSegments: true,
@@ -97,7 +105,11 @@ class HlsFragmentedFmp4Session implements ValidationSession {
   }
 
   #rebuildSnapshot(time: number, shouldEmit: boolean): void {
-    if (Number.isFinite(time) && time < this.#lastPlaybackTime) {
+    const isBackwardSeek = Number.isFinite(time) && time < this.#lastPlaybackTime;
+    const isForwardSeek =
+      Number.isFinite(time) && time > this.#lastPlaybackTime + SEEK_JUMP_THRESHOLD_SECONDS;
+
+    if (isBackwardSeek) {
       this.#timelineProjector.resetOnBackwardSeek(time);
     }
 
@@ -108,8 +120,11 @@ class HlsFragmentedFmp4Session implements ValidationSession {
     const reader = this.#runtime.lookup(this.#lastPlaybackTime);
     const result = reader
       ? normalizeHlsManifestHelper(reader)
-      : this.#runtime.getErrorReason()
+      : this.#runtime.getErrorReason() || isBackwardSeek || isForwardSeek
         ? createUnknownResult()
+        // Not a seek and no error — likely a brief gap between fragments
+        // during normal forward playback; keep the last known result
+        // instead of flickering to "unknown".
         : this.#snapshot.result;
 
     if (reader && result) {
