@@ -18,9 +18,12 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
 // Deployment config for GitHub Pages
-export default defineConfig({ 
+export default defineConfig({
   base: '/c2pa-video-player/',
   plugins: [react()],
+  optimizeDeps: {
+    exclude: ['@nettrek/c2pa-hls-bridge'],
+  },
   resolve: {
     alias: {
       '@': '/src',
