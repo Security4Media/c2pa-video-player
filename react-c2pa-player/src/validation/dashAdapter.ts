@@ -119,6 +119,12 @@ class DashFragmentedFmp4Session implements ValidationSession {
   }
 
   #rebuildSnapshot(time: number, shouldEmit: boolean): void {
+    const liveSignal = this.#runtime.isLive();
+
+    if (liveSignal !== null) {
+      this.#timelineProjector.setLiveMode(liveSignal);
+    }
+
     if (Number.isFinite(time)) {
       this.#lastPlaybackTime = time;
     }

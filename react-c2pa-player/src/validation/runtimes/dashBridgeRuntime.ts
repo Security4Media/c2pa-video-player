@@ -59,6 +59,7 @@ interface DashMediaPlayerLike {
   on(eventName: string, handler: (event: unknown) => void): void;
   off(eventName: string, handler: (event: unknown) => void): void;
   reset(): void;
+  isDynamic(): boolean;
 }
 
 // Fallback used only when a segment's real timing couldn't be correlated
@@ -100,10 +101,16 @@ export class DashBridgeRuntime {
   #player: DashMediaPlayerLike | null = null;
   #controller: C2paController | null = null;
   #fragmentLoadingEventName: string | null = null;
+  #streamInitializedEventName: string | null = null;
   #message = 'Live DASH C2PA validation pending';
   #errorReason: string | null = null;
   #estimatedTimelineEnd = 0;
   #latestManifest: C2paManifest | null = null;
+  // null until STREAM_INITIALIZED fires and reveals whether this is a
+  // live/dynamic MPD or a static (VOD) one - used to gate the eviction below
+  // and the timeline projector's destructive-vs-non-destructive handling of
+  // backward observations (see FragmentedTimelineProjector.setLiveMode).
+  #isLive: boolean | null = null;
 
   constructor(context: ValidationAdapterContext) {
     this.#context = context;
@@ -120,6 +127,11 @@ export class DashBridgeRuntime {
 
     this.#fragmentLoadingEventName = MediaPlayer.events.FRAGMENT_LOADING_COMPLETED;
     player.on(this.#fragmentLoadingEventName, this.#onFragmentLoadingCompleted);
+
+    this.#streamInitializedEventName = MediaPlayer.events.STREAM_INITIALIZED;
+    player.on(this.#streamInitializedEventName, this.#onStreamInitialized);
+
+    this.#context.videoElement.addEventListener('seeking', this.#onVideoSeeking);
 
     const controller = attachC2pa(player as unknown as DashjsPlayer, {
       mediaTypes: [...VALIDATED_MEDIA_TYPES],
@@ -139,6 +151,12 @@ export class DashBridgeRuntime {
     if (this.#player && this.#fragmentLoadingEventName) {
       this.#player.off(this.#fragmentLoadingEventName, this.#onFragmentLoadingCompleted);
     }
+
+    if (this.#player && this.#streamInitializedEventName) {
+      this.#player.off(this.#streamInitializedEventName, this.#onStreamInitialized);
+    }
+
+    this.#context.videoElement.removeEventListener('seeking', this.#onVideoSeeking);
 
     this.#controller?.off('segmentValidated', this.#onSegmentValidated);
     this.#controller?.off('initProcessed', this.#onInitProcessed);
@@ -206,6 +224,37 @@ export class DashBridgeRuntime {
   getErrorReason(): string | null {
     return this.#errorReason;
   }
+
+  /** `null` until STREAM_INITIALIZED fires and reveals live vs. VOD. */
+  isLive(): boolean | null {
+    return this.#isLive;
+  }
+
+  #onStreamInitialized = (): void => {
+    const next = this.#player?.isDynamic() ?? null;
+
+    if (next !== null && this.#isLive !== next) {
+      this.#isLive = next;
+      this.#emit();
+    }
+  };
+
+  /**
+   * Clears the FIFO fragment/validation correlation-tracking maps on a video
+   * seek. These are pure event-correlation bookkeeping (matching dash.js's
+   * FRAGMENT_LOADING_COMPLETED requests to the plugin's segmentValidated
+   * events in arrival order, and checking that order is still increasing) -
+   * not validation history, so clearing them doesn't lose anything. Without
+   * this, a VOD backward seek that makes dash.js re-fetch an already-seen
+   * segment produces a start time earlier than what's already tracked,
+   * which #onSegmentValidated would otherwise misreport as the two event
+   * streams having desynced (see #flagCorrelationIssue below) even though
+   * the re-fetch is entirely expected.
+   */
+  #onVideoSeeking = (): void => {
+    this.#pendingTiming.clear();
+    this.#lastDequeuedStartTime.clear();
+  };
 
   #onFragmentLoadingCompleted = (event: unknown): void => {
     const request = (event as FragmentLoadingCompletedEventLike | null)?.request;
@@ -310,6 +359,13 @@ export class DashBridgeRuntime {
    * grow this array — and its O(n) lookup() scan — without limit.
    */
   #evictStaleSegments(): void {
+    // VOD (or not-yet-known) sources: never evict. A VOD asset's duration is
+    // finite and known, so there's nothing to bound memory against, and
+    // doing so anyway would drop real history for anything over ~10 minutes.
+    if (this.#isLive !== true) {
+      return;
+    }
+
     const cutoff = this.#estimatedTimelineEnd - SEGMENT_RETENTION_WINDOW_SECONDS;
 
     while (this.#segments.length > 1 && this.#segments[0].endTime < cutoff) {
