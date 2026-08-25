@@ -14,8 +14,9 @@
  * limitations under the License.
  */
 
-import type { ManifestStore } from '@contentauth/c2pa-web';
+import type { Manifest, ManifestStore } from '@contentauth/c2pa-web';
 import type { ManifestSource, PlayerValidationState } from '@/validation';
+import { getActiveManifest } from '../../../services/c2pa_functions';
 
 /**
  * Resolves an adapter-agnostic `ManifestSource` into the `ManifestStore`
@@ -55,6 +56,29 @@ export function resolveManifestStoreFromSource(
                     },
                 },
             } as ManifestStore;
+        case 'integrity-only':
+        case 'none':
+            return null;
+    }
+}
+
+/**
+ * Resolves an adapter-agnostic `ManifestSource` to the concrete `Manifest`
+ * it carries (if any) - used for the per-fragment "click a segment, inspect
+ * it" detail view, which needs the manifest itself (issuer, actions, CAWG
+ * identity, ...) rather than the `ManifestStore` shape the section selectors
+ * take as their *trust-context* argument.
+ */
+export function resolveManifestFromSource(source: ManifestSource | undefined): Manifest | null {
+    if (!source) {
+        return null;
+    }
+
+    switch (source.kind) {
+        case 'manifest-store':
+            return getActiveManifest(source.manifestStore);
+        case 'single-manifest':
+            return source.manifest;
         case 'integrity-only':
         case 'none':
             return null;

@@ -238,6 +238,8 @@ export function C2PAPlayerRoot({
                                 c2paStatus={state.c2paStatus}
                                 timeline={state.timeline}
                                 resetKey={state.menuResetKey}
+                                selectedSegment={state.selectedSegment}
+                                onBackToLive={() => controller.setState({ selectedSegment: null })}
                             />
                         </div>
                     </div>

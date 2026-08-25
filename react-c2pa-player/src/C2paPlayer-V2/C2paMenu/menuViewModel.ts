@@ -16,6 +16,7 @@
 
 import type { Manifest } from '@contentauth/c2pa-web';
 import type { C2PAStatus } from '@/types/c2pa.types';
+import type { ValidationTimelineSegment } from '@/validation';
 import type { C2PATimelineState } from '../C2PAPlayerRoot.types';
 import { getActiveManifest, getActiveManifestValidationStatus } from '../../services/c2pa_functions';
 import {
@@ -27,7 +28,7 @@ import {
     selectSignatureTime,
     selectWorkSection,
 } from './C2paManifestFunctions';
-import { resolveManifestStoreFromSource } from './manifestSelectors';
+import { resolveManifestFromSource, resolveManifestStoreFromSource } from './manifestSelectors';
 import type {
     AiOptOutSectionItem,
     ClaimGeneratorSectionItem,
@@ -52,7 +53,7 @@ export const c2paMenuSectionTitles = {
     alert: 'Alert',
 } as const;
 
-export type C2paMenuMode = 'ready' | 'loading' | 'no-manifest' | 'invalid';
+export type C2paMenuMode = 'ready' | 'loading' | 'no-manifest' | 'invalid' | 'segment-integrity';
 export type C2paMenuSectionTitleKey = keyof typeof c2paMenuSectionTitles;
 
 export interface SummarySectionItem {
@@ -76,6 +77,8 @@ export interface C2paMenuRenderState {
     mode: C2paMenuMode;
     manifestId: string | null;
     sections: C2paMenuSections | null;
+    /** True when showing a clicked timeline fragment rather than the live/current status. */
+    isSegmentView: boolean;
 }
 
 function selectLiveSegmentsSection(
@@ -146,7 +149,12 @@ function getManifestId(activeManifest: Manifest | null, c2paStatus: C2PAStatus |
 export function buildMenuRenderState(
     c2paStatus: C2PAStatus | null,
     timeline: C2PATimelineState,
+    selectedSegment?: ValidationTimelineSegment | null,
 ): C2paMenuRenderState {
+    if (selectedSegment) {
+        return buildSegmentMenuRenderState(selectedSegment);
+    }
+
     const manifestStore = c2paStatus?.manifestStore ?? null;
     const normalizedResult = c2paStatus?.normalizedResult ?? null;
     const activeManifest = manifestStore
@@ -161,6 +169,7 @@ export function buildMenuRenderState(
             mode: 'no-manifest',
             manifestId: 'no-manifest',
             sections: null,
+            isSegmentView: false,
         };
     }
 
@@ -169,6 +178,7 @@ export function buildMenuRenderState(
             mode: 'loading',
             manifestId: manifestStore?.active_manifest ?? 'loading',
             sections: null,
+            isSegmentView: false,
         };
     }
 
@@ -192,6 +202,7 @@ export function buildMenuRenderState(
     return {
         mode: validationStatus === 'Invalid' ? 'invalid' : 'ready',
         manifestId,
+        isSegmentView: false,
         sections: {
             summary: {
                 issuer: selectSignatureIssuer(activeManifest),
@@ -207,6 +218,88 @@ export function buildMenuRenderState(
                 ? selectHistorySection(activeManifest, selectorManifestStore)
                 : null,
             liveSegments: selectLiveSegmentsSection(c2paStatus?.timelineSegments),
+        },
+    };
+}
+
+function buildSegmentAlertMessage(segment: ValidationTimelineSegment): string | null {
+    const anomaly = (segment.diagnostics ?? [])
+        .filter((diagnostic) => diagnostic.status !== 'valid')
+        .sort((a, b) => b.timestamp - a.timestamp)[0];
+
+    if (anomaly) {
+        return `${anomaly.mediaType} segment #${anomaly.segmentNumber}: ${anomaly.status}` +
+            (anomaly.sequenceReason ? ` — ${anomaly.sequenceReason}` : '');
+    }
+
+    if (segment.manifestRef?.kind === 'integrity-only' && segment.manifestRef.integrityStatus !== 'valid') {
+        const { integrityStatus, sequenceReason } = segment.manifestRef;
+        return `Segment integrity: ${integrityStatus}` + (sequenceReason ? ` — ${sequenceReason}` : '');
+    }
+
+    return null;
+}
+
+/**
+ * Builds render state for a clicked timeline fragment instead of the live
+ * status. Reuses the same per-manifest selectors as the live path when the
+ * segment has a manifest (`manifestRef` resolves to one); falls back to a
+ * status/anomaly-only view (mode 'segment-integrity') when it doesn't - the
+ * DASH VSI/integrity-only case, or any segment with no manifestRef at all.
+ */
+function buildSegmentMenuRenderState(segment: ValidationTimelineSegment): C2paMenuRenderState {
+    const activeManifest = resolveManifestFromSource(segment.manifestRef);
+    const validationStatus = segment.validationState;
+    const alert = buildSegmentAlertMessage(segment);
+
+    if (!activeManifest) {
+        return {
+            mode: 'segment-integrity',
+            manifestId: 'segment',
+            isSegmentView: true,
+            sections: {
+                summary: {
+                    issuer: null,
+                    issuedOn: null,
+                    validationStatus,
+                    alert: alert ?? 'No signed manifest is attached to this segment.',
+                },
+                claimGenerator: null,
+                organization: null,
+                work: null,
+                aiOptOut: null,
+                history: null,
+                liveSegments: null,
+            },
+        };
+    }
+
+    const manifestId = getManifestId(activeManifest, null);
+    const selectorManifestStore = manifestId
+        ? resolveManifestStoreFromSource(segment.manifestRef, manifestId, validationStatus)
+        : null;
+
+    return {
+        mode: validationStatus === 'Invalid' ? 'invalid' : 'ready',
+        manifestId,
+        isSegmentView: true,
+        sections: {
+            summary: {
+                issuer: selectSignatureIssuer(activeManifest),
+                issuedOn: formatSignatureDate(selectSignatureTime(activeManifest)),
+                validationStatus,
+                alert,
+            },
+            claimGenerator: selectClaimGeneratorSection(activeManifest),
+            organization: selectOrganizationSection(activeManifest, selectorManifestStore ?? undefined),
+            work: selectWorkSection(activeManifest, selectorManifestStore ?? undefined),
+            aiOptOut: selectAiOptOutSection(activeManifest),
+            history: selectorManifestStore
+                ? selectHistorySection(activeManifest, selectorManifestStore)
+                : null,
+            // Not relevant to a single-segment detail view - that list is
+            // about anomalies across the whole timeline, not this fragment.
+            liveSegments: null,
         },
     };
 }

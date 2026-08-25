@@ -18,11 +18,14 @@ import type { C2PATimelineState } from '../C2PAPlayerRoot.types';
 import { C2paMenuContent } from './C2paMenuContent';
 import { buildMenuRenderState, c2paMenuSectionTitles } from './menuViewModel';
 import { C2PAStatus } from '@/types/c2pa.types';
+import type { ValidationTimelineSegment } from '@/validation';
 
 interface C2paMenuRootProps {
   c2paStatus: C2PAStatus | null;
   timeline: C2PATimelineState;
   resetKey: string;
+  selectedSegment: ValidationTimelineSegment | null;
+  onBackToLive: () => void;
 }
 
 /**
@@ -30,8 +33,8 @@ interface C2paMenuRootProps {
  * status payload and forwards the normalized result to the presentational
  * content component.
  */
-export function C2paMenuRoot({ c2paStatus, timeline, resetKey }: C2paMenuRootProps) {
-  const renderState = buildMenuRenderState(c2paStatus, timeline);
+export function C2paMenuRoot({ c2paStatus, timeline, resetKey, selectedSegment, onBackToLive }: C2paMenuRootProps) {
+  const renderState = buildMenuRenderState(c2paStatus, timeline, selectedSegment);
 
   return (
     <C2paMenuContent
@@ -39,6 +42,8 @@ export function C2paMenuRoot({ c2paStatus, timeline, resetKey }: C2paMenuRootPro
       sections={renderState.sections}
       mode={renderState.mode}
       resetKey={`${resetKey}:${renderState.manifestId ?? 'none'}`}
+      isSegmentView={renderState.isSegmentView}
+      onBackToLive={onBackToLive}
     />
   );
 }

@@ -40,6 +40,8 @@ interface C2paMenuContentProps {
   sections: C2paMenuSections | null;
   mode: C2paMenuMode;
   resetKey: string;
+  isSegmentView: boolean;
+  onBackToLive: () => void;
 }
 
 /**
@@ -52,6 +54,8 @@ export function C2paMenuContent({
   sections,
   mode,
   resetKey,
+  isSegmentView,
+  onBackToLive,
 }: C2paMenuContentProps) {
   const [activeView, setActiveView] = useState<'default' | 'history'>('default');
   const [workExpanded, setWorkExpanded] = useState(false);
@@ -76,6 +80,19 @@ export function C2paMenuContent({
 
   let headerTitle = 'Content Credentials';
   let headerAction: ReactNode = null;
+
+  if (isSegmentView) {
+    headerAction = (
+      <button
+        className="c2pa-history-section__back-button c2pa-history-section__back-button--title"
+        type="button"
+        onClick={onBackToLive}
+        aria-label="Back to live status"
+      >
+        <span className="c2pa-history-section__back-icon">‹</span>
+      </button>
+    );
+  }
 
   if (mode === 'loading') {
     return (
@@ -137,7 +154,7 @@ export function C2paMenuContent({
 
   return (
     <div className="c2pa-menu-panel">
-      <MenuHeader title={headerTitle} />
+      <MenuHeader title={headerTitle} leadingAction={headerAction} />
       <ul className="vjs-menu-content c2pa-menu-content-list" role="menu">
         {mode === 'invalid' ? <InvalidState /> : null}
         <SummarySection section={sections.summary} sectionTitles={sectionTitles} />
