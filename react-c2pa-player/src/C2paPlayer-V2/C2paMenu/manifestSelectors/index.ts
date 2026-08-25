@@ -22,6 +22,7 @@ export {
 } from './creativeWorkSelectors';
 export { selectDublinCoreMetadata } from './dublinCoreSelectors';
 export { selectIngredients } from './ingredientSelectors';
+export { resolveManifestStoreFromSource } from './manifestSourceDispatch';
 export { selectClaimGenerator } from './claimGeneratorSelectors';
 export { selectAiOptOutSection } from './aiOptOutSelectors';
 export {

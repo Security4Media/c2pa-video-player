@@ -1,0 +1,62 @@
+/*
+ * Copyright 2026 European Broadcasting Union
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+import type { ManifestStore } from '@contentauth/c2pa-web';
+import type { ManifestSource, PlayerValidationState } from '@/validation';
+
+/**
+ * Resolves an adapter-agnostic `ManifestSource` into the `ManifestStore`
+ * shape the existing section selectors (selectOrganizationSection,
+ * selectWorkSection, selectHistorySection) expect, or `null` when there's
+ * nothing store-shaped to give them (no manifest at all, or integrity-only
+ * data with no manifest attached).
+ *
+ * Mirrors what the old adapter-specific `createAdapterManifestStore` built
+ * for its one reachable case (DASH, whose `NormalizedValidationResult.
+ * manifestStore` is always null) - HLS and monolithic already carry a real
+ * `ManifestStore` by the time menuViewModel.ts would fall back to this, so
+ * `manifest-store` below is presently unexercised but kept for adapters that
+ * only have a `ManifestSource` and never populate the legacy field.
+ */
+export function resolveManifestStoreFromSource(
+    source: ManifestSource | undefined,
+    manifestId: string,
+    validationStatus: PlayerValidationState,
+): ManifestStore | null {
+    if (!source) {
+        return null;
+    }
+
+    switch (source.kind) {
+        case 'manifest-store':
+            return source.manifestStore;
+        case 'single-manifest':
+            return {
+                active_manifest: manifestId,
+                manifests: source.manifests,
+                validation_state: validationStatus,
+                validation_results: {
+                    activeManifest: {
+                        success: validationStatus === 'Invalid' ? [] : [{}],
+                        failure: validationStatus === 'Invalid' ? source.validationErrors : [],
+                    },
+                },
+            } as ManifestStore;
+        case 'integrity-only':
+        case 'none':
+            return null;
+    }
+}

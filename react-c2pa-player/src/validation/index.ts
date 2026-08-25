@@ -49,11 +49,13 @@ export { UnsupportedValidationAdapter } from './unsupportedAdapter';
 export type {
   AdapterCapabilities,
   AdapterKind,
+  ManifestSource,
   MediaSourceDescriptor,
   MediaSourceOrigin,
   MediaValidationAdapter,
   NormalizedC2PAResult,
   PlayerValidationState,
+  SegmentIntegrityStatus,
   TimeInterval,
   TimelineSegmentDiagnostic,
   TrustMaterial,
