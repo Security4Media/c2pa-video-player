@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+import { Emitter } from './emitter';
 import { createUnknownResult, normalizeHlsManifestHelper } from './normalization';
 import { HlsBridgeRuntime } from './runtimes';
 import { detectAdapterKind } from './sourceDetection';
@@ -60,7 +61,7 @@ class HlsFragmentedFmp4Session implements ValidationSession {
 
   readonly #runtime: HlsBridgeRuntime;
   readonly #timelineProjector = new FragmentedTimelineProjector();
-  readonly #listeners = new Set<ValidationSessionListener>();
+  readonly #emitter = new Emitter<ValidationStatusSnapshot>();
   #unsubscribeRuntime: (() => void) | null = null;
   #snapshot: ValidationStatusSnapshot = {
     adapterKind: this.adapterKind,
@@ -87,7 +88,7 @@ class HlsFragmentedFmp4Session implements ValidationSession {
     this.#unsubscribeRuntime?.();
     this.#unsubscribeRuntime = null;
     this.#runtime.dispose();
-    this.#listeners.clear();
+    this.#emitter.clear();
   }
 
   getStatusAt(time: number): ValidationStatusSnapshot {
@@ -96,12 +97,10 @@ class HlsFragmentedFmp4Session implements ValidationSession {
   }
 
   subscribe(listener: ValidationSessionListener): () => void {
-    this.#listeners.add(listener);
+    const unsubscribe = this.#emitter.subscribe(listener);
     listener(this.#snapshot);
 
-    return () => {
-      this.#listeners.delete(listener);
-    };
+    return unsubscribe;
   }
 
   #rebuildSnapshot(time: number, shouldEmit: boolean): void {
@@ -145,6 +144,6 @@ class HlsFragmentedFmp4Session implements ValidationSession {
   }
 
   #emit(): void {
-    this.#listeners.forEach((listener) => listener(this.#snapshot));
+    this.#emitter.emit(this.#snapshot);
   }
 }

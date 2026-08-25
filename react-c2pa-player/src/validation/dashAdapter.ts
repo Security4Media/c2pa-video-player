@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+import { Emitter } from './emitter';
 import { createUnknownResult } from './normalization';
 import { DashBridgeRuntime } from './runtimes';
 import { detectAdapterKind } from './sourceDetection';
@@ -56,7 +57,7 @@ class DashFragmentedFmp4Session implements ValidationSession {
 
   readonly #runtime: DashBridgeRuntime;
   readonly #timelineProjector = new FragmentedTimelineProjector();
-  readonly #listeners = new Set<ValidationSessionListener>();
+  readonly #emitter = new Emitter<ValidationStatusSnapshot>();
   #unsubscribeRuntime: (() => void) | null = null;
   #drainedSegmentCount = 0;
   #lastPlaybackTime = 0;
@@ -86,7 +87,7 @@ class DashFragmentedFmp4Session implements ValidationSession {
     this.#unsubscribeRuntime?.();
     this.#unsubscribeRuntime = null;
     this.#runtime.dispose();
-    this.#listeners.clear();
+    this.#emitter.clear();
   }
 
   getStatusAt(time: number): ValidationStatusSnapshot {
@@ -95,12 +96,10 @@ class DashFragmentedFmp4Session implements ValidationSession {
   }
 
   subscribe(listener: ValidationSessionListener): () => void {
-    this.#listeners.add(listener);
+    const unsubscribe = this.#emitter.subscribe(listener);
     listener(this.#snapshot);
 
-    return () => {
-      this.#listeners.delete(listener);
-    };
+    return unsubscribe;
   }
 
   // Unlike HLS, new segments arrive as discrete events with their own known
@@ -146,6 +145,6 @@ class DashFragmentedFmp4Session implements ValidationSession {
   }
 
   #emit(): void {
-    this.#listeners.forEach((listener) => listener(this.#snapshot));
+    this.#emitter.emit(this.#snapshot);
   }
 }

@@ -23,10 +23,11 @@ import type {
   MediaType,
   SegmentRecord,
 } from '@qualabs/c2pa-live-dashjs-plugin';
+import { Emitter, type EmitterListener } from '../emitter';
 import { normalizeDashSegmentRecord } from '../normalization/dash';
 import type { NormalizedValidationResult, TimelineSegmentDiagnostic, ValidationAdapterContext } from '../types';
 
-type RuntimeListener = () => void;
+type RuntimeListener = EmitterListener<void>;
 
 export interface DashSegmentEntry {
   startTime: number;
@@ -91,7 +92,7 @@ const SEGMENT_RETENTION_WINDOW_SECONDS = 600;
  */
 export class DashBridgeRuntime {
   readonly #context: ValidationAdapterContext;
-  readonly #listeners = new Set<RuntimeListener>();
+  readonly #emitter = new Emitter();
   readonly #pendingTiming = new Map<string, PendingTiming[]>();
   readonly #lastDequeuedStartTime = new Map<string, number>();
   readonly #segments: DashSegmentEntry[] = [];
@@ -154,14 +155,11 @@ export class DashBridgeRuntime {
     this.#player = null;
     this.#pendingTiming.clear();
     this.#lastDequeuedStartTime.clear();
-    this.#listeners.clear();
+    this.#emitter.clear();
   }
 
   subscribe(listener: RuntimeListener): () => void {
-    this.#listeners.add(listener);
-    return () => {
-      this.#listeners.delete(listener);
-    };
+    return this.#emitter.subscribe(listener);
   }
 
   /**
@@ -330,6 +328,6 @@ export class DashBridgeRuntime {
   };
 
   #emit(): void {
-    this.#listeners.forEach((listener) => listener());
+    this.#emitter.emit();
   }
 }

@@ -15,15 +15,16 @@
  */
 
 import { createC2pa, type ManifestStore, type Settings } from '@contentauth/c2pa-web';
+import { Emitter, type EmitterListener } from '../emitter';
 import type { ValidationAdapterContext } from '../types';
 
-type RuntimeListener = () => void;
+type RuntimeListener = EmitterListener<void>;
 
 type C2paSdk = Awaited<ReturnType<typeof createC2pa>>;
 
 export class MonolithicBridgeRuntime {
   readonly #context: ValidationAdapterContext;
-  readonly #listeners = new Set<RuntimeListener>();
+  readonly #emitter = new Emitter();
   #sdk: C2paSdk | null = null;
   #manifestStore: ManifestStore | null = null;
   #message = 'Monolithic C2PA validation pending';
@@ -108,14 +109,11 @@ export class MonolithicBridgeRuntime {
     this.#disposed = true;
     this.#sdk?.dispose?.();
     this.#sdk = null;
-    this.#listeners.clear();
+    this.#emitter.clear();
   }
 
   subscribe(listener: RuntimeListener): () => void {
-    this.#listeners.add(listener);
-    return () => {
-      this.#listeners.delete(listener);
-    };
+    return this.#emitter.subscribe(listener);
   }
 
   getManifestStore(): ManifestStore | null {
@@ -131,6 +129,6 @@ export class MonolithicBridgeRuntime {
   }
 
   #emit(): void {
-    this.#listeners.forEach((listener) => listener());
+    this.#emitter.emit();
   }
 }

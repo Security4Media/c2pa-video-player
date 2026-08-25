@@ -19,13 +19,14 @@ import {
   type C2paManifestHelper,
 } from '@nettrek/c2pa-hls-bridge';
 import Hls from 'hls.js';
+import { Emitter, type EmitterListener } from '../emitter';
 import type { TimeInterval, ValidationAdapterContext } from '../types';
 
-type RuntimeListener = () => void;
+type RuntimeListener = EmitterListener<void>;
 
 export class HlsBridgeRuntime {
   readonly #context: ValidationAdapterContext;
-  readonly #listeners = new Set<RuntimeListener>();
+  readonly #emitter = new Emitter();
   #hls: Hls | null = null;
   #bridge: C2paHlsBridge | null = null;
   #message = 'HLS C2PA fragment validation pending';
@@ -93,14 +94,11 @@ export class HlsBridgeRuntime {
     this.#hls?.destroy();
     this.#bridge = null;
     this.#hls = null;
-    this.#listeners.clear();
+    this.#emitter.clear();
   }
 
   subscribe(listener: RuntimeListener): () => void {
-    this.#listeners.add(listener);
-    return () => {
-      this.#listeners.delete(listener);
-    };
+    return this.#emitter.subscribe(listener);
   }
 
   lookup(time: number): C2paManifestHelper | null {
@@ -122,7 +120,7 @@ export class HlsBridgeRuntime {
   }
 
   #emit(): void {
-    this.#listeners.forEach((listener) => listener());
+    this.#emitter.emit();
   }
 }
 

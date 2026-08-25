@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+import { Emitter } from './emitter';
 import { normalizeMonolithicManifestStore } from './normalization';
 import { MonolithicBridgeRuntime } from './runtimes';
 import { detectAdapterKind } from './sourceDetection';
@@ -50,7 +51,7 @@ class MonolithicC2PASession implements ValidationSession {
   readonly adapterKind = 'monolithic' as const;
 
   readonly #runtime: MonolithicBridgeRuntime;
-  readonly #listeners = new Set<ValidationSessionListener>();
+  readonly #emitter = new Emitter<ValidationStatusSnapshot>();
   #unsubscribeRuntime: (() => void) | null = null;
   #snapshot: ValidationStatusSnapshot = {
     adapterKind: this.adapterKind,
@@ -78,7 +79,7 @@ class MonolithicC2PASession implements ValidationSession {
     this.#unsubscribeRuntime?.();
     this.#unsubscribeRuntime = null;
     this.#runtime.dispose();
-    this.#listeners.clear();
+    this.#emitter.clear();
   }
 
   getStatusAt(): ValidationStatusSnapshot {
@@ -86,12 +87,10 @@ class MonolithicC2PASession implements ValidationSession {
   }
 
   subscribe(listener: ValidationSessionListener): () => void {
-    this.#listeners.add(listener);
+    const unsubscribe = this.#emitter.subscribe(listener);
     listener(this.#snapshot);
 
-    return () => {
-      this.#listeners.delete(listener);
-    };
+    return unsubscribe;
   }
 
   #buildSnapshot(): ValidationStatusSnapshot {
@@ -104,6 +103,6 @@ class MonolithicC2PASession implements ValidationSession {
   }
 
   #emit(): void {
-    this.#listeners.forEach((listener) => listener(this.#snapshot));
+    this.#emitter.emit(this.#snapshot);
   }
 }
