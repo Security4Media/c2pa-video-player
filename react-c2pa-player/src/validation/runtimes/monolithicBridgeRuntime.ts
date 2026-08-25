@@ -14,7 +14,15 @@
  * limitations under the License.
  */
 
-import { createC2pa, type ManifestStore, type Settings } from '@contentauth/c2pa-web';
+import type { ManifestStore } from '@contentauth/c2pa-web';
+// WebCrypto-based reader, not the @contentauth/c2pa-web WASM core: its own
+// createC2pa()/reader.fromBlob() fetch a bundled c2pa_bg.wasm whose SRI
+// integrity attribute doesn't match what gets served through this repo's
+// dependency tree (@nettrek/c2pa-hls-bridge pulls in a different
+// @contentauth/c2pa-web version than the one pinned at the workspace root),
+// so the browser blocks the resource. This package implements the same
+// `{ reader: { fromBlob, fromBlobFragment }, dispose }` surface with no WASM.
+import { createC2pa, type Settings } from '@nettrek/c2pa-web-crypto';
 import { Emitter, type EmitterListener } from '../emitter';
 import type { ValidationAdapterContext } from '../types';
 
@@ -43,21 +51,26 @@ export class MonolithicBridgeRuntime {
         return;
       }
 
+      // Cast at this boundary: TrustMaterial's `trust`/`cawgTrust` are typed
+      // against @contentauth/c2pa-web's TrustSettings, which has no index
+      // signature, while this package's Settings/TrustSettings require one -
+      // a TS strictness mismatch between two independently-typed packages,
+      // not an actual shape mismatch (both are plain { trustAnchors,
+      // allowedList, trustConfig } string records).
       const settings: Settings | undefined = this.#context.policy.enableTrustVerification
-        ? {
+        ? ({
             verify: {
               verifyTrust: true,
               verifyAfterReading: true,
             },
             trust: trustMaterial.trust,
             cawgTrust: trustMaterial.cawgTrust,
-          }
+          } as Settings)
         : undefined;
 
-      const sdk = await createC2pa({
-        wasmSrc: trustMaterial.wasmSrc,
-        settings,
-      });
+      // wasmSrc is a @contentauth/c2pa-web-only config option; this reader
+      // has no WASM to point it at, so it's intentionally not passed here.
+      const sdk = await createC2pa({ settings });
 
       if (this.#disposed) {
         // dispose() ran while createC2pa() was in flight and never saw this
@@ -88,7 +101,10 @@ export class MonolithicBridgeRuntime {
         return;
       }
 
-      this.#manifestStore = manifestStore;
+      // Same cross-package structural cast as above: this reader's
+      // ManifestStore is a separately-declared, data-compatible re-statement
+      // of the c2pa-types shape, not identical field-for-field in TS's eyes.
+      this.#manifestStore = manifestStore as ManifestStore | null;
       this.#message = 'Monolithic C2PA validation active';
       this.#errorReason = null;
       this.#emit();
