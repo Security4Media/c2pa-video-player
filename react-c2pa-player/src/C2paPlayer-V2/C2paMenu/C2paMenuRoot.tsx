@@ -35,13 +35,20 @@ interface C2paMenuRootProps {
  */
 export function C2paMenuRoot({ c2paStatus, timeline, resetKey, selectedSegment, onBackToLive }: C2paMenuRootProps) {
   const renderState = buildMenuRenderState(c2paStatus, timeline, selectedSegment);
+  // Two different segments can resolve to the same manifestId (e.g. distinct
+  // DASH integrity-only segments always resolve to the literal 'segment', or
+  // two segments genuinely covered by the same live manifest) - fold in the
+  // segment's own start time so switching between them still resets local
+  // menu UI state (e.g. leaves a drilled-into History view) instead of
+  // carrying it over from whichever segment was selected before.
+  const segmentIdentity = selectedSegment ? `segment:${selectedSegment.startTime}` : 'live';
 
   return (
     <C2paMenuContent
       sectionTitles={c2paMenuSectionTitles}
       sections={renderState.sections}
       mode={renderState.mode}
-      resetKey={`${resetKey}:${renderState.manifestId ?? 'none'}`}
+      resetKey={`${resetKey}:${renderState.manifestId ?? 'none'}:${segmentIdentity}`}
       isSegmentView={renderState.isSegmentView}
       onBackToLive={onBackToLive}
     />
