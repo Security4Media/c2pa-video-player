@@ -26,16 +26,37 @@ import './StandalonePlayerPage.css';
 import ebuLogo from '@/assets/logos/ebu-logo-dark.svg';
 import nabLogo from '@/assets/logos/nab-logo.png';
 import { PlayerStatus, VideoMode } from '@/types/player.types';
+import {
+  createMediaSourceDescriptor,
+  getMimeTypeForExtension,
+  KNOWN_MIME_TYPE_EXTENSIONS,
+  type MediaSourceDescriptor,
+} from '@/validation';
 
 interface StreamInfo {
   timestamp: string;
   message: string;
 }
 
+// The extension->MIME type mapping itself lives in validation/sourceDetection.ts
+// (the single source of truth also used to route sources to an adapter); this
+// keeps its own combined displayName+url suffix-matching, since either one
+// alone can lack a visible extension (e.g. an opaque signed URL vs. a plain
+// filename label).
+function inferMimeType(url: string, displayName: string): string {
+  const sourceLabel = `${displayName} ${url}`.toLowerCase().split(/[?#]/, 1)[0] ?? '';
+  const matchedExtension = KNOWN_MIME_TYPE_EXTENSIONS.find((extension) =>
+    sourceLabel.endsWith(extension)
+  );
+
+  return (matchedExtension && getMimeTypeForExtension(matchedExtension)) || 'video/mp4';
+}
+
 export function StandalonePlayerPage() {
   const [mp4Url, setMp4Url] = useState('');
   const [selectedVideo, setSelectedVideo] = useState('');
   const [availableVideos, setAvailableVideos] = useState<VideoItem[]>([]);
+  const [mediaSource, setMediaSource] = useState<MediaSourceDescriptor | null>(null);
   const [videoMode, setVideoMode] = useState<VideoMode>('server');
   const [playerStatus, setPlayerStatus] = useState<PlayerStatus>('ready');
   const [statusMessage, setStatusMessage] = useState('Player Ready');
@@ -94,18 +115,13 @@ export function StandalonePlayerPage() {
       // Only clear selectedVideo if no videoKey is provided (e.g., manual URL entry)
       // If videoKey is provided (from dropdown selection), update it
       setSelectedVideo(videoKey || '');
-
-      setVideoJsOptions((prev) => ({
-        ...prev,
-        sources: [
-          {
-            src: url,
-            type: 'video/mp4',
-          },
-        ],
-      }));
-
-      updateStreamInfo('Video source updated');
+      const sourceDescriptor = createMediaSourceDescriptor({
+        url,
+        displayName,
+        mimeType: inferMimeType(url, displayName),
+      });
+      setMediaSource(sourceDescriptor);
+      updateStreamInfo(`Video source updated (${sourceDescriptor.displayName})`);
     },
     [updateStatus, updateStreamInfo]
   );
@@ -243,6 +259,7 @@ export function StandalonePlayerPage() {
     updateStatus('ready', 'Player Ready');
     updateStreamInfo('Player cleared');
     setPlayerStats({ currentTime: 0, duration: 0, buffered: 0 });
+    setMediaSource(null);
     window.history.replaceState({}, document.title, window.location.pathname); // Clear query parameters from URL bar
 
     // Clear video source
@@ -310,6 +327,7 @@ export function StandalonePlayerPage() {
 
         <VideoPlayerSection
           videoJsOptions={videoJsOptions}
+          mediaSource={mediaSource}
           onTimeUpdate={handleTimeUpdate}
           onDurationChange={handleDurationChange}
           onStatusUpdate={updateStatus}

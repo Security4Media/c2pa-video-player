@@ -79,6 +79,24 @@ function syncMenuStateToPlayerRoot(
     });
 }
 
+function getStatusManifestId(c2paStatus: C2PAStatus | null) {
+    const manifestId =
+        c2paStatus?.manifestStore?.active_manifest ??
+        c2paStatus?.normalizedResult?.activeManifest?.id ??
+        null;
+
+    return typeof manifestId === 'string' ? manifestId : null;
+}
+
+function getStatusValidationState(c2paStatus: C2PAStatus | null) {
+    return (
+        c2paStatus?.validationState ??
+        c2paStatus?.manifestStore?.validation_state ??
+        c2paStatus?.normalizedResult?.validationState ??
+        'Unknown'
+    );
+}
+
 /**
  * Store the Video.js menu component reference used by the menu shell/bridge.
  *
@@ -133,6 +151,7 @@ export function handleMenuClosed() {
     playerRootController?.setState({
         isMenuOpen: false,
         menuResetKey: `${menuState.resetVersion}:${menuState.lastManifestId ?? 'none'}`,
+        selectedSegment: null,
     });
 }
 
@@ -153,7 +172,7 @@ export function updateC2PAMenu(
     }
 
     const c2paStatus = playerRootController?.getState().c2paStatus ?? null;
-    const currentManifestId = c2paStatus?.manifestStore?.active_manifest ?? null;
+    const currentManifestId = getStatusManifestId(c2paStatus);
     const manifestChanged = currentManifestId !== menuState.lastManifestId;
 
     if (menuState.isInvalid) {
@@ -171,9 +190,14 @@ export function updateC2PAMenu(
     if (manifestChanged) {
         menuState.lastManifestId = currentManifestId;
         menuState.resetVersion += 1;
+        // A selected fragment belongs to the manifest that was live when it
+        // was clicked; once the live manifest moves on, that selection is
+        // stale - drop it rather than showing an old fragment against new
+        // live playback context.
+        playerRootController?.setState({ selectedSegment: null });
     }
 
-    menuState.isInvalid = c2paStatus?.manifestStore?.validation_state === 'Invalid';
+    menuState.isInvalid = getStatusValidationState(c2paStatus) === 'Invalid';
     updateButtonValidationState(videoPlayer, menuState.isInvalid);
     syncMenuStateToPlayerRoot(c2paStatus);
 }
@@ -188,6 +212,7 @@ export function disposeC2PAMenu() {
         c2paStatus: null,
         timeline: createEmptyTimelineState(),
         menuResetKey: `${menuState.resetVersion}:none`,
+        selectedSegment: null,
     });
     playerRootController = null;
     resetMenuState();

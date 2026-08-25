@@ -14,18 +14,16 @@
  * limitations under the License.
  */
 
-export {
-    selectAiOptOutSection,
-    selectClaimGenerator,
-    selectClaimGeneratorSection,
-    selectCreativeWorkAuthors,
-    selectCreativeWorkContent,
-    selectCreativeWorkOrganization,
-    selectIngredients,
-    selectHistorySection,
-    selectOrganizationIdentity,
-    selectOrganizationSection,
-    selectSignatureIssuer,
-    selectSignatureTime,
-    selectWorkSection,
-} from './manifestSelectors';
+import type { ValidationPolicy } from '../types';
+import { LocalTrustMaterialProvider } from './localTrustMaterialProvider';
+
+const defaultTrustMaterialProvider = new LocalTrustMaterialProvider();
+
+export function createDefaultValidationPolicy(): ValidationPolicy {
+  return {
+    enableTrustVerification: true,
+    trustMaterialProvider: defaultTrustMaterialProvider,
+  };
+}
+
+export { LocalTrustMaterialProvider };

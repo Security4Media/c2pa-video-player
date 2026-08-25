@@ -1,5 +1,26 @@
 # React C2PA Player - Refactoring Summary
 
+## Status: Retired — describes a superseded architecture
+
+Everything below this note documents a refactor from before the current
+adapter/session/runtime/normalization architecture existed. None of the
+components or hooks it describes (`C2PAPlayer`, `C2PAStatusBadge`,
+`TimelineSegmentVisualizer`, `C2PAFrictionOverlay`, `useC2PAManifest`,
+`useC2PATimeline`, `useC2PAValidation`, `useC2PASeekHandler`,
+`useVideoPlayerInitializer`) exist in the codebase anymore — they (and the
+`INTEGRATION.md`/`COMPONENTS.md` docs referenced below) were removed as dead
+code once the adapter framework in `src/validation/` and the `C2paPlayer-V2/`
+UI superseded them.
+
+For the current architecture, public API, and development workflow, see
+**[README.md](./README.md)**.
+
+Kept as historical record of an earlier iteration; nothing below is current.
+
+---
+
+# React C2PA Player - Refactoring Summary
+
 ## Overview
 
 The React C2PA Player has been refactored to become a fully reusable component library with interactive UI elements that respond to C2PA manifest data extracted from videos.
@@ -376,3 +397,4 @@ The React C2PA Player is now:
 - ✅ **Production-Ready** - Optimized build
 
 The script logic from `cawg_c2pa_player.html` can now be moved into the React project using `useVideoPlayerInitializer`, making the entire setup fully reusable across projects.
+

@@ -47,6 +47,7 @@ function createInitialPlayerRootState(): C2PAPlayerRootState {
             segments: [],
         },
         menuResetKey: 'initial',
+        selectedSegment: null,
     };
 }
 

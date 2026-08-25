@@ -26,6 +26,7 @@ import {
   HistoryDetailView,
   HistorySection,
   InvalidState,
+  LiveSegmentDiagnosticsSection,
   LoadingState,
   MenuHeader,
   NoManifestState,
@@ -39,6 +40,8 @@ interface C2paMenuContentProps {
   sections: C2paMenuSections | null;
   mode: C2paMenuMode;
   resetKey: string;
+  isSegmentView: boolean;
+  onBackToLive: () => void;
 }
 
 /**
@@ -51,16 +54,20 @@ export function C2paMenuContent({
   sections,
   mode,
   resetKey,
+  isSegmentView,
+  onBackToLive,
 }: C2paMenuContentProps) {
   const [activeView, setActiveView] = useState<'default' | 'history'>('default');
   const [workExpanded, setWorkExpanded] = useState(false);
   const [aiOptOutExpanded, setAiOptOutExpanded] = useState(false);
+  const [liveSegmentsExpanded, setLiveSegmentsExpanded] = useState(false);
   const [ingredientsExpanded, setIngredientsExpanded] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     setActiveView('default');
     setWorkExpanded(false);
     setAiOptOutExpanded(false);
+    setLiveSegmentsExpanded(false);
     setIngredientsExpanded({});
   }, [resetKey]);
 
@@ -73,6 +80,19 @@ export function C2paMenuContent({
 
   let headerTitle = 'Content Credentials';
   let headerAction: ReactNode = null;
+
+  if (isSegmentView) {
+    headerAction = (
+      <button
+        className="c2pa-history-section__back-button c2pa-history-section__back-button--title"
+        type="button"
+        onClick={onBackToLive}
+        aria-label="Back to live status"
+      >
+        <span className="c2pa-history-section__back-icon">‹</span>
+      </button>
+    );
+  }
 
   if (mode === 'loading') {
     return (
@@ -91,17 +111,6 @@ export function C2paMenuContent({
         <MenuHeader title={headerTitle} />
         <ul className="vjs-menu-content c2pa-menu-content-list" role="menu">
           <NoManifestState />
-        </ul>
-      </div>
-    );
-  }
-
-  if (mode === 'invalid') {
-    return (
-      <div className="c2pa-menu-panel">
-        <MenuHeader title={headerTitle} />
-        <ul className="vjs-menu-content c2pa-menu-content-list" role="menu">
-          <InvalidState />
         </ul>
       </div>
     );
@@ -145,8 +154,9 @@ export function C2paMenuContent({
 
   return (
     <div className="c2pa-menu-panel">
-      <MenuHeader title={headerTitle} />
+      <MenuHeader title={headerTitle} leadingAction={headerAction} />
       <ul className="vjs-menu-content c2pa-menu-content-list" role="menu">
+        {mode === 'invalid' ? <InvalidState /> : null}
         <SummarySection section={sections.summary} sectionTitles={sectionTitles} />
         {sections.claimGenerator ? (
           <ClaimGeneratorSection
@@ -180,6 +190,14 @@ export function C2paMenuContent({
           <HistorySection
             title={sectionTitles.history}
             onOpen={() => setActiveView('history')}
+          />
+        ) : null}
+        {sections.liveSegments ? (
+          <LiveSegmentDiagnosticsSection
+            section={sections.liveSegments}
+            title={sectionTitles.liveSegments}
+            isExpanded={liveSegmentsExpanded}
+            onToggle={() => setLiveSegmentsExpanded(current => !current)}
           />
         ) : null}
       </ul>

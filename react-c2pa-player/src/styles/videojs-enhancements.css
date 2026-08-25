@@ -185,3 +185,11 @@
   top: 0;
   pointer-events: none;
 }
+
+/* Only non-Valid/Trusted segments are inspectable - re-enable pointer events
+   for just those so clicking one opens the menu on that fragment, while the
+   rest of the seekbar keeps click-to-seek working through the overlay. */
+.seekbar-play-c2pa--inspectable {
+  pointer-events: auto;
+  cursor: pointer;
+}

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-import type { ValidationState } from '@/types/c2pa.types';
+import type { C2PATimelineSegmentUpdate, ValidationState } from '@/types/c2pa.types';
 import type { C2PATimelineState } from '../C2PAPlayerRoot.types';
 import type { VideoJsPlayerLike } from '../C2paMenu/C2paMenu.types';
 
@@ -26,6 +26,19 @@ interface TimelineSegmentElement extends HTMLDivElement {
         endTime: string;
         verificationStatus: TimelineVerificationStatus;
     };
+    /**
+     * The full segment this element represents, when it was built from a
+     * real per-fragment `ValidationTimelineSegment` (replaceC2PATimelineSegments)
+     * rather than synthesized from a bare status string (the two legacy call
+     * sites below). Only elements carrying this are click-inspectable.
+     */
+    __c2paSegment?: C2PATimelineSegmentUpdate;
+}
+
+const INSPECTABLE_CLASS = 'seekbar-play-c2pa--inspectable';
+
+function isInspectableStatus(status: TimelineVerificationStatus): boolean {
+    return status !== 'Valid' && status !== 'Trusted';
 }
 
 interface TimelineComponentLike {
@@ -63,6 +76,11 @@ interface TimelineFunctions {
         videoPlayer: TimelineVideoPlayer,
         c2paControlBar: TimelineComponentLike,
     ) => void;
+    replaceC2PATimelineSegments: (
+        segments: C2PATimelineSegmentUpdate[],
+        videoPlayer: TimelineVideoPlayer,
+        c2paControlBar: TimelineComponentLike,
+    ) => void;
 }
 
 function isInvalidSegmentStatus(status: string) {
@@ -79,6 +97,24 @@ function normalizeVerificationStatus(status: string): TimelineVerificationStatus
     }
 
     return 'unknown';
+}
+
+/**
+ * Live sources report an indefinite/growing `duration()` (Infinity or NaN).
+ * Falling back to the current playhead (or the latest known segment
+ * boundary, whichever is larger) keeps the bar reading as "filled to the
+ * live edge" instead of leaving every segment at its default 0% width.
+ */
+function getEffectiveTimelineDuration(
+    rawDuration: number,
+    currentTime: number,
+    latestKnownEndTime: number,
+): number {
+    if (Number.isFinite(rawDuration) && rawDuration > 0) {
+        return rawDuration;
+    }
+
+    return Math.max(currentTime, latestKnownEndTime, 1);
 }
 
 function getSegmentColor(verificationStatus: TimelineVerificationStatus, isManifestInvalid = false) {
@@ -104,7 +140,9 @@ function getSegmentColor(verificationStatus: TimelineVerificationStatus, isManif
  *
  * @returns Typed timeline helpers for seek, validation, and segment updates
  */
-export function getTimelineFunctions(): TimelineFunctions {
+export function getTimelineFunctions(
+    onSegmentClick?: (segment: C2PATimelineSegmentUpdate) => void,
+): TimelineFunctions {
     let progressSegments: TimelineSegmentElement[] = [];
 
     const handleOnSeeked = function (time: number) {
@@ -128,6 +166,7 @@ export function getTimelineFunctions(): TimelineFunctions {
         segmentEndTime: number,
         verificationStatus: TimelineVerificationStatus,
         isManifestInvalid = false,
+        sourceSegment?: C2PATimelineSegmentUpdate,
     ) {
         const segment = document.createElement('div') as TimelineSegmentElement;
         segment.className = 'seekbar-play-c2pa';
@@ -136,7 +175,28 @@ export function getTimelineFunctions(): TimelineFunctions {
         segment.dataset.endTime = String(segmentEndTime);
         segment.dataset.verificationStatus = verificationStatus;
         segment.style.backgroundColor = getSegmentColor(verificationStatus, isManifestInvalid);
+
+        // Only real per-fragment segments (not the synthesized "unknown" gap
+        // filler or the legacy static-fallback status blob) are inspectable,
+        // and only when there's something worth inspecting - a Valid/Trusted
+        // fragment has nothing more to show than the live status already does.
+        if (sourceSegment && onSegmentClick && isInspectableStatus(verificationStatus)) {
+            segment.__c2paSegment = sourceSegment;
+            segment.classList.add(INSPECTABLE_CLASS);
+            segment.addEventListener('click', (event) => {
+                event.stopPropagation();
+                onSegmentClick(sourceSegment);
+            });
+        }
+
         return segment;
+    };
+
+    const removeProgressSegments = function () {
+        progressSegments.forEach((segment) => {
+            segment.remove();
+        });
+        progressSegments = [];
     };
 
     const updateC2PATimeline = function (
@@ -163,6 +223,12 @@ export function getTimelineFunctions(): TimelineFunctions {
             playProgressControl.style.color = lastSegment.style.backgroundColor;
         }
 
+        const effectiveDuration = getEffectiveTimelineDuration(
+            videoPlayer.duration(),
+            currentTime,
+            parseFloat(lastSegment.dataset.endTime),
+        );
+
         let numSegments = progressSegments.length;
         let isVideoSegmentInvalid = false;
 
@@ -172,9 +238,9 @@ export function getTimelineFunctions(): TimelineFunctions {
 
             let segmentProgressPercentage = 0;
             if (currentTime >= segmentStartTime && currentTime <= segmentEndTime) {
-                segmentProgressPercentage = (currentTime / videoPlayer.duration()) * 100;
+                segmentProgressPercentage = (currentTime / effectiveDuration) * 100;
             } else if (currentTime >= segmentEndTime) {
-                segmentProgressPercentage = (segmentEndTime / videoPlayer.duration()) * 100;
+                segmentProgressPercentage = (segmentEndTime / effectiveDuration) * 100;
             }
 
             console.log('[C2PA] Segment progress percentage: ', segmentProgressPercentage);
@@ -245,11 +311,7 @@ export function getTimelineFunctions(): TimelineFunctions {
 
         if (time === 0) {
             console.log('[C2PA] Player resetting');
-            progressSegments.forEach((segment) => {
-                segment.remove();
-            });
-
-            progressSegments = [];
+            removeProgressSegments();
             seeking = false;
 
             updateC2PAButton(videoPlayer);
@@ -332,6 +394,53 @@ export function getTimelineFunctions(): TimelineFunctions {
         }
     };
 
+    const replaceC2PATimelineSegments = function (
+        segments: C2PATimelineSegmentUpdate[],
+        videoPlayer: TimelineVideoPlayer,
+        c2paControlBar: TimelineComponentLike,
+    ) {
+        removeProgressSegments();
+
+        const sortedSegments = [...segments]
+            .filter((segment) => Number.isFinite(segment.startTime) && Number.isFinite(segment.endTime))
+            .filter((segment) => segment.endTime >= segment.startTime)
+            .sort((a, b) => a.startTime - b.startTime);
+
+        const latestKnownEndTime = sortedSegments.reduce(
+            (max, segment) => Math.max(max, segment.endTime),
+            0,
+        );
+        const effectiveDuration = getEffectiveTimelineDuration(
+            videoPlayer.duration(),
+            videoPlayer.currentTime(),
+            latestKnownEndTime,
+        );
+
+        sortedSegments.forEach((segment) => {
+            const verificationStatus = segment.pending
+                ? 'unknown'
+                : normalizeVerificationStatus(segment.validationState);
+            const timelineSegment = createTimelineSegment(
+                segment.startTime,
+                segment.endTime,
+                verificationStatus,
+                false,
+                // A pending segment has no verdict yet, so there's nothing to
+                // inspect even though it normalizes to the same "unknown"
+                // status as a real unverified/missing one.
+                segment.pending ? undefined : segment,
+            );
+
+            const width = Math.min(100, Math.max(0, (segment.endTime / effectiveDuration) * 100));
+            timelineSegment.style.width = `${width}%`;
+
+            c2paControlBar.el().appendChild(timelineSegment);
+            progressSegments.push(timelineSegment);
+        });
+
+        updateC2PATimeline(videoPlayer.currentTime(), videoPlayer, c2paControlBar);
+    };
+
     return {
         handleOnSeeked,
         handleOnSeeking,
@@ -339,5 +448,6 @@ export function getTimelineFunctions(): TimelineFunctions {
         getTimelineState,
         formatTime,
         updateC2PATimeline,
+        replaceC2PATimelineSegments,
     };
 }

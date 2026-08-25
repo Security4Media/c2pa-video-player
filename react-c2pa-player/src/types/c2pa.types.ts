@@ -15,19 +15,29 @@
  */
 
 import type { ManifestStore } from '@contentauth/c2pa-web';
+import type {
+  AdapterKind as C2PAAdapterKind,
+  NormalizedC2PAResult as C2PANormalizedResult,
+  PlayerValidationState,
+  ValidationTimelineSegment as C2PATimelineSegmentUpdate,
+} from '@/validation';
 
-export type PlayerValidationState = 'Trusted' | 'Valid' | 'Invalid' | 'Unknown';
+export type { PlayerValidationState };
 export type ValidationState = PlayerValidationState;
-
+export type { C2PAAdapterKind, C2PANormalizedResult, C2PATimelineSegmentUpdate };
 
 export interface C2PAStatus {
   manifestStore: ManifestStore | null;
   verificationStatus: PlayerValidationState;
   validationState?: PlayerValidationState;
+  adapterKind?: C2PAAdapterKind;
+  normalizedResult?: C2PANormalizedResult;
+  timelineSegments?: C2PATimelineSegmentUpdate[];
+  message?: string;
 }
 
 export interface C2PAPlayerProps {
-  videoPlayer: any; // videojs player instance
+  videoPlayer: any;
   videoElement: HTMLVideoElement;
   isMonolithic?: boolean;
 }

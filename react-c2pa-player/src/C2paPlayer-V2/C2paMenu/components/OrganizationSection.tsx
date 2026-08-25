@@ -91,6 +91,31 @@ function IdentityDetails({ itemValue }: { itemValue: CawgOrganizationItem }) {
           <span className="itemName">Under license:</span> <WebsiteLink href={itemValue.creativeWork.license} />
         </div>
       ) : null}
+      {itemValue.dublinCore?.title ? (
+        <div className="c2pa-org-section__row">
+          <span className="itemName">Title:</span> {itemValue.dublinCore.title}
+        </div>
+      ) : null}
+      {itemValue.dublinCore?.publisher ? (
+        <div className="c2pa-org-section__row">
+          <span className="itemName">Publisher:</span> {itemValue.dublinCore.publisher}
+        </div>
+      ) : null}
+      {itemValue.dublinCore?.creator ? (
+        <div className="c2pa-org-section__row">
+          <span className="itemName">Creator:</span> {itemValue.dublinCore.creator}
+        </div>
+      ) : null}
+      {itemValue.dublinCore?.description ? (
+        <div className="c2pa-org-section__row">
+          <span className="itemName">Description:</span> {itemValue.dublinCore.description}
+        </div>
+      ) : null}
+      {itemValue.dublinCore?.rights ? (
+        <div className="c2pa-org-section__row">
+          <span className="itemName">Rights:</span> {itemValue.dublinCore.rights}
+        </div>
+      ) : null}
     </div>
   );
 }

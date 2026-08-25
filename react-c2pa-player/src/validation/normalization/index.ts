@@ -14,8 +14,7 @@
  * limitations under the License.
  */
 
-export interface ProviderInfo {
-    name: string;
-}
-
-export function providerInfoFromSocialId(url: string): ProviderInfo | undefined;
+export { normalizeDashSegmentRecord } from './dash';
+export { normalizeHlsManifestHelper } from './hls';
+export { normalizeMonolithicManifestStore } from './monolithic';
+export { createCompatibilityManifestStore, createUnknownResult } from './shared';

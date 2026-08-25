@@ -14,11 +14,4 @@
  * limitations under the License.
  */
 
-// Export Video Player components
-export { VideoPlayerSection } from './components/VideoPlayerSection';
-
-// Export hooks
-export { useC2PAPlayer } from './hooks/useC2PAPlayer';
-
-// Export types
-export type { C2PAStatus } from './types/c2pa.types';
+export { FragmentedTimelineProjector } from './fragmentedTimelineProjector';

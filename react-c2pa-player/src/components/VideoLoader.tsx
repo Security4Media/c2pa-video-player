@@ -309,7 +309,7 @@ export const VideoLoader = memo(function VideoLoader({
         <input
           type="text"
           id="mp4Url"
-          placeholder="Select a video or enter MP4 URL..."
+          placeholder="Select a video or enter MP4/HLS URL..."
           value={mp4Url}
           onChange={(e) => onMp4UrlChange(e.target.value)}
         />
