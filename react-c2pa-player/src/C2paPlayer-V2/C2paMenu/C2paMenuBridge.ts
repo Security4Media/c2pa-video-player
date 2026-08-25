@@ -151,6 +151,7 @@ export function handleMenuClosed() {
     playerRootController?.setState({
         isMenuOpen: false,
         menuResetKey: `${menuState.resetVersion}:${menuState.lastManifestId ?? 'none'}`,
+        selectedSegment: null,
     });
 }
 
@@ -189,6 +190,11 @@ export function updateC2PAMenu(
     if (manifestChanged) {
         menuState.lastManifestId = currentManifestId;
         menuState.resetVersion += 1;
+        // A selected fragment belongs to the manifest that was live when it
+        // was clicked; once the live manifest moves on, that selection is
+        // stale - drop it rather than showing an old fragment against new
+        // live playback context.
+        playerRootController?.setState({ selectedSegment: null });
     }
 
     menuState.isInvalid = getStatusValidationState(c2paStatus) === 'Invalid';
@@ -206,6 +212,7 @@ export function disposeC2PAMenu() {
         c2paStatus: null,
         timeline: createEmptyTimelineState(),
         menuResetKey: `${menuState.resetVersion}:none`,
+        selectedSegment: null,
     });
     playerRootController = null;
     resetMenuState();
