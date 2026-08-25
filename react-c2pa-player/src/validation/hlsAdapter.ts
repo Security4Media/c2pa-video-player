@@ -128,7 +128,19 @@ class HlsFragmentedFmp4Session implements ValidationSession {
         : this.#snapshot.result;
 
     if (reader && result) {
-      this.#timelineProjector.observe(this.#lastPlaybackTime, result.validationState);
+      // No discrete segment boundary to pass (see the FragmentedTimelineProjector
+      // comment on `startTime`) - HLS samples the playhead rather than observing
+      // bridge-reported segment events - but `result.manifestSource` is still the
+      // real manifest active at this exact lookup, so it's still meaningful to
+      // attach: a merged run just ends up carrying whichever sample was most
+      // recent, same as it does for `endTime`.
+      this.#timelineProjector.observe(
+        this.#lastPlaybackTime,
+        result.validationState,
+        undefined,
+        undefined,
+        result.manifestSource,
+      );
       this.#timelineProjector.mergeInvalidIntervals(this.#runtime.getTamperedIntervals());
     }
 

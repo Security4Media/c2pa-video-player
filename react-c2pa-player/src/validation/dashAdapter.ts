@@ -113,6 +113,7 @@ class DashFragmentedFmp4Session implements ValidationSession {
         segment.result.validationState,
         [segment.diagnostic],
         segment.startTime,
+        segment.result.manifestSource,
       );
     });
   }

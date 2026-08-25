@@ -15,6 +15,7 @@
  */
 
 import type {
+  ManifestSource,
   PlayerValidationState,
   TimeInterval,
   TimelineSegmentDiagnostic,
@@ -29,7 +30,8 @@ export class FragmentedTimelineProjector {
     time: number,
     validationState: PlayerValidationState,
     diagnostics?: TimelineSegmentDiagnostic[],
-    startTime?: number
+    startTime?: number,
+    manifestRef?: ManifestSource
   ): void {
     if (!Number.isFinite(time)) {
       return;
@@ -57,12 +59,20 @@ export class FragmentedTimelineProjector {
         endTime: time,
         validationState,
         diagnostics,
+        manifestRef,
       });
     } else {
       lastSegment.endTime = Math.max(lastSegment.endTime, time);
 
       if (diagnostics?.length) {
         lastSegment.diagnostics = [...(lastSegment.diagnostics ?? []), ...diagnostics];
+      }
+
+      // Adjacent same-state observations get merged into one visual segment;
+      // keep the most recently observed manifestRef rather than the first,
+      // matching endTime's own "extend to latest" semantics.
+      if (manifestRef) {
+        lastSegment.manifestRef = manifestRef;
       }
     }
 
