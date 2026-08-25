@@ -21,8 +21,17 @@ import './VideoPlayerSection.css';
 import { PlayerStatus } from '@/types/player.types';
 import {
   createDefaultValidationAdapterRegistry,
+  type AdapterKind,
   type MediaSourceDescriptor,
 } from '@/validation';
+
+// Player-owning adapters (see capabilities.ownsPlayback below) each stream
+// their own kind of manifest; this message is shown while videojs is still
+// loading that source, before playback starts.
+const LOADING_MESSAGE_BY_ADAPTER_KIND: Partial<Record<AdapterKind, string>> = {
+  'hls-fragmented-fmp4': 'Loading HLS Playlist',
+  'dash-fragmented-fmp4': 'Loading DASH Stream',
+};
 
 
 interface VideoPlayerSectionProps {
@@ -138,7 +147,7 @@ export const VideoPlayerSection = memo(function VideoPlayerSection({
         });
 
         if (capabilities.ownsPlayback) {
-          initializeC2PAForPlayer('loading', 'Loading HLS Playlist');
+          initializeC2PAForPlayer('loading', LOADING_MESSAGE_BY_ADAPTER_KIND[adapterKind] ?? 'Loading stream');
         }
         
         player.on('playing', () => onStatusUpdate('ready', 'Playing'));
