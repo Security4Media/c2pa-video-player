@@ -28,7 +28,8 @@ export class FragmentedTimelineProjector {
   observe(
     time: number,
     validationState: PlayerValidationState,
-    diagnostics?: TimelineSegmentDiagnostic[]
+    diagnostics?: TimelineSegmentDiagnostic[],
+    startTime?: number
   ): void {
     if (!Number.isFinite(time)) {
       return;
@@ -39,11 +40,20 @@ export class FragmentedTimelineProjector {
     }
 
     const lastSegment = this.#segments[this.#segments.length - 1];
-    const startTime = this.#segments.length === 0 ? 0 : this.#lastObservedTime;
+    // Callers with real segment boundaries (DASH) pass their own startTime so
+    // joining mid-broadcast and genuine gaps between segments are represented
+    // accurately. Callers that only sample a playhead (HLS) omit it, falling
+    // back to the old contiguous-from-last-observation assumption.
+    const resolvedStartTime =
+      typeof startTime === 'number' && Number.isFinite(startTime)
+        ? startTime
+        : this.#segments.length === 0
+          ? 0
+          : this.#lastObservedTime;
 
     if (!lastSegment || lastSegment.validationState !== validationState) {
       this.#segments.push({
-        startTime,
+        startTime: resolvedStartTime,
         endTime: time,
         validationState,
         diagnostics,
