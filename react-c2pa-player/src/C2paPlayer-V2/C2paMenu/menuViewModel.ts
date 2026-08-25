@@ -20,6 +20,8 @@ import type { ValidationTimelineSegment } from '@/validation';
 import type { C2PATimelineState } from '../C2PAPlayerRoot.types';
 import { getActiveManifest, getActiveManifestValidationStatus } from '../../services/c2pa_functions';
 import {
+    resolveManifestFromSource,
+    resolveManifestStoreFromSource,
     selectAiOptOutSection,
     selectClaimGeneratorSection,
     selectHistorySection,
@@ -27,8 +29,7 @@ import {
     selectSignatureIssuer,
     selectSignatureTime,
     selectWorkSection,
-} from './C2paManifestFunctions';
-import { resolveManifestFromSource, resolveManifestStoreFromSource } from './manifestSelectors';
+} from './manifestSelectors';
 import type {
     AiOptOutSectionItem,
     ClaimGeneratorSectionItem,
