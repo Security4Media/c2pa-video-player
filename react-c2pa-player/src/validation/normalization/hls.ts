@@ -17,7 +17,7 @@
 import type { Manifest } from '@contentauth/c2pa-web';
 import type { C2paManifestHelper } from '@nettrek/c2pa-hls-bridge';
 import { getHlsValidationState } from '../rules';
-import type { NormalizedValidationResult } from '../types';
+import type { ManifestSource, NormalizedValidationResult } from '../types';
 import { createCompatibilityManifestStore } from './shared';
 
 export function normalizeHlsManifestHelper(reader: C2paManifestHelper): NormalizedValidationResult {
@@ -26,16 +26,30 @@ export function normalizeHlsManifestHelper(reader: C2paManifestHelper): Normaliz
   const validationState = getHlsValidationState(reader, containsSignature);
   const manifests = reader.getManifestMap() as Record<string, Manifest>;
   const activeManifest = reader.getActiveManifest() as Manifest | null;
+  // Still built and returned as `manifestStore` below: menuViewModel.ts's top-level
+  // validation-status computation reads it via getActiveManifestValidationStatus(),
+  // so this can't be dropped in favor of `manifestSource` alone yet (see Phase 2's
+  // report for why the migration stops short of full removal here).
   const manifestStore = createCompatibilityManifestStore(
     activeManifest,
     manifests,
     validationState,
     validationErrors,
   );
+  const manifestSource: ManifestSource = activeManifest
+    ? {
+        kind: 'single-manifest',
+        manifest: activeManifest,
+        manifests,
+        validationState,
+        validationErrors,
+      }
+    : { kind: 'none' };
 
   return {
     manifestStore,
     validationState,
     activeManifest,
+    manifestSource,
   };
 }
