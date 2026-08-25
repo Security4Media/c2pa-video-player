@@ -56,10 +56,45 @@ export interface ValidationPolicy {
   trustMaterialProvider: TrustMaterialProvider;
 }
 
+/**
+ * Status of one segment's cryptographic/structural check, as reported by a
+ * fragmented-stream validator that may have no manifest to attach a status
+ * to (e.g. a DASH segment covered only by continuity/replay checks).
+ */
+export type SegmentIntegrityStatus =
+  | 'valid'
+  | 'invalid'
+  | 'replayed'
+  | 'reordered'
+  | 'missing'
+  | 'warning'
+  | 'unverified';
+
+/**
+ * Adapter-agnostic description of where a validation result's manifest data
+ * (if any) came from. Lets menu/selector code branch on shape without each
+ * adapter having to fabricate a `ManifestStore`-shaped compatibility object
+ * (see `normalization/shared.ts`'s `createCompatibilityManifestStore`, which
+ * predates this type and is still used where a real trust-anchor-aware
+ * `ManifestStore` is genuinely available).
+ */
+export type ManifestSource =
+  | { kind: 'manifest-store'; manifestStore: ManifestStore }
+  | {
+      kind: 'single-manifest';
+      manifest: Manifest;
+      manifests: Record<string, Manifest>;
+      validationState: PlayerValidationState;
+      validationErrors: unknown[];
+    }
+  | { kind: 'integrity-only'; integrityStatus: SegmentIntegrityStatus; sequenceReason?: string; errorCodes?: string[] }
+  | { kind: 'none' };
+
 export interface NormalizedValidationResult {
   manifestStore: ManifestStore | null;
   validationState: PlayerValidationState;
   activeManifest: Manifest | null;
+  manifestSource?: ManifestSource;
 }
 
 export type NormalizedC2PAResult = NormalizedValidationResult;
@@ -81,6 +116,7 @@ export interface ValidationTimelineSegment {
   sourceSegmentId?: string;
   pending?: boolean;
   diagnostics?: TimelineSegmentDiagnostic[];
+  manifestRef?: ManifestSource;
 }
 
 export interface TimeInterval {
