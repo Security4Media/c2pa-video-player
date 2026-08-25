@@ -15,6 +15,7 @@
  */
 
 import type { C2PAStatus, ValidationState } from '@/types/c2pa.types';
+import type { ValidationTimelineSegment } from '@/validation';
 import type { Root } from 'react-dom/client';
 
 export interface C2PATimelineSegmentState {
@@ -36,6 +37,13 @@ export interface C2PAPlayerRootState {
     c2paStatus: C2PAStatus | null;
     timeline: C2PATimelineState;
     menuResetKey: string;
+    /**
+     * A timeline fragment the user clicked to inspect, or null when showing
+     * the live/current status. Set by the raw DOM click handler on rendered
+     * timeline segments (outside the React tree - see C2paTimelineFunctions.ts)
+     * and read by the menu to switch into a per-segment detail view.
+     */
+    selectedSegment: ValidationTimelineSegment | null;
 }
 
 export interface C2PAPlayerRootController {
