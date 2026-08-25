@@ -191,6 +191,61 @@
 }
 
 /* C2PA Timeline Segments */
+
+/* The segments are layered on each other with descending z-indexes (earlier
+   segment on top), and that range grows with the number of segments. Making
+   their host its own stacking context keeps all of it contained at one level,
+   so the playhead handle below only has to outrank this single value rather
+   than the highest segment index. */
+.video-js .vjs-progress-control .c2pa-timeline-host {
+  position: relative;
+  z-index: 1;
+}
+
+/* Keep the playhead handle visible above the segments.
+
+   These selectors are deliberately over-qualified (four classes) rather than
+   relying on cascade order. video.js's own stylesheet is injected *after* this
+   one - it arrives both from the CDN <link> in index.html and from the
+   `video.js/dist/video-js.css` module import in VideoJS.tsx - so any rule of
+   ours at equal specificity loses. That is what silently reduced this handle
+   to video.js's own `z-index: 1` (video-js.css:1059), tying with the segment
+   host and losing to it on DOM order, and left `content` blank so no handle
+   was drawn at all.
+
+   `.vjs-play-progress` itself is left at `z-index: auto` on purpose: it must
+   stay *behind* the segments, since its own background would otherwise hide
+   them. Only the handle is lifted. z-index 3 clears both the segment host and
+   `.vjs-mouse-display`, which video.js puts at 1.
+
+   The handle is drawn here as a plain round box rather than reusing video.js's
+   icon-font glyph. Two video.js stylesheets are in play (the CDN 8.3.0 <link>
+   and the bundled 8.23.7 module import) and between them the glyph's `content`
+   ends up empty, so nothing rendered. A self-contained circle sidesteps the
+   icon-font and SVG-icon paths altogether. White, because it has to stay
+   legible against all four verdict colours as well as the grey track. */
+.video-js .vjs-progress-control .vjs-progress-holder .vjs-play-progress::before {
+  content: '';
+  display: block;
+  position: absolute;
+  right: -0.35em;
+  top: 50%;
+  width: 0.7em;
+  height: 0.7em;
+  margin-top: -0.35em;
+  border-radius: 50%;
+  background-color: #fff;
+  box-shadow: 0 0 2px rgba(0, 0, 0, 0.6);
+  z-index: 3;
+}
+
+/* Same handle, for builds where video.js renders it as an SVG element instead
+   of the pseudo-element above (it suppresses `::before` when SVG icons are
+   enabled - video-js.css:1067). */
+.video-js .vjs-progress-control .vjs-progress-holder .vjs-play-progress .vjs-svg-icon {
+  z-index: 3;
+}
+
 .seekbar-play-c2pa {
   position: absolute;
   height: 100%;

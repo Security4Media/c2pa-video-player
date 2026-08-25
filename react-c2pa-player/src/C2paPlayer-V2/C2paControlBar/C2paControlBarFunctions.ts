@@ -71,4 +71,10 @@ export const initializeC2PAControlBar = function (videoPlayer: ControlBarPlayer)
 
     c2paTimeline.el().style.width = '100%';
     c2paTimeline.el().style.backgroundColor = 'transparent';
+    // Distinguishes our segment host from video.js's own `.vjs-load-progress`
+    // (both carry that class, since this component extends LoadProgressBar).
+    // The stylesheet uses it to contain the segments' z-index range in their
+    // own stacking context, so the playhead handle can sit above the whole
+    // stack no matter how many segments there are.
+    c2paTimeline.el().classList.add('c2pa-timeline-host');
 };
