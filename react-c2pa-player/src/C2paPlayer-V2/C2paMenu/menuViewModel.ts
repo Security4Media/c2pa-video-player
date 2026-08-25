@@ -197,11 +197,21 @@ export function buildMenuRenderState(
             ? resolveManifestStoreFromSource(normalizedResult?.manifestSource, manifestId, validationStatus)
             : null);
 
-    // Still build sections when invalid: the manifest parsed and its claimed
-    // content (issuer, CAWG identity, actions) is worth showing to the user
-    // alongside the invalid warning, even though it couldn't be verified.
+    // An invalid manifest's claimed content (issuer, CAWG identity, actions,
+    // ...) is unverified by definition, so none of it is trustworthy enough
+    // to show alongside the failure - surface only the failure message,
+    // for every adapter (monolithic, HLS, DASH, live or VOD) alike.
+    if (validationStatus === 'Invalid') {
+        return {
+            mode: 'invalid',
+            manifestId,
+            isSegmentView: false,
+            sections: buildInvalidOnlySections(buildAlertMessage(timeline)),
+        };
+    }
+
     return {
-        mode: validationStatus === 'Invalid' ? 'invalid' : 'ready',
+        mode: 'ready',
         manifestId,
         isSegmentView: false,
         sections: {
@@ -220,6 +230,28 @@ export function buildMenuRenderState(
                 : null,
             liveSegments: selectLiveSegmentsSection(c2paStatus?.timelineSegments),
         },
+    };
+}
+
+/**
+ * Sections for the 'invalid' mode: only the failure message is trustworthy
+ * enough to show, so every other section (claim generator, organization,
+ * work, AI opt-out, history, live segment diagnostics) is suppressed.
+ */
+function buildInvalidOnlySections(alert: string | null): C2paMenuSections {
+    return {
+        summary: {
+            issuer: null,
+            issuedOn: null,
+            validationStatus: null,
+            alert,
+        },
+        claimGenerator: null,
+        organization: null,
+        work: null,
+        aiOptOut: null,
+        history: null,
+        liveSegments: null,
     };
 }
 
@@ -275,13 +307,22 @@ function buildSegmentMenuRenderState(segment: ValidationTimelineSegment): C2paMe
         };
     }
 
+    if (validationStatus === 'Invalid') {
+        return {
+            mode: 'invalid',
+            manifestId: getManifestId(activeManifest, null),
+            isSegmentView: true,
+            sections: buildInvalidOnlySections(alert),
+        };
+    }
+
     const manifestId = getManifestId(activeManifest, null);
     const selectorManifestStore = manifestId
         ? resolveManifestStoreFromSource(segment.manifestRef, manifestId, validationStatus)
         : null;
 
     return {
-        mode: validationStatus === 'Invalid' ? 'invalid' : 'ready',
+        mode: 'ready',
         manifestId,
         isSegmentView: true,
         sections: {
