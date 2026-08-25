@@ -19,10 +19,11 @@ import type {
     C2PAPlayerRootController,
     C2PATimelineState,
 } from './C2PAPlayerRoot.types';
-import type { VideoJsPlayerLike } from './C2paMenu/C2paMenu.types';
+import type { VideoJsMenuButtonComponentLike, VideoJsPlayerLike } from './C2paMenu/C2paMenu.types';
 import type {
     AdapterCapabilities,
     ValidationStatusSnapshot,
+    ValidationTimelineSegment,
 } from '../validation';
 import { createC2PAStatusFromSnapshot } from '../validation';
 import { initializeC2PAControlBar } from './C2paControlBar/C2paControlBarFunctions';
@@ -34,6 +35,7 @@ import {
 } from './C2paFrictionModal/C2paFrictionModalFunctions';
 import {
     disposeC2PAMenu,
+    handleMenuOpened,
     initializeC2PAMenu,
     setPlayerRootController,
     updateC2PAMenu,
@@ -123,6 +125,26 @@ export const C2PAPlayer = function (
 
     let c2paMenu: TimelineComponentLike | null = null;
     let c2paControlBar: TimelineComponentLike | null = null;
+    let playerRoot: C2PAPlayerRootController | null = null;
+
+    // Referenced by name (not called) before playerRoot is assigned below -
+    // by the time a user can actually click a segment, initialize() has
+    // already run and playerRoot is set.
+    const handleTimelineSegmentClick = function (segment: ValidationTimelineSegment) {
+        if (!playerRoot) {
+            return;
+        }
+
+        // Mirrors what the menu button's own handleClick() does when opened
+        // normally: without this, the next playbackUpdate tick's
+        // updateC2PAMenu() -> syncMenuStateToPlayerRoot() would overwrite
+        // isMenuOpen back to false from the bridge's own (still-closed)
+        // tracked state.
+        handleMenuOpened();
+        (c2paMenu as VideoJsMenuButtonComponentLike | null)?.pressButton?.();
+        playerRoot.setState({ selectedSegment: segment, isMenuOpen: true });
+    };
+
     const {
         getTimelineState,
         handleC2PAValidation,
@@ -130,9 +152,8 @@ export const C2PAPlayer = function (
         handleOnSeeking,
         updateC2PATimeline,
         replaceC2PATimelineSegments,
-    } = getTimelineFunctions() as TimelineFunctions;
+    } = getTimelineFunctions(handleTimelineSegmentClick) as TimelineFunctions;
 
-    let playerRoot: C2PAPlayerRootController | null = null;
     let isManifestInvalid = false;
     let seeking = false;
     let playbackStarted = false;

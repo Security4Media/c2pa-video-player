@@ -22,6 +22,7 @@
 export { initializeC2PAMenu } from './C2paMenuShell';
 export {
     disposeC2PAMenu,
+    handleMenuOpened,
     setPlayerRootController,
     updateC2PAMenu,
 } from './C2paMenuBridge';

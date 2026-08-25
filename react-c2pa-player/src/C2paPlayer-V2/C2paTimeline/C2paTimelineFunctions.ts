@@ -26,6 +26,19 @@ interface TimelineSegmentElement extends HTMLDivElement {
         endTime: string;
         verificationStatus: TimelineVerificationStatus;
     };
+    /**
+     * The full segment this element represents, when it was built from a
+     * real per-fragment `ValidationTimelineSegment` (replaceC2PATimelineSegments)
+     * rather than synthesized from a bare status string (the two legacy call
+     * sites below). Only elements carrying this are click-inspectable.
+     */
+    __c2paSegment?: C2PATimelineSegmentUpdate;
+}
+
+const INSPECTABLE_CLASS = 'seekbar-play-c2pa--inspectable';
+
+function isInspectableStatus(status: TimelineVerificationStatus): boolean {
+    return status !== 'Valid' && status !== 'Trusted';
 }
 
 interface TimelineComponentLike {
@@ -127,7 +140,9 @@ function getSegmentColor(verificationStatus: TimelineVerificationStatus, isManif
  *
  * @returns Typed timeline helpers for seek, validation, and segment updates
  */
-export function getTimelineFunctions(): TimelineFunctions {
+export function getTimelineFunctions(
+    onSegmentClick?: (segment: C2PATimelineSegmentUpdate) => void,
+): TimelineFunctions {
     let progressSegments: TimelineSegmentElement[] = [];
 
     const handleOnSeeked = function (time: number) {
@@ -151,6 +166,7 @@ export function getTimelineFunctions(): TimelineFunctions {
         segmentEndTime: number,
         verificationStatus: TimelineVerificationStatus,
         isManifestInvalid = false,
+        sourceSegment?: C2PATimelineSegmentUpdate,
     ) {
         const segment = document.createElement('div') as TimelineSegmentElement;
         segment.className = 'seekbar-play-c2pa';
@@ -159,6 +175,20 @@ export function getTimelineFunctions(): TimelineFunctions {
         segment.dataset.endTime = String(segmentEndTime);
         segment.dataset.verificationStatus = verificationStatus;
         segment.style.backgroundColor = getSegmentColor(verificationStatus, isManifestInvalid);
+
+        // Only real per-fragment segments (not the synthesized "unknown" gap
+        // filler or the legacy static-fallback status blob) are inspectable,
+        // and only when there's something worth inspecting - a Valid/Trusted
+        // fragment has nothing more to show than the live status already does.
+        if (sourceSegment && onSegmentClick && isInspectableStatus(verificationStatus)) {
+            segment.__c2paSegment = sourceSegment;
+            segment.classList.add(INSPECTABLE_CLASS);
+            segment.addEventListener('click', (event) => {
+                event.stopPropagation();
+                onSegmentClick(sourceSegment);
+            });
+        }
+
         return segment;
     };
 
@@ -394,6 +424,11 @@ export function getTimelineFunctions(): TimelineFunctions {
                 segment.startTime,
                 segment.endTime,
                 verificationStatus,
+                false,
+                // A pending segment has no verdict yet, so there's nothing to
+                // inspect even though it normalizes to the same "unknown"
+                // status as a real unverified/missing one.
+                segment.pending ? undefined : segment,
             );
 
             const width = Math.min(100, Math.max(0, (segment.endTime / effectiveDuration) * 100));
