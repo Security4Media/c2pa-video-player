@@ -42,15 +42,8 @@ export default defineConfig({
             return req.url;
           }
         },
-      },   
-      '/trust': {
-        target: 'http://localhost:9000',
-        changeOrigin: true,
-        bypass: (req, res, options) => {
-            return req.url;
-          }
-        }
       },
+    },
   },
   build: {
     emptyOutDir: true,
