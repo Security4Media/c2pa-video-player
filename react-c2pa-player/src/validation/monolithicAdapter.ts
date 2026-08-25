@@ -31,7 +31,6 @@ const MONOLITHIC_CAPABILITIES = {
   ownsPlayback: false,
   providesTimelineSegments: false,
   supportsLookupByTime: false,
-  supportsTrustVerification: true,
 } as const;
 
 export class MonolithicC2PAAdapter implements MediaValidationAdapter {

@@ -38,7 +38,6 @@ export interface AdapterCapabilities {
   ownsPlayback: boolean;
   providesTimelineSegments: boolean;
   supportsLookupByTime: boolean;
-  supportsTrustVerification: boolean;
 }
 
 export interface TrustMaterial {

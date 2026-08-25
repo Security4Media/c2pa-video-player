@@ -29,7 +29,6 @@ export class UnsupportedValidationAdapter implements MediaValidationAdapter {
     ownsPlayback: false,
     providesTimelineSegments: false,
     supportsLookupByTime: false,
-    supportsTrustVerification: false,
   } as const;
 
   canHandle(): boolean {

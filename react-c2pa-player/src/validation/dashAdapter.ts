@@ -32,11 +32,6 @@ const DASH_CAPABILITIES = {
   ownsPlayback: true,
   providesTimelineSegments: true,
   supportsLookupByTime: true,
-  // @svta/cml-c2pa (behind the plugin) only performs cryptographic/structural
-  // validation — it does not check the signing certificate against a trust
-  // anchor list, so this adapter cannot honor enableTrustVerification the way
-  // monolithic/HLS do.
-  supportsTrustVerification: false,
 } as const;
 
 export class DashFragmentedFmp4Adapter implements MediaValidationAdapter {

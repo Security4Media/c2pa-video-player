@@ -67,7 +67,6 @@ export const VideoPlayerSection = memo(function VideoPlayerSection({
     ownsPlayback: false,
     providesTimelineSegments: false,
     supportsLookupByTime: false,
-    supportsTrustVerification: false,
   };
   const currentSource = mediaSource?.url || videoJsOptions.sources?.[0]?.src || '';
   const resolvedVideoJsOptions = useMemo(() => ({
