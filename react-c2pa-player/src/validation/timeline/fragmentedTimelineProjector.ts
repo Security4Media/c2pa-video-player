@@ -17,7 +17,6 @@
 import type {
   ManifestSource,
   PlayerValidationState,
-  TimeInterval,
   TimelineSegmentDiagnostic,
   ValidationTimelineSegment,
 } from '../types';
@@ -44,8 +43,10 @@ const MERGE_EPSILON_SECONDS = 0.001;
 
 /**
  * Builds the seek-bar's per-fragment validation timeline from a stream of
- * `observe()` calls (HLS: playhead samples; DASH: real segment boundaries as
- * they validate).
+ * `observe()` calls. Both adapters report real fragment boundaries: DASH as
+ * each segment validates, HLS by enumerating the fragments its bridge has
+ * already validated (see `runtimes/hlsBridgeRuntime.ts#getFragmentVerdicts`).
+ * Callers holding only a playhead sample may omit `startTime`.
  *
  * Backward-time observations are handled differently depending on
  * `setLiveMode`:
@@ -62,7 +63,6 @@ export class FragmentedTimelineProjector {
   #segments: ValidationTimelineSegment[] = [];
   #lastObservedTime = 0;
   #isLive = false;
-  #mergedTamperedIntervalKeys = new Set<string>();
 
   /**
    * Informs the projector whether the source being observed is a confirmed
@@ -100,9 +100,9 @@ export class FragmentedTimelineProjector {
         ? 0
         // Forward/no-op move: unchanged fallback (extend from where the last
         // observation left off). Backward move with no explicit boundary
-        // (HLS's case, which only samples the playhead): collapse to a point
-        // rather than fabricating a wide interval back to #lastObservedTime,
-        // which would misrepresent an unvisited gap as known.
+        // (a bare playhead sample): collapse to a point rather than
+        // fabricating a wide interval back to #lastObservedTime, which would
+        // misrepresent an unvisited gap as known.
         : isBackward
           ? time
           : this.#lastObservedTime;
@@ -113,13 +113,13 @@ export class FragmentedTimelineProjector {
     const lastSegment = this.#segments[this.#segments.length - 1];
 
     // Fast path: this observation only extends past the chronologically-latest
-    // segment's current end - ordinary forward playback ticks, or DASH's
-    // ordinary next-contiguous-segment arrival. Cheap, no need to scan/rebuild
-    // the array. The `safeEnd >= lastSegment.endTime` check specifically rules
-    // out a correction that lands *inside* the last segment's existing range
-    // (e.g. a DASH re-fetch after a VOD backward seek re-validating a segment
-    // it already covered) - that case needs real splitting, not a blind
-    // append, so it falls through to the general upsert below instead.
+    // segment's current end - ordinary forward playback ticks, or the next
+    // contiguous fragment arriving. Cheap, no need to scan/rebuild the array.
+    // The `safeEnd >= lastSegment.endTime` check rules out a correction that
+    // lands *inside* the last segment's existing range (e.g. re-validating a
+    // fragment already covered, after a VOD backward seek) - that needs real
+    // splitting, not a blind append, so it falls through to the general
+    // upsert below instead.
     if (
       lastSegment &&
       safeStart >= lastSegment.startTime &&
@@ -163,42 +163,6 @@ export class FragmentedTimelineProjector {
     }
   }
 
-  /**
-   * `intervals` is the bridge's full, cumulative list of tampered-with
-   * ranges (see HlsBridgeRuntime.getTamperedIntervals), not a delta, and this
-   * is called on every snapshot rebuild (every playback tick) - so already-
-   * incorporated intervals are tracked and skipped, otherwise the same
-   * interval would be pushed and re-merged again on every single call,
-   * accumulating duplicate/conflicting entries for the same span over time.
-   */
-  mergeInvalidIntervals(intervals: TimeInterval[]): void {
-    const newIntervals = intervals.filter((interval) => {
-      const key = `${interval.startTime}-${interval.endTime}`;
-
-      if (this.#mergedTamperedIntervalKeys.has(key)) {
-        return false;
-      }
-
-      this.#mergedTamperedIntervalKeys.add(key);
-      return true;
-    });
-
-    if (newIntervals.length === 0) {
-      return;
-    }
-
-    newIntervals.forEach((interval) => {
-      this.#segments.push({
-        startTime: interval.startTime,
-        endTime: interval.endTime,
-        validationState: 'Invalid',
-        sourceSegmentId: 'tampered',
-      });
-    });
-
-    this.#segments = mergeSegments(this.#segments);
-  }
-
   snapshot(): ValidationTimelineSegment[] {
     return this.#segments.map((segment) => ({ ...segment }));
   }
@@ -239,7 +203,7 @@ function capDiagnostics(
 }
 
 /**
- * Upserts `newSegment` into the sorted, non-overlapping `segments` array:
+ * Inserts one interval into the sorted, non-overlapping `segments` array:
  * trims or splits any existing segment(s) that overlap `newSegment`'s range
  * (a segment fully covered by `newSegment` contributes nothing; a segment
  * only partially overlapping keeps its non-overlapping remainder), inserts
@@ -313,9 +277,8 @@ function mergeSegments(
 
     const overlaps = segment.startTime <= previous.endTime + MERGE_EPSILON_SECONDS;
     const sameState = segment.validationState === previous.validationState;
-    const sameSource = segment.sourceSegmentId === previous.sourceSegmentId;
 
-    if (overlaps && sameState && sameSource) {
+    if (overlaps && sameState) {
       previous.endTime = Math.max(previous.endTime, segment.endTime);
 
       if (segment.diagnostics?.length) {

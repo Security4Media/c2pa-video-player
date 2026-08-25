@@ -109,12 +109,48 @@ function selectLiveSegmentsSection(
     };
 }
 
-function buildAlertMessage(timeline: C2PATimelineState) {
-    if (timeline.compromisedRegions.length > 0) {
-        return `The segment between ${timeline.compromisedRegions.join(', ')} may have been tampered with`;
+function formatClock(totalSeconds: number) {
+    const wholeSeconds = Math.max(0, Math.floor(totalSeconds));
+
+    return `${String(Math.floor(wholeSeconds / 60)).padStart(2, '0')}:${String(wholeSeconds % 60).padStart(2, '0')}`;
+}
+
+/**
+ * Rounds a range outward to whole seconds. C2PA fragments are often shorter
+ * than the mm:ss display resolution, so a truthful `[0.02, 0.6]` would read
+ * as "00:00-00:00"; widening to at least one second keeps it legible and
+ * never understates the affected region.
+ */
+function formatCompromisedRange(startTime: number, endTime: number) {
+    const start = Math.max(0, Math.floor(startTime));
+
+    return `${formatClock(start)}-${formatClock(Math.max(start + 1, Math.ceil(endTime)))}`;
+}
+
+/**
+ * Ranges are derived from the validation timeline itself rather than from
+ * `timeline.compromisedRegions`, which is read back out of the rendered DOM
+ * and so reflects whatever the renderer did to the values. Monolithic sources
+ * report no per-fragment segments, so they still fall back to it (their
+ * "region" is the whole asset).
+ */
+function buildAlertMessage(
+    timeline: C2PATimelineState,
+    timelineSegments: C2PAStatus['timelineSegments'],
+) {
+    const invalidRanges = (timelineSegments ?? [])
+        .filter((segment) => segment.validationState === 'Invalid')
+        .filter((segment) => Number.isFinite(segment.startTime) && Number.isFinite(segment.endTime))
+        .map((segment) => formatCompromisedRange(segment.startTime, segment.endTime));
+    const ranges = invalidRanges.length > 0 ? invalidRanges : timeline.compromisedRegions;
+
+    if (ranges.length === 0) {
+        return null;
     }
 
-    return null;
+    const label = ranges.length === 1 ? 'The segment between' : 'The segments between';
+
+    return `${label} ${[...new Set(ranges)].join(', ')} may have been tampered with`;
 }
 
 function formatSignatureDate(timeValue: string | null) {
@@ -206,7 +242,10 @@ export function buildMenuRenderState(
             mode: 'invalid',
             manifestId,
             isSegmentView: false,
-            sections: buildInvalidOnlySections(buildAlertMessage(timeline)),
+            sections: buildInvalidOnlySections(
+                buildAlertMessage(timeline, c2paStatus?.timelineSegments),
+                selectLiveSegmentsSection(c2paStatus?.timelineSegments),
+            ),
         };
     }
 
@@ -219,7 +258,7 @@ export function buildMenuRenderState(
                 issuer: selectSignatureIssuer(activeManifest),
                 issuedOn: formatSignatureDate(selectSignatureTime(activeManifest)),
                 validationStatus: validationStatus ?? 'Unknown',
-                alert: buildAlertMessage(timeline),
+                alert: buildAlertMessage(timeline, c2paStatus?.timelineSegments),
             },
             claimGenerator: selectClaimGeneratorSection(activeManifest),
             organization: selectOrganizationSection(activeManifest, selectorManifestStore ?? undefined),
@@ -234,11 +273,17 @@ export function buildMenuRenderState(
 }
 
 /**
- * Sections for the 'invalid' mode: only the failure message is trustworthy
- * enough to show, so every other section (claim generator, organization,
- * work, AI opt-out, history, live segment diagnostics) is suppressed.
+ * Sections for the 'invalid' mode: nothing the manifest *claims* is
+ * trustworthy enough to show, so claim generator, organization, work, AI
+ * opt-out and history are all suppressed. The failure message and the
+ * per-segment issue list are kept - they describe the failure itself rather
+ * than asserting anything on the unverified manifest's behalf, and they are
+ * the detail a user needs to understand what went wrong.
  */
-function buildInvalidOnlySections(alert: string | null): C2paMenuSections {
+function buildInvalidOnlySections(
+    alert: string | null,
+    liveSegments: LiveSegmentDiagnosticsSectionItem | null,
+): C2paMenuSections {
     return {
         summary: {
             issuer: null,
@@ -251,7 +296,7 @@ function buildInvalidOnlySections(alert: string | null): C2paMenuSections {
         work: null,
         aiOptOut: null,
         history: null,
-        liveSegments: null,
+        liveSegments,
     };
 }
 
@@ -312,7 +357,10 @@ function buildSegmentMenuRenderState(segment: ValidationTimelineSegment): C2paMe
             mode: 'invalid',
             manifestId: getManifestId(activeManifest, null),
             isSegmentView: true,
-            sections: buildInvalidOnlySections(alert),
+            // No segment-issue list in a single-fragment view: that list is
+            // about anomalies across the whole timeline, not this fragment,
+            // whose own verdict is already the subject of this view.
+            sections: buildInvalidOnlySections(alert, null),
         };
     }
 

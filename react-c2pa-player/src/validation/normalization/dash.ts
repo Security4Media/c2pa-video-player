@@ -63,15 +63,12 @@ function toDiagnostic(record: SegmentRecord): TimelineSegmentDiagnostic {
 
 /**
  * Normalizes one plugin `SegmentRecord` into the shared validation result
- * shape. `manifestStore` is deliberately left `null` rather than built via
- * the shared `createCompatibilityManifestStore` helper: that helper injects
- * a generic success code whenever the state isn't 'Invalid', which the
- * menu's `getManifestStoreValidationState` reads as "Trusted" — a fair
- * shortcut for HLS/monolithic, whose validators do check a trust anchor
- * list, but not for @svta/cml-c2pa, which never does. Leaving
- * `manifestStore` unset makes the menu fall back to `validationState`
- * as-is (see `menuViewModel.ts`'s `buildMenuRenderState`), preserving the
- * Valid/Invalid/Unknown distinction from `getDashSegmentValidationState`.
+ * shape. `manifestStore` is deliberately left `null` (same as HLS's
+ * normalizeHlsManifestHelper): leaving it unset makes the menu fall back to
+ * `validationState` as-is (see `menuViewModel.ts`'s `buildMenuRenderState`),
+ * preserving the Valid/Invalid/Unknown distinction from
+ * `getDashSegmentValidationState` - @svta/cml-c2pa never checks a trust
+ * anchor list, so this adapter's result is never 'Trusted' anyway.
  *
  * `record.manifest` is only populated when the manifest is new or changed
  * (see `record.previousManifestId`); `latestManifest` carries the last known

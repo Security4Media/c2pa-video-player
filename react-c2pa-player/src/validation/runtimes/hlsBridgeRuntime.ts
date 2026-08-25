@@ -20,9 +20,17 @@ import {
 } from '@nettrek/c2pa-hls-bridge';
 import Hls from 'hls.js';
 import { Emitter, type EmitterListener } from '../emitter';
-import type { TimeInterval, ValidationAdapterContext } from '../types';
+import { getHlsValidationState } from '../rules';
+import type { PlayerValidationState, TimeInterval, ValidationAdapterContext } from '../types';
 
 type RuntimeListener = EmitterListener<void>;
+
+/** One fragment's real presentation bounds plus its own validation verdict. */
+export interface FragmentVerdict {
+  startTime: number;
+  endTime: number;
+  validationState: PlayerValidationState;
+}
 
 export class HlsBridgeRuntime {
   readonly #context: ValidationAdapterContext;
@@ -77,7 +85,15 @@ export class HlsBridgeRuntime {
         enableExperimentalWebCrypto: true,
         wasmSrc: trustMaterial.wasmSrc,
         trust: this.#context.policy.enableTrustVerification ? trustMaterial.trust : undefined,
-        cawgTrust: this.#context.policy.enableTrustVerification ? trustMaterial.cawgTrust : undefined,
+        // Evaluate the `cawg.identity` assertion's signer against the same
+        // C2PA trust material rather than a separate CAWG-only policy. Per
+        // c2pa-rs the CAWG identity is otherwise checked against its own
+        // (effectively empty) policy, so a signer we do trust for the claim
+        // still reports `cawg.identity.untrusted` and the asset can never
+        // reach 'Trusted'. This is the bridge's documented opt-in for exactly
+        // that case (dist/C2paBridge.d.ts:38-47), and it keeps one list to
+        // maintain instead of two that have already drifted apart.
+        enableCawgIdentityTrustVerification: this.#context.policy.enableTrustVerification,
       },
       hls as never,
     );
@@ -130,10 +146,58 @@ export class HlsBridgeRuntime {
     return this.#bridge?.getC2PAMetaByTimeCode(time) ?? null;
   }
 
-  getTamperedIntervals(): TimeInterval[] {
-    return (this.#bridge?.getTamperedWithIntervals() ?? [])
+  /**
+   * Every fragment the bridge has validated so far, with its real
+   * presentation bounds and its own verdict.
+   *
+   * `getTamperedWithIntervals()` is used purely as an *enumeration* of known
+   * fragments, not as a list of tampered ones. Its filter is
+   * `!item.value.manifestReader.valid`, but `C2paManifestHelper` exposes only
+   * an `isValid()` method and no `valid` property, so `!undefined` is always
+   * true and the bridge returns every validated fragment regardless of
+   * verdict (@nettrek/c2pa-hls-bridge 0.5.0, dist/index.js:5615 vs.
+   * dist/C2paManifestHelper.d.ts:132; the MP4 bridge does it correctly at
+   * :5795). The *bounds* are trustworthy - they come from `frag.start` and
+   * `frag.start + frag.duration`, captured once at fragment load - so we keep
+   * the bounds and determine each fragment's verdict ourselves via the same
+   * time-code lookup and the same `getHlsValidationState` rule used
+   * everywhere else.
+   *
+   * If the vendor ever fixes that typo, this list narrows to genuinely
+   * invalid fragments: the verdicts stay correct, and valid fragments simply
+   * stay unreported here until the playhead reaches them (the caller keeps a
+   * per-playhead observation as a floor). That's a graceful degradation, not
+   * a break.
+   *
+   * Note the list is keyed on `hls.currentLevel`, so it is empty until ABR
+   * settles on a level and starts over on a level switch - another reason
+   * the caller must not treat this as the complete picture.
+   */
+  getFragmentVerdicts(): FragmentVerdict[] {
+    const bridge = this.#bridge;
+
+    if (!bridge) {
+      return [];
+    }
+
+    return (bridge.getTamperedWithIntervals() ?? [])
       .map(readInterval)
-      .filter((interval): interval is TimeInterval => interval !== null);
+      .filter((interval): interval is TimeInterval => interval !== null)
+      .filter((interval) => interval.endTime > interval.startTime)
+      .map((interval) => {
+        // Sample the middle of the fragment: the bounds are half-open, so an
+        // endpoint can resolve to the neighbouring fragment.
+        const midpoint = (interval.startTime + interval.endTime) / 2;
+        const reader = bridge.getC2PAMetaByTimeCode(midpoint);
+
+        return {
+          startTime: interval.startTime,
+          endTime: interval.endTime,
+          validationState: reader
+            ? getHlsValidationState(reader, reader.containsSignature())
+            : ('Unknown' as PlayerValidationState),
+        };
+      });
   }
 
   getMessage(): string {

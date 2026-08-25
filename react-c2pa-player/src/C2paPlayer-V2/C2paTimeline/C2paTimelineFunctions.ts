@@ -75,6 +75,7 @@ interface TimelineFunctions {
         currentTime: number,
         videoPlayer: TimelineVideoPlayer,
         c2paControlBar: TimelineComponentLike,
+        extendTrailingSegmentToPlayhead?: boolean,
     ) => void;
     replaceC2PATimelineSegments: (
         segments: C2PATimelineSegmentUpdate[],
@@ -150,17 +151,6 @@ export function getTimelineFunctions(
         return false;
     };
 
-    const updateC2PAButton = function (videoPlayer: VideoJsPlayerLike, isVideoSegmentInvalid = false) {
-        const c2paInvalidButton = videoPlayer.el()?.querySelector('.c2pa-menu-button button');
-        if (c2paInvalidButton) {
-            if (isVideoSegmentInvalid) {
-                c2paInvalidButton.classList.add('c2pa-menu-button-invalid');
-            } else {
-                c2paInvalidButton.classList.remove('c2pa-menu-button-invalid');
-            }
-        }
-    };
-
     const createTimelineSegment = function (
         segmentStartTime: number,
         segmentEndTime: number,
@@ -203,6 +193,17 @@ export function getTimelineFunctions(
         currentTime: number,
         videoPlayer: TimelineVideoPlayer,
         c2paControlBar: TimelineComponentLike,
+        // Whether the trailing segment should be stretched to the playhead.
+        // True only for the playhead-appended fallback (monolithic sources),
+        // where one verdict covers the whole asset and a segment's extent is
+        // "from where this verdict started, up to wherever playback has
+        // reached". Adapters that report real per-fragment bounds pass false:
+        // stretching there would overwrite the one record of a fragment's
+        // actual extent, and since the newest fragment legitimately ends
+        // *ahead* of the playhead it would invert its range (start > end) -
+        // which getTimelineState then reads back out of the DOM to build the
+        // tampered-range alert.
+        extendTrailingSegmentToPlayhead = false,
     ) {
         console.log('[C2PA] Updating play bar');
 
@@ -215,46 +216,47 @@ export function getTimelineFunctions(
             return;
         }
 
-        lastSegment.dataset.endTime = String(currentTime);
-
-        const playProgressControl = videoPlayer.el()?.querySelector('.vjs-play-progress') as HTMLElement | null;
-        if (playProgressControl) {
-            playProgressControl.style.backgroundColor = lastSegment.style.backgroundColor;
-            playProgressControl.style.color = lastSegment.style.backgroundColor;
+        if (extendTrailingSegmentToPlayhead && currentTime > parseFloat(lastSegment.dataset.startTime)) {
+            lastSegment.dataset.endTime = String(currentTime);
         }
 
+        const latestKnownEndTime = progressSegments.reduce(
+            (max, segment) => Math.max(max, parseFloat(segment.dataset.endTime)),
+            0,
+        );
         const effectiveDuration = getEffectiveTimelineDuration(
             videoPlayer.duration(),
             currentTime,
-            parseFloat(lastSegment.dataset.endTime),
+            latestKnownEndTime,
         );
 
         let numSegments = progressSegments.length;
-        let isVideoSegmentInvalid = false;
 
         progressSegments.forEach((segment) => {
-            const segmentStartTime = parseFloat(segment.dataset.startTime);
             const segmentEndTime = parseFloat(segment.dataset.endTime);
 
-            let segmentProgressPercentage = 0;
-            if (currentTime >= segmentStartTime && currentTime <= segmentEndTime) {
-                segmentProgressPercentage = (currentTime / effectiveDuration) * 100;
-            } else if (currentTime >= segmentEndTime) {
-                segmentProgressPercentage = (segmentEndTime / effectiveDuration) * 100;
-            }
+            // Each segment spans 0 -> its own endTime, layered with a
+            // descending z-index so earlier (narrower) segments paint on top;
+            // the visible result reads left-to-right in chronological order.
+            // Widths are NOT clamped to the playhead: a fragment whose verdict
+            // is already known must show its colour even if playback hasn't
+            // reached it yet.
+            const segmentProgressPercentage = Math.min(
+                100,
+                Math.max(0, (segmentEndTime / effectiveDuration) * 100),
+            );
 
-            console.log('[C2PA] Segment progress percentage: ', segmentProgressPercentage);
             segment.style.width = `${segmentProgressPercentage}%`;
             segment.style.zIndex = String(numSegments);
             numSegments--;
-            console.log('[C2PA] ----');
-
-            if (isInvalidSegmentStatus(segment.dataset.verificationStatus)) {
-                isVideoSegmentInvalid = true;
-            }
         });
 
-        updateC2PAButton(videoPlayer, isVideoSegmentInvalid);
+        // The played-bar colour is intentionally left to CSS. Painting
+        // `.vjs-play-progress` from a single segment flattened the whole
+        // played region to one verdict's colour, hiding the per-fragment
+        // segments layered above it. The menu button's invalid state is
+        // likewise owned solely by C2paMenuBridge now (see updateC2PAMenu) -
+        // this function used to be a second, competing writer of that class.
     };
 
     const handleSeekC2PATimeline = function (
@@ -295,7 +297,7 @@ export function getTimelineFunctions(
             }
         }
 
-        updateC2PATimeline(seekTime, videoPlayer, c2paControlBar);
+        updateC2PATimeline(seekTime, videoPlayer, c2paControlBar, isMonolithic);
     };
 
     const handleOnSeeking = function (
@@ -314,7 +316,6 @@ export function getTimelineFunctions(
             removeProgressSegments();
             seeking = false;
 
-            updateC2PAButton(videoPlayer);
             return [seeking, 0.0];
         }
 
@@ -325,9 +326,12 @@ export function getTimelineFunctions(
         return [seeking, lastPlaybackTime];
     };
 
+    // Floors rather than rounds the seconds: Math.round(seconds % 60) can
+    // return 60, which used to render as "00:60" / "01:60".
     const formatTime = function (seconds: number) {
-        const minutes = Math.floor(seconds / 60);
-        const remainingSeconds = Math.round(seconds % 60);
+        const wholeSeconds = Math.max(0, Math.floor(seconds));
+        const minutes = Math.floor(wholeSeconds / 60);
+        const remainingSeconds = wholeSeconds % 60;
         return `${String(minutes).padStart(2, '0')}:${String(remainingSeconds).padStart(2, '0')}`;
     };
 
@@ -344,10 +348,12 @@ export function getTimelineFunctions(
         }));
 
         if (isMonolithic) {
-            if (
-                segments.length > 0 &&
-                isInvalidSegmentStatus(segments[0].verificationStatus)
-            ) {
+            // A monolithic verdict covers the whole asset, so any invalid
+            // segment means the whole asset is compromised. Checking *any*
+            // rather than just `segments[0]`: the first entry is the synthetic
+            // "unknown" seed that updateC2PATimeline creates before the first
+            // real verdict arrives, so it is essentially never the invalid one.
+            if (segments.some((segment) => isInvalidSegmentStatus(segment.verificationStatus))) {
                 compromisedRegions.push(`${formatTime(0.0)}-${formatTime(videoPlayer.duration())}`);
             }
         } else {

@@ -157,6 +157,17 @@ export function C2paMenuContent({
       <MenuHeader title={headerTitle} leadingAction={headerAction} />
       <ul className="vjs-menu-content c2pa-menu-content-list" role="menu">
         {mode === 'invalid' ? <InvalidState /> : null}
+        {/* Problems first: if any fragment failed validation, that is the most
+            important thing in this menu and shouldn't sit below the
+            provenance detail. */}
+        {sections.liveSegments ? (
+          <LiveSegmentDiagnosticsSection
+            section={sections.liveSegments}
+            title={sectionTitles.liveSegments}
+            isExpanded={liveSegmentsExpanded}
+            onToggle={() => setLiveSegmentsExpanded(current => !current)}
+          />
+        ) : null}
         <SummarySection section={sections.summary} sectionTitles={sectionTitles} />
         {sections.claimGenerator ? (
           <ClaimGeneratorSection
@@ -190,14 +201,6 @@ export function C2paMenuContent({
           <HistorySection
             title={sectionTitles.history}
             onOpen={() => setActiveView('history')}
-          />
-        ) : null}
-        {sections.liveSegments ? (
-          <LiveSegmentDiagnosticsSection
-            section={sections.liveSegments}
-            title={sectionTitles.liveSegments}
-            isExpanded={liveSegmentsExpanded}
-            onToggle={() => setLiveSegmentsExpanded(current => !current)}
           />
         ) : null}
       </ul>

@@ -17,11 +17,13 @@
 import { Emitter } from './emitter';
 import { createUnknownResult, normalizeHlsManifestHelper } from './normalization';
 import { HlsBridgeRuntime } from './runtimes';
+import type { FragmentVerdict } from './runtimes/hlsBridgeRuntime';
 import { detectAdapterKind } from './sourceDetection';
 import { FragmentedTimelineProjector } from './timeline';
 import type {
   MediaSourceDescriptor,
   MediaValidationAdapter,
+  TimelineSegmentDiagnostic,
   ValidationAdapterContext,
   ValidationSession,
   ValidationSessionListener,
@@ -71,6 +73,11 @@ class HlsFragmentedFmp4Session implements ValidationSession {
     message: 'HLS C2PA fragment validation pending',
   };
   #lastPlaybackTime = 0;
+  // Fragments already pushed into the projector, keyed by bounds *and* verdict
+  // so a fragment whose verdict later changes is re-observed. Rebuilt from
+  // each enumeration (see #observeFragmentVerdicts) rather than only added to,
+  // so it can never outgrow the bridge's own fragment list.
+  #observedFragmentKeys = new Set<string>();
 
   constructor(context: ValidationAdapterContext) {
     this.#runtime = new HlsBridgeRuntime(context);
@@ -129,13 +136,20 @@ class HlsFragmentedFmp4Session implements ValidationSession {
         // instead of flickering to "unknown".
         : this.#snapshot.result;
 
+    // Record every fragment the bridge has already validated, with its real
+    // presentation bounds - including fragments buffered ahead of the playhead,
+    // which a playhead-only sample would never colour. This is what makes a
+    // determined verdict stick to its own fragment instead of being inferred
+    // from wherever the playhead happened to be.
+    this.#observeFragmentVerdicts();
+
     if (reader && result) {
-      // No discrete segment boundary to pass (see the FragmentedTimelineProjector
-      // comment on `startTime`) - HLS samples the playhead rather than observing
-      // bridge-reported segment events - but `result.manifestSource` is still the
-      // real manifest active at this exact lookup, so it's still meaningful to
-      // attach: a merged run just ends up carrying whichever sample was most
-      // recent, same as it does for `endTime`.
+      // Playhead-sampled floor, kept because the enumeration above is keyed on
+      // hls.currentLevel: it is empty until ABR settles and restarts on a level
+      // switch, so without this the current position could go uncoloured. No
+      // explicit boundary to pass here (see FragmentedTimelineProjector's
+      // `startTime` comment), but `result.manifestSource` is the real manifest
+      // active at this exact lookup, so it's still meaningful to attach.
       this.#timelineProjector.observe(
         this.#lastPlaybackTime,
         result.validationState,
@@ -143,7 +157,6 @@ class HlsFragmentedFmp4Session implements ValidationSession {
         undefined,
         result.manifestSource,
       );
-      this.#timelineProjector.mergeInvalidIntervals(this.#runtime.getTamperedIntervals());
     }
 
     this.#snapshot = {
@@ -158,7 +171,69 @@ class HlsFragmentedFmp4Session implements ValidationSession {
     }
   }
 
+  /**
+   * Pushes each newly-known (or newly-changed) fragment verdict into the
+   * projector with its real presentation bounds, so every fragment the bridge
+   * has validated carries its own colour - not just the ones the playhead has
+   * visited.
+   *
+   * Runs on every rebuild, so it only observes fragments whose (bounds,
+   * verdict) pair it hasn't seen: re-upserting the whole list each tick would
+   * be quadratic in fragment count for no benefit, since the projector's
+   * upsert is idempotent for an unchanged fragment.
+   */
+  #observeFragmentVerdicts(): void {
+    const verdicts = this.#runtime.getFragmentVerdicts();
+    const seen = new Set<string>();
+
+    verdicts.forEach((verdict) => {
+      const key = `${verdict.startTime}-${verdict.endTime}-${verdict.validationState}`;
+      seen.add(key);
+
+      if (this.#observedFragmentKeys.has(key)) {
+        return;
+      }
+
+      // Only the interesting fragments need a manifest reference (for
+      // click-to-inspect) or a diagnostic entry; a plain Valid/Trusted
+      // fragment has nothing more to say than its colour.
+      const isAnomalous = verdict.validationState !== 'Valid' && verdict.validationState !== 'Trusted';
+      const midpoint = (verdict.startTime + verdict.endTime) / 2;
+      const reader = isAnomalous ? this.#runtime.lookup(midpoint) : null;
+
+      this.#timelineProjector.observe(
+        verdict.endTime,
+        verdict.validationState,
+        isAnomalous ? [toFragmentDiagnostic(verdict)] : undefined,
+        verdict.startTime,
+        reader ? normalizeHlsManifestHelper(reader).manifestSource : undefined,
+      );
+    });
+
+    this.#observedFragmentKeys = seen;
+  }
+
   #emit(): void {
     this.#emitter.emit(this.#snapshot);
   }
+}
+
+/**
+ * Describes one non-Valid HLS fragment for the menu's "Segment issues" list.
+ *
+ * HLS has no per-fragment sequence number in the bridge's public API, so the
+ * fragment's start time stands in for both the display number (whole seconds
+ * into the stream, which is what a viewer can actually locate) and the
+ * ordering key. `timestamp` is only ever used for relative sorting within one
+ * adapter's diagnostics (see menuViewModel.ts#selectLiveSegmentsSection), so
+ * seconds-into-stream orders correctly even though DASH puts wall-clock ms
+ * there; the two never mix, since a session has exactly one adapter.
+ */
+function toFragmentDiagnostic(verdict: FragmentVerdict): TimelineSegmentDiagnostic {
+  return {
+    segmentNumber: Math.floor(verdict.startTime),
+    mediaType: 'video',
+    status: verdict.validationState === 'Invalid' ? 'invalid' : 'unverified',
+    timestamp: verdict.startTime,
+  };
 }

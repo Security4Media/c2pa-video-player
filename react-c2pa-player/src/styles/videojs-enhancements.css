@@ -173,6 +173,19 @@
   color: var(--c2pa-unknown);
 }
 
+/* Grey means "no C2PA verdict yet". The whole seek bar starts grey and each
+   validated fragment paints its own colour over it (see .seekbar-play-c2pa),
+   so anything still grey is genuinely unvalidated rather than just unplayed.
+   Without overriding the holder, video.js's default slate-blue track read as
+   a validation colour.
+
+   Needs three classes to outrank video.js's own `.video-js .vjs-slider`
+   (video-js.css:1152), which the holder also matches and which would
+   otherwise win on source order alone. */
+.video-js .vjs-progress-control .vjs-progress-holder {
+  background-color: var(--c2pa-unknown);
+}
+
 .video-js .vjs-progress-holder .vjs-play-progress {
   background-color: var(--c2pa-unknown);
 }

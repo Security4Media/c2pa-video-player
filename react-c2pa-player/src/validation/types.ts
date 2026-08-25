@@ -81,10 +81,11 @@ export type SegmentIntegrityStatus =
 /**
  * Adapter-agnostic description of where a validation result's manifest data
  * (if any) came from. Lets menu/selector code branch on shape without each
- * adapter having to fabricate a `ManifestStore`-shaped compatibility object
- * (see `normalization/shared.ts`'s `createCompatibilityManifestStore`, which
- * predates this type and is still used where a real trust-anchor-aware
- * `ManifestStore` is genuinely available).
+ * adapter having to fabricate a `ManifestStore`-shaped compatibility object:
+ * HLS and DASH leave `NormalizedValidationResult.manifestStore` null and let
+ * menuViewModel.ts's manifestStore-less fallback path use `validationState`
+ * directly; only monolithic populates a real `ManifestStore`, since its
+ * reader genuinely produces one.
  */
 export type ManifestSource =
   | { kind: 'manifest-store'; manifestStore: ManifestStore }
@@ -121,7 +122,6 @@ export interface ValidationTimelineSegment {
   startTime: number;
   endTime: number;
   validationState: PlayerValidationState;
-  sourceSegmentId?: string;
   pending?: boolean;
   diagnostics?: TimelineSegmentDiagnostic[];
   manifestRef?: ManifestSource;

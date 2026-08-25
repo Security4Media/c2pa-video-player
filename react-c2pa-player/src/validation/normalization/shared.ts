@@ -14,8 +14,7 @@
  * limitations under the License.
  */
 
-import type { Manifest, ManifestStore } from '@contentauth/c2pa-web';
-import type { NormalizedValidationResult, PlayerValidationState } from '../types';
+import type { NormalizedValidationResult } from '../types';
 
 export function createUnknownResult(): NormalizedValidationResult {
   return {
@@ -24,49 +23,4 @@ export function createUnknownResult(): NormalizedValidationResult {
     activeManifest: null,
     manifestSource: { kind: 'none' },
   };
-}
-
-export function createCompatibilityManifestStore(
-  activeManifest: Manifest | null,
-  manifests: Record<string, Manifest>,
-  validationState: PlayerValidationState,
-  validationErrors: unknown[]
-): ManifestStore | null {
-  const activeManifestId = findActiveManifestId(activeManifest, manifests);
-
-  if (!activeManifest || !activeManifestId) {
-    return null;
-  }
-
-  return {
-    active_manifest: activeManifestId,
-    manifests,
-    validation_state: validationState,
-    validation_results: {
-      activeManifest: {
-        // Only a genuinely 'Valid' result may be promoted to a success entry
-        // (which getManifestStoreValidationState reads as grounds for
-        // 'Trusted'). 'Unknown' (no signature at all) must never fabricate a
-        // success here, or unsigned content displays a false "Trusted" badge.
-        success: validationState === 'Valid' ? [{ code: 'c2pa.fragment.validated' }] : [],
-        failure: validationState === 'Invalid' ? validationErrors : [],
-      },
-    },
-  } as ManifestStore;
-}
-
-function findActiveManifestId(
-  activeManifest: Manifest | null,
-  manifests: Record<string, Manifest>
-): string | null {
-  if (!activeManifest) {
-    return null;
-  }
-
-  if (typeof activeManifest.id === 'string') {
-    return activeManifest.id;
-  }
-
-  const activeEntry = Object.entries(manifests).find(([, manifest]) => manifest === activeManifest);
-  return activeEntry?.[0] ?? null;
 }

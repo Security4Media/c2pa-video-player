@@ -166,6 +166,7 @@ export function handleMenuClosed() {
 export function updateC2PAMenu(
     c2paMenu: VideoJsMenuComponentLike | null,
     videoPlayer: VideoJsPlayerLike,
+    hasInvalidSegments = false,
 ) {
     if (!menuState.menuReference && c2paMenu) {
         setMenuReference(c2paMenu);
@@ -174,18 +175,6 @@ export function updateC2PAMenu(
     const c2paStatus = playerRootController?.getState().c2paStatus ?? null;
     const currentManifestId = getStatusManifestId(c2paStatus);
     const manifestChanged = currentManifestId !== menuState.lastManifestId;
-
-    if (menuState.isInvalid) {
-        console.log('[C2PA] Maintaining invalid button state (persists across all video states)');
-        updateButtonValidationState(videoPlayer, true);
-    }
-
-    console.log('[C2PA] Rendering menu', {
-        manifestId: currentManifestId,
-        previousManifestId: menuState.lastManifestId,
-        manifestChanged,
-        menuOpen: menuState.isMenuOpen,
-    });
 
     if (manifestChanged) {
         menuState.lastManifestId = currentManifestId;
@@ -197,7 +186,17 @@ export function updateC2PAMenu(
         playerRootController?.setState({ selectedSegment: null });
     }
 
-    menuState.isInvalid = getStatusValidationState(c2paStatus) === 'Invalid';
+    // Latched, not sampled. `hasInvalidSegments` covers anything invalid found
+    // anywhere in the timeline, not just under the playhead, and once a bad
+    // fragment has been seen the warning stays for the rest of the source:
+    // moving the playhead into a clean fragment doesn't un-tamper the ones
+    // already detected. Previously this was reassigned from the instantaneous
+    // playhead verdict on every tick, so the badge cleared itself as soon as
+    // playback moved past the problem.
+    menuState.isInvalid =
+        menuState.isInvalid ||
+        hasInvalidSegments ||
+        getStatusValidationState(c2paStatus) === 'Invalid';
     updateButtonValidationState(videoPlayer, menuState.isInvalid);
     syncMenuStateToPlayerRoot(c2paStatus);
 }

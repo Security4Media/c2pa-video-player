@@ -88,7 +88,13 @@ export function getHlsValidationState(
     return 'Unknown';
   }
 
-  return reader.isValid() ? 'Valid' : 'Invalid';
+  // reader.isValid() is a deprecated boolean that "considers both 'Valid'
+  // and 'Trusted' states as valid" - i.e. it collapses the two into one,
+  // which would leave the timeline permanently reporting 'Valid' (blue)
+  // even for content whose signer is fully trust-anchored. Use the reader's
+  // own three-state result instead so a genuinely trusted signer shows as
+  // 'Trusted' (green) here too, not just in the menu's summary status.
+  return reader.getManifestStoreValidationState() ?? 'Invalid';
 }
 
 /**

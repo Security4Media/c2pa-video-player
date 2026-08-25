@@ -97,6 +97,7 @@ interface TimelineFunctions {
         currentTime: number,
         videoPlayer: C2PAVideoJsPlayer,
         c2paControlBar: TimelineComponentLike,
+        extendTrailingSegmentToPlayhead?: boolean,
     ) => void;
     replaceC2PATimelineSegments: (
         segments: NonNullable<ValidationStatusSnapshot['timelineSegments']>,
@@ -233,15 +234,23 @@ export const C2PAPlayer = function (
             const currentTime = videoPlayer.currentTime();
             const c2paStatus = createC2PAStatusFromSnapshot(snapshot);
 
-            if (
+            // Adapters that report their own per-fragment segments own the
+            // whole timeline, so their state is safe to apply on any tick -
+            // including seeks and backward jumps, which the guard below skips.
+            // Only the legacy playhead-appending fallback needs that guard,
+            // since it infers a segment's extent from forward progression.
+            const ownsFullTimeline = Boolean(
+                snapshot?.timelineSegments && snapshot.timelineSegments.length > 0,
+            );
+            const isOrdinaryForwardTick =
                 !seeking &&
                 currentTime >= lastPlaybackTime &&
-                currentTime - lastPlaybackTime < minSeekTime &&
-                c2paControlBar
-            ) {
-                if (snapshot?.timelineSegments && snapshot.timelineSegments.length > 0) {
+                currentTime - lastPlaybackTime < minSeekTime;
+
+            if (c2paControlBar && (ownsFullTimeline || isOrdinaryForwardTick)) {
+                if (ownsFullTimeline) {
                     replaceC2PATimelineSegments(
-                        snapshot.timelineSegments,
+                        snapshot!.timelineSegments!,
                         videoPlayer,
                         c2paControlBar,
                     );
@@ -251,7 +260,10 @@ export const C2PAPlayer = function (
                         currentTime,
                         c2paControlBar,
                     );
-                    updateC2PATimeline(currentTime, videoPlayer, c2paControlBar);
+                    // Playhead-appended fallback: stretch the trailing segment
+                    // to the playhead, since its verdict covers the asset from
+                    // where it started through wherever playback has reached.
+                    updateC2PATimeline(currentTime, videoPlayer, c2paControlBar, true);
                 }
 
                 const timeline = getTimelineState(useStaticTimelineFallback, videoPlayer, currentTime);
@@ -261,9 +273,13 @@ export const C2PAPlayer = function (
                     c2paStatus,
                     timeline,
                 );
+                // Pass the timeline-wide verdict, not just the playhead's: a
+                // tampered fragment anywhere must keep the menu button flagged
+                // (updateC2PAMenu latches it).
                 updateC2PAMenu(
                     c2paMenu,
                     videoPlayer,
+                    isManifestInvalid,
                 );
             }
 

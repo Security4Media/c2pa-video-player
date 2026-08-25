@@ -65,6 +65,13 @@
   color: var(--c2pa-unknown);
 }
 
+/* Grey means "no C2PA verdict yet" - see the matching rule and rationale in
+   videojs-enhancements.css (three classes, to outrank video.js's
+   `.video-js .vjs-slider`). */
+.video-js .vjs-progress-control .vjs-progress-holder {
+  background-color: var(--c2pa-unknown);
+}
+
 .video-js .vjs-progress-holder .vjs-play-progress {
   background-color: var(--c2pa-unknown);
 }
