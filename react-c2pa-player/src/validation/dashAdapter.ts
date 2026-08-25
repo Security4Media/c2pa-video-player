@@ -32,6 +32,8 @@ const DASH_CAPABILITIES = {
   ownsPlayback: true,
   providesTimelineSegments: true,
   supportsLookupByTime: true,
+  supportsLive: true,
+  requiresPlayerOwnership: true,
 } as const;
 
 export class DashFragmentedFmp4Adapter implements MediaValidationAdapter {

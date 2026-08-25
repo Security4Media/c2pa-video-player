@@ -40,6 +40,8 @@ const HLS_CAPABILITIES = {
   ownsPlayback: true,
   providesTimelineSegments: true,
   supportsLookupByTime: true,
+  supportsLive: false,
+  requiresPlayerOwnership: true,
 } as const;
 
 export class HlsFragmentedFmp4Adapter implements MediaValidationAdapter {

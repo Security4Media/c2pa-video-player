@@ -38,6 +38,15 @@ export interface AdapterCapabilities {
   ownsPlayback: boolean;
   providesTimelineSegments: boolean;
   supportsLookupByTime: boolean;
+  /** Whether this adapter can validate an unbounded/live source, not just a fixed-length VOD asset. */
+  supportsLive: boolean;
+  /**
+   * Whether this adapter's underlying validation library must attach
+   * directly to (and drive) the video element itself to work at all -
+   * distinct from `ownsPlayback`, which describes whether it currently
+   * does so, not whether the format inherently requires it.
+   */
+  requiresPlayerOwnership: boolean;
 }
 
 export interface TrustMaterial {
