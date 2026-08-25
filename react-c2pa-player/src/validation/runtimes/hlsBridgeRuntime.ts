@@ -30,6 +30,7 @@ export class HlsBridgeRuntime {
   #bridge: C2paHlsBridge | null = null;
   #message = 'HLS C2PA fragment validation pending';
   #errorReason: string | null = null;
+  #disposed = false;
 
   constructor(context: ValidationAdapterContext) {
     this.#context = context;
@@ -44,6 +45,14 @@ export class HlsBridgeRuntime {
     }
 
     const trustMaterial = await this.#context.policy.trustMaterialProvider.load();
+
+    // dispose() may have run while the trust material was loading. Bail out
+    // without creating an Hls/bridge instance that dispose() would never see
+    // and therefore never clean up.
+    if (this.#disposed) {
+      return;
+    }
+
     const hls = new Hls({ enableWorker: true });
     const bridge = new C2paHlsBridge(
       {
@@ -79,6 +88,7 @@ export class HlsBridgeRuntime {
   }
 
   dispose(): void {
+    this.#disposed = true;
     this.#bridge?.dispose();
     this.#hls?.destroy();
     this.#bridge = null;

@@ -28,6 +28,7 @@ export class MonolithicBridgeRuntime {
   #manifestStore: ManifestStore | null = null;
   #message = 'Monolithic C2PA validation pending';
   #errorReason: string | null = null;
+  #disposed = false;
 
   constructor(context: ValidationAdapterContext) {
     this.#context = context;
@@ -36,6 +37,11 @@ export class MonolithicBridgeRuntime {
   async load(): Promise<void> {
     try {
       const trustMaterial = await this.#context.policy.trustMaterialProvider.load();
+
+      if (this.#disposed) {
+        return;
+      }
+
       const settings: Settings | undefined = this.#context.policy.enableTrustVerification
         ? {
             verify: {
@@ -47,10 +53,19 @@ export class MonolithicBridgeRuntime {
           }
         : undefined;
 
-      this.#sdk = await createC2pa({
+      const sdk = await createC2pa({
         wasmSrc: trustMaterial.wasmSrc,
         settings,
       });
+
+      if (this.#disposed) {
+        // dispose() ran while createC2pa() was in flight and never saw this
+        // instance — clean it up ourselves instead of leaking it.
+        sdk.dispose?.();
+        return;
+      }
+
+      this.#sdk = sdk;
 
       const response = await fetch(this.#context.source.url);
       const blob = await response.blob();
@@ -59,11 +74,21 @@ export class MonolithicBridgeRuntime {
         blob,
       );
 
-      this.#manifestStore = (await reader?.manifestStore()) ?? null;
+      const manifestStore = (await reader?.manifestStore()) ?? null;
+
+      if (this.#disposed) {
+        return;
+      }
+
+      this.#manifestStore = manifestStore;
       this.#message = 'Monolithic C2PA validation active';
       this.#errorReason = null;
       this.#emit();
     } catch (error) {
+      if (this.#disposed) {
+        return;
+      }
+
       console.error('[Monolithic C2PA] Initialization error:', error);
       this.#manifestStore = null;
       this.#errorReason = error instanceof Error ? error.message : 'Monolithic validation failed';
@@ -73,6 +98,7 @@ export class MonolithicBridgeRuntime {
   }
 
   dispose(): void {
+    this.#disposed = true;
     this.#sdk?.dispose?.();
     this.#sdk = null;
     this.#listeners.clear();
