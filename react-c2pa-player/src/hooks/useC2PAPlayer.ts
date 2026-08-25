@@ -49,7 +49,6 @@ export function useC2PAPlayer({
   const videoElementRef = useRef<HTMLVideoElement | null>(null);
   const validationCleanupRef = useRef<(() => void) | null>(null);
   const isInitializingRef = useRef(false);
-  const latestSnapshotRef = useRef<ValidationStatusSnapshot | null>(null);
   const [state, setState] = useState<UseC2PAPlayerState>({
     isInitialized: false,
     manifestStore: null,
@@ -64,7 +63,6 @@ export function useC2PAPlayer({
     removeValidationBindings();
     validationSessionRef.current?.dispose();
     validationSessionRef.current = null;
-    latestSnapshotRef.current = null;
     videoElementRef.current = null;
 
     if (c2paPlayerRef.current && typeof c2paPlayerRef.current.dispose === 'function') {
@@ -80,7 +78,6 @@ export function useC2PAPlayer({
   }, [removeValidationBindings]);
 
   const publishSnapshot = useCallback((snapshot: ValidationStatusSnapshot | null) => {
-    latestSnapshotRef.current = snapshot;
     c2paPlayerRef.current?.playbackUpdate(snapshot);
     setState((currentState) => ({
       ...currentState,
@@ -154,8 +151,7 @@ export function useC2PAPlayer({
         const handlePlaybackEvent = () => {
           resolveSnapshotAtCurrentTime();
         };
-        const unsubscribe = validationSession.subscribe((snapshot) => {
-          latestSnapshotRef.current = snapshot;
+        const unsubscribe = validationSession.subscribe(() => {
           resolveSnapshotAtCurrentTime();
         });
 
