@@ -1,5 +1,48 @@
 # Validation Adapter Refactor Continuity
 
+## Status: Retired (superseded by Phases 0-2 on `feat/pluggable-validation-adapters`)
+
+Everything below this note predates a 3-phase follow-up that landed most of
+this doc's own "Immediate Next Phase" and "Extension Boundary Work" items.
+Kept as historical record of the HLS/DASH investigation; treat anything
+below as a snapshot of the state at the time, not current fact.
+
+What actually landed, in order:
+
+- **Phase 0** (build-breaking + trust-safety fixes): committed the missing
+  `dublinCoreSelectors.ts`; replaced the vendored, source-less
+  `vendor/c2pa-hls-bridge-fix` with the officially published
+  `@nettrek/c2pa-hls-bridge@0.5.0` (the fix this doc's "HLS Follow-Up Work"
+  section anticipated needing upstream was, by the time of this work, already
+  released - no fork/vendoring needed after all); fixed a false-"Trusted"
+  badge for unsigned content; fixed DASH's CAWG/organization/history menu
+  sections never rendering; fixed a discarded segment `startTime` in the DASH
+  timeline; restored the merged remote+local trust-anchor union in
+  `LocalTrustMaterialProvider`.
+- **Phase 1** (robustness bugs): dispose-during-load races in the HLS/
+  monolithic runtimes; DASH plugin errors that were silently swallowed;
+  unbounded memory growth on long-running live DASH sessions; no integrity
+  check on the DASH fragment/validation FIFO correlation; unchecked fetch
+  status in the monolithic runtime; a stale validation badge on seek; a
+  hardcoded HLS-specific loading message leaking into DASH.
+- **Phase 2** (adapter contract generalization - this doc's own "Extension
+  Boundary Work" section, largely): added an adapter-agnostic `ManifestSource`
+  type replacing the two divergent fake-manifest-store shims (though
+  `createCompatibilityManifestStore` is still used for HLS, whose top-level
+  validation-status computation still reads the real `ManifestStore` it
+  builds - not yet fully migrated); extracted a shared `Emitter<T>` replacing
+  6 copy-pasted pub/sub implementations; removed verified-dead code (a
+  write-only ref, unreachable branches in `getManifestStoreValidationState`,
+  the unused `supportsTrustVerification` flag, a redundant kind check in the
+  adapter registry); added `supportsLive`/`requiresPlayerOwnership` capability
+  metadata; consolidated a duplicated extension-to-MIME-type table.
+
+Not done by any of the three phases: Phase 3 (per-fragment manifest
+click-through in the timeline/menu) and Phase 4 (lower-risk batch cleanup -
+dead file removal, `C2paManifestFunctions.ts` facade collapse, the
+`vite.config.deploy.ts` `optimizeDeps` gap, the CAWG-untrusted-credential
+scope reconciliation between `rules.ts` and `c2pa_functions.ts`).
+
 ## Current State
 
 Branch: `feat/hls-validation`
