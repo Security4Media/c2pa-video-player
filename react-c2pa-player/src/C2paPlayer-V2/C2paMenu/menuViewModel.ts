@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-import type { Manifest, ManifestStore } from '@contentauth/c2pa-web';
-import type { C2PAStatus, PlayerValidationState } from '@/types/c2pa.types';
+import type { Manifest } from '@contentauth/c2pa-web';
+import type { C2PAStatus } from '@/types/c2pa.types';
 import type { C2PATimelineState } from '../C2PAPlayerRoot.types';
 import { getActiveManifest, getActiveManifestValidationStatus } from '../../services/c2pa_functions';
 import {
@@ -27,6 +27,7 @@ import {
     selectSignatureTime,
     selectWorkSection,
 } from './C2paManifestFunctions';
+import { resolveManifestStoreFromSource } from './manifestSelectors';
 import type {
     AiOptOutSectionItem,
     ClaimGeneratorSectionItem,
@@ -133,38 +134,6 @@ function getManifestId(activeManifest: Manifest | null, c2paStatus: C2PAStatus |
     return typeof manifestId === 'string' ? manifestId : null;
 }
 
-function createAdapterManifestStore(
-    c2paStatus: C2PAStatus | null,
-    manifestId: string | null,
-    validationStatus: PlayerValidationState,
-): ManifestStore | null {
-    const normalizedResult = c2paStatus?.normalizedResult ?? null;
-
-    if (!normalizedResult || !manifestId || !normalizedResult.activeManifest) {
-        return null;
-    }
-
-    // Adapters like DASH deliberately never populate normalizedResult.manifestStore
-    // (see normalization/dash.ts) — fall back to a single-entry map built from the
-    // active manifest alone so their CAWG/organization/history sections still render.
-    const sourceManifestStore = normalizedResult.manifestStore ?? null;
-    const manifests = sourceManifestStore?.manifests ?? { [manifestId]: normalizedResult.activeManifest };
-
-    return {
-        active_manifest: manifestId,
-        manifests,
-        validation_state: validationStatus,
-        validation_results: {
-            activeManifest: {
-                success: validationStatus === 'Invalid' ? [] : [{}],
-                failure: validationStatus === 'Invalid'
-                    ? (sourceManifestStore?.validation_results?.activeManifest?.failure ?? [])
-                    : [],
-            },
-        },
-    } as ManifestStore;
-}
-
 /**
  * Build the normalized section-based render state consumed by the React menu tree.
  * The bridge passes raw player status into React, and this helper keeps
@@ -207,8 +176,15 @@ export function buildMenuRenderState(
         ? getActiveManifestValidationStatus(manifestStore)
         : normalizedResult?.validationState ?? 'Unknown';
     const manifestId = getManifestId(activeManifest, c2paStatus);
+    // Adapters like DASH deliberately never populate normalizedResult.manifestStore
+    // (see normalization/dash.ts) — fall back to resolving the adapter-agnostic
+    // ManifestSource into the same store shape so their CAWG/organization/history
+    // sections still render.
     const selectorManifestStore =
-        manifestStore ?? createAdapterManifestStore(c2paStatus, manifestId, validationStatus);
+        manifestStore ??
+        (manifestId
+            ? resolveManifestStoreFromSource(normalizedResult?.manifestSource, manifestId, validationStatus)
+            : null);
 
     // Still build sections when invalid: the manifest parsed and its claimed
     // content (issuer, CAWG identity, actions) is worth showing to the user
