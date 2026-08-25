@@ -139,21 +139,26 @@ function createAdapterManifestStore(
     validationStatus: PlayerValidationState,
 ): ManifestStore | null {
     const normalizedResult = c2paStatus?.normalizedResult ?? null;
-    const sourceManifestStore = normalizedResult?.manifestStore ?? null;
 
-    if (!normalizedResult || !sourceManifestStore || !manifestId || !normalizedResult.activeManifest) {
+    if (!normalizedResult || !manifestId || !normalizedResult.activeManifest) {
         return null;
     }
 
+    // Adapters like DASH deliberately never populate normalizedResult.manifestStore
+    // (see normalization/dash.ts) — fall back to a single-entry map built from the
+    // active manifest alone so their CAWG/organization/history sections still render.
+    const sourceManifestStore = normalizedResult.manifestStore ?? null;
+    const manifests = sourceManifestStore?.manifests ?? { [manifestId]: normalizedResult.activeManifest };
+
     return {
         active_manifest: manifestId,
-        manifests: sourceManifestStore.manifests,
+        manifests,
         validation_state: validationStatus,
         validation_results: {
             activeManifest: {
                 success: validationStatus === 'Invalid' ? [] : [{}],
                 failure: validationStatus === 'Invalid'
-                    ? (sourceManifestStore.validation_results?.activeManifest?.failure ?? [])
+                    ? (sourceManifestStore?.validation_results?.activeManifest?.failure ?? [])
                     : [],
             },
         },

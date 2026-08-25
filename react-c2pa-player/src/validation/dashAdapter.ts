@@ -112,9 +112,12 @@ class DashFragmentedFmp4Session implements ValidationSession {
     this.#drainedSegmentCount = this.#runtime.getSegmentCount();
 
     newSegments.forEach((segment) => {
-      this.#timelineProjector.observe(segment.endTime, segment.result.validationState, [
-        segment.diagnostic,
-      ]);
+      this.#timelineProjector.observe(
+        segment.endTime,
+        segment.result.validationState,
+        [segment.diagnostic],
+        segment.startTime,
+      );
     });
   }
 

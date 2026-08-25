@@ -43,7 +43,11 @@ export function createCompatibilityManifestStore(
     validation_state: validationState,
     validation_results: {
       activeManifest: {
-        success: validationState === 'Invalid' ? [] : [{ code: 'c2pa.fragment.validated' }],
+        // Only a genuinely 'Valid' result may be promoted to a success entry
+        // (which getManifestStoreValidationState reads as grounds for
+        // 'Trusted'). 'Unknown' (no signature at all) must never fabricate a
+        // success here, or unsigned content displays a false "Trusted" badge.
+        success: validationState === 'Valid' ? [{ code: 'c2pa.fragment.validated' }] : [],
         failure: validationState === 'Invalid' ? validationErrors : [],
       },
     },
