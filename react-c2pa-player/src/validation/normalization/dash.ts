@@ -17,7 +17,7 @@
 import type { Manifest, ManifestAssertion } from '@contentauth/c2pa-web';
 import type { C2paManifest, SegmentRecord } from '@qualabs/c2pa-live-dashjs-plugin';
 import { getDashSegmentValidationState } from '../rules';
-import type { NormalizedValidationResult, TimelineSegmentDiagnostic } from '../types';
+import type { ManifestSource, NormalizedValidationResult, TimelineSegmentDiagnostic } from '../types';
 
 function toCompatibilityAssertions(assertions: C2paManifest['assertions']): ManifestAssertion[] {
   if (!assertions) {
@@ -87,9 +87,25 @@ export function normalizeDashSegmentRecord(
 } {
   const validationState = getDashSegmentValidationState(record.status);
   const activeManifest = toCompatibilityManifest(record.manifest ?? latestManifest);
+  // No `validationErrors` array exists in this adapter (unlike HLS) - DASH
+  // reports failures as a status string, not a list of failure objects - so
+  // this is always empty, matching createAdapterManifestStore's old
+  // DASH-specific behavior of never populating `failure`.
+  const manifestSource: ManifestSource = activeManifest
+    ? {
+        kind: 'single-manifest',
+        manifest: activeManifest,
+        // `label` (properly typed) rather than `id` (an ad hoc, `unknown`-typed
+        // index-signature field - see toCompatibilityManifest) since this
+        // function always sets id to exactly the same value as label.
+        manifests: { [activeManifest.label ?? '']: activeManifest },
+        validationState,
+        validationErrors: [],
+      }
+    : { kind: 'integrity-only', integrityStatus: record.status, sequenceReason: record.sequenceReason, errorCodes: record.errorCodes ? [...record.errorCodes] : undefined };
 
   return {
-    result: { manifestStore: null, validationState, activeManifest },
+    result: { manifestStore: null, validationState, activeManifest, manifestSource },
     diagnostic: toDiagnostic(record),
   };
 }
