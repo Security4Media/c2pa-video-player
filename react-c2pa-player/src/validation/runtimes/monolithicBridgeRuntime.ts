@@ -68,6 +68,13 @@ export class MonolithicBridgeRuntime {
       this.#sdk = sdk;
 
       const response = await fetch(this.#context.source.url);
+
+      if (!response.ok) {
+        throw new Error(
+          `Failed to fetch media source (HTTP ${response.status} ${response.statusText})`,
+        );
+      }
+
       const blob = await response.blob();
       const reader = await this.#sdk.reader.fromBlob(
         blob.type || this.#context.source.mimeType || 'video/mp4',
