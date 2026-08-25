@@ -58,6 +58,18 @@ export class HlsBridgeRuntime {
     const bridge = new C2paHlsBridge(
       {
         enableTrustListVerification: this.#context.policy.enableTrustVerification,
+        // Opt into the bridge's WebCrypto engine (@nettrek/c2pa-web-crypto)
+        // instead of its default WASM engine (@contentauth/c2pa-web): the
+        // WASM engine's own internal wasm fetch has an SRI integrity
+        // mismatch under this repo's dependency tree (root pins a different
+        // @contentauth/c2pa-web version than this bridge's own nested one),
+        // which gets the resource blocked by the browser. `wasmSrc` is kept
+        // below as the bridge's documented WASM fallback for browsers
+        // without `crypto.subtle`. See rules.ts#isCawgIdentityUntrustedFailure
+        // for the one behavioral difference this engine switch requires
+        // handling: WebCrypto reports untrusted CAWG identities under a
+        // different, more specific status code than WASM does.
+        enableExperimentalWebCrypto: true,
         wasmSrc: trustMaterial.wasmSrc,
         trust: this.#context.policy.enableTrustVerification ? trustMaterial.trust : undefined,
         cawgTrust: this.#context.policy.enableTrustVerification ? trustMaterial.cawgTrust : undefined,

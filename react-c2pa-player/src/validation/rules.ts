@@ -19,7 +19,16 @@ import type { C2paManifestHelper } from '@nettrek/c2pa-hls-bridge';
 import type { PlayerValidationState } from './types';
 
 function isCawgIdentityUntrustedFailure(result: { code?: string; url?: string }) {
-  return result.code === 'signingCredential.untrusted' && result.url?.includes('cawg.identity');
+  // The HLS bridge's WASM engine (@contentauth/c2pa-web) reports an
+  // untrusted CAWG identity as the generic `signingCredential.untrusted`,
+  // distinguishable from an untrusted C2PA claim signer only by checking the
+  // failure's URL. Its WebCrypto engine (@nettrek/c2pa-web-crypto, enabled in
+  // hlsBridgeRuntime.ts) reports the differentiated `cawg.identity.untrusted`
+  // code directly - no URL check needed, and one is not guaranteed present.
+  return (
+    result.code === 'cawg.identity.untrusted' ||
+    (result.code === 'signingCredential.untrusted' && result.url?.includes('cawg.identity'))
+  );
 }
 
 export function getValidationResultsForManifest(validationDeltas: { success?: unknown[]; failure?: unknown[] } = {}) {
