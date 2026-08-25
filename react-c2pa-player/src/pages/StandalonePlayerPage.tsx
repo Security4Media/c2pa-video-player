@@ -28,6 +28,8 @@ import nabLogo from '@/assets/logos/nab-logo.png';
 import { PlayerStatus, VideoMode } from '@/types/player.types';
 import {
   createMediaSourceDescriptor,
+  getMimeTypeForExtension,
+  KNOWN_MIME_TYPE_EXTENSIONS,
   type MediaSourceDescriptor,
 } from '@/validation';
 
@@ -36,30 +38,18 @@ interface StreamInfo {
   message: string;
 }
 
+// The extension->MIME type mapping itself lives in validation/sourceDetection.ts
+// (the single source of truth also used to route sources to an adapter); this
+// keeps its own combined displayName+url suffix-matching, since either one
+// alone can lack a visible extension (e.g. an opaque signed URL vs. a plain
+// filename label).
 function inferMimeType(url: string, displayName: string): string {
   const sourceLabel = `${displayName} ${url}`.toLowerCase().split(/[?#]/, 1)[0] ?? '';
+  const matchedExtension = KNOWN_MIME_TYPE_EXTENSIONS.find((extension) =>
+    sourceLabel.endsWith(extension)
+  );
 
-  if (sourceLabel.endsWith('.m3u8')) {
-    return 'application/vnd.apple.mpegurl';
-  }
-
-  if (sourceLabel.endsWith('.mpd')) {
-    return 'application/dash+xml';
-  }
-
-  if (sourceLabel.endsWith('.webm')) {
-    return 'video/webm';
-  }
-
-  if (sourceLabel.endsWith('.ogg')) {
-    return 'video/ogg';
-  }
-
-  if (sourceLabel.endsWith('.mov')) {
-    return 'video/quicktime';
-  }
-
-  return 'video/mp4';
+  return (matchedExtension && getMimeTypeForExtension(matchedExtension)) || 'video/mp4';
 }
 
 export function StandalonePlayerPage() {

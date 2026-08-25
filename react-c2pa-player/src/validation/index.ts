@@ -42,6 +42,8 @@ export { DashBridgeRuntime, HlsBridgeRuntime, MonolithicBridgeRuntime } from './
 export {
   createMediaSourceDescriptor,
   detectAdapterKind,
+  getMimeTypeForExtension,
+  KNOWN_MIME_TYPE_EXTENSIONS,
   type CreateMediaSourceDescriptorInput,
 } from './sourceDetection';
 export { FragmentedTimelineProjector } from './timeline';

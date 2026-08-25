@@ -21,6 +21,18 @@ const MONOLITHIC_MIME_TYPES = new Set(['video/mp4', 'video/quicktime', 'video/we
 const HLS_MIME_TYPES = new Set(['application/vnd.apple.mpegurl', 'application/x-mpegurl']);
 const DASH_MIME_TYPES = new Set(['application/dash+xml']);
 
+// Single source of truth for "what MIME type does this extension imply" -
+// previously duplicated as its own hardcoded chain in
+// StandalonePlayerPage.tsx's inferMimeType, which drifted from this file's
+// separate per-kind extension/MIME sets above.
+const EXTENSION_MIME_TYPES: Readonly<Record<string, string>> = {
+  '.m3u8': 'application/vnd.apple.mpegurl',
+  '.mpd': 'application/dash+xml',
+  '.webm': 'video/webm',
+  '.ogg': 'video/ogg',
+  '.mov': 'video/quicktime',
+};
+
 export interface CreateMediaSourceDescriptorInput {
   url: string;
   displayName?: string;
@@ -63,6 +75,18 @@ export function detectAdapterKind(source: MediaSourceDescriptor): AdapterKind {
   }
 
   return 'unsupported';
+}
+
+/**
+ * Extensions this module knows a specific MIME type for. None is a suffix
+ * of another, so callers matching against a combined label (rather than a
+ * clean URL path, which `getUrlExtension` handles) can check them in any
+ * order without ambiguity.
+ */
+export const KNOWN_MIME_TYPE_EXTENSIONS: readonly string[] = Object.keys(EXTENSION_MIME_TYPES);
+
+export function getMimeTypeForExtension(extension: string): string | undefined {
+  return EXTENSION_MIME_TYPES[extension];
 }
 
 function getUrlExtension(url: string): string | null {
