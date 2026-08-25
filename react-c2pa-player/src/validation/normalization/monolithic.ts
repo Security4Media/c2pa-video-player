@@ -33,5 +33,6 @@ export function normalizeMonolithicManifestStore(
     manifestStore,
     validationState,
     activeManifest,
+    manifestSource: { kind: 'manifest-store', manifestStore },
   };
 }

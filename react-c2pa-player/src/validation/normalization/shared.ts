@@ -22,6 +22,7 @@ export function createUnknownResult(): NormalizedValidationResult {
     manifestStore: null,
     validationState: 'Unknown',
     activeManifest: null,
+    manifestSource: { kind: 'none' },
   };
 }
 
