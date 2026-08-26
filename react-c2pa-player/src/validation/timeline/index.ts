@@ -15,3 +15,5 @@
  */
 
 export { FragmentedTimelineProjector } from './fragmentedTimelineProjector';
+export { readRegionKey, selectReadRegions } from './readRegionGate';
+export type { ReadRegion, SegmentVerdict } from './readRegionGate';

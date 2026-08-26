@@ -17,8 +17,9 @@
 import { Emitter } from './emitter';
 import { createUnknownResult } from './normalization';
 import { DashBridgeRuntime } from './runtimes';
+import type { DashSegmentEntry } from './runtimes/dashBridgeRuntime';
 import { detectAdapterKind } from './sourceDetection';
-import { FragmentedTimelineProjector } from './timeline';
+import { FragmentedTimelineProjector, readRegionKey, selectReadRegions } from './timeline';
 import type {
   MediaSourceDescriptor,
   MediaValidationAdapter,
@@ -58,6 +59,11 @@ class DashFragmentedFmp4Session implements ValidationSession {
   #unsubscribeRuntime: (() => void) | null = null;
   #drainedSegmentCount = 0;
   #lastPlaybackTime = 0;
+  // Every segment verdict the plugin has produced, whether or not playback has
+  // reached it. The plugin validates each segment as it downloads, so this runs
+  // ahead of the playhead; #observeReadRegions decides what may be shown.
+  readonly #knownSegments: DashSegmentEntry[] = [];
+  #observedRegionKeys = new Set<string>();
   #snapshot: ValidationStatusSnapshot = {
     adapterKind: this.adapterKind,
     result: null,
@@ -99,23 +105,54 @@ class DashFragmentedFmp4Session implements ValidationSession {
     return unsubscribe;
   }
 
-  // Unlike HLS, new segments arrive as discrete events with their own known
-  // [startTime, endTime) rather than being discovered by polling the
-  // playhead, so the timeline is built here (as segments close) instead of
-  // from #rebuildSnapshot's playback-time argument.
+  // Segments arrive as discrete events with their own known [startTime,
+  // endTime), but they arrive when the segment *downloads*, which for VOD runs
+  // well ahead of playback. So they are only accumulated here; what actually
+  // reaches the timeline is decided against the playhead in #observeReadRegions.
   #drainNewSegments(): void {
     const newSegments = this.#runtime.getSegmentsSince(this.#drainedSegmentCount);
     this.#drainedSegmentCount = this.#runtime.getSegmentCount();
+    this.#knownSegments.push(...newSegments);
+  }
 
-    newSegments.forEach((segment) => {
+  /**
+   * Projects the parts of validated segments that playback has actually read,
+   * clipped at the playhead (see selectReadRegions). Skips regions already
+   * projected, so a fully-read segment is observed once while the segment being
+   * watched refreshes as its clipped end advances.
+   */
+  #observeReadRegions(): void {
+    const regions = selectReadRegions(
+      this.#knownSegments.map((segment) => ({
+        startTime: segment.startTime,
+        endTime: segment.endTime,
+        validationState: segment.result.validationState,
+        segment,
+      })),
+      this.#lastPlaybackTime,
+    );
+    const seen = new Set<string>();
+
+    regions.forEach((region) => {
+      const key = readRegionKey(region);
+      seen.add(key);
+
+      if (this.#observedRegionKeys.has(key)) {
+        return;
+      }
+
+      const { segment } = region.source;
+
       this.#timelineProjector.observe(
-        segment.endTime,
-        segment.result.validationState,
+        region.endTime,
+        region.validationState,
         [segment.diagnostic],
-        segment.startTime,
+        region.startTime,
         segment.result.manifestSource,
       );
     });
+
+    this.#observedRegionKeys = seen;
   }
 
   #rebuildSnapshot(time: number, shouldEmit: boolean): void {
@@ -129,6 +166,8 @@ class DashFragmentedFmp4Session implements ValidationSession {
       this.#lastPlaybackTime = time;
     }
 
+    this.#observeReadRegions();
+
     const lookedUp = this.#runtime.lookup(this.#lastPlaybackTime);
     const result = lookedUp
       ? lookedUp.result
@@ -141,6 +180,9 @@ class DashFragmentedFmp4Session implements ValidationSession {
       result,
       timelineSegments: this.#timelineProjector.snapshot(),
       message: this.#runtime.getMessage(),
+      // Init-segment C2PA processing failed, so the asset's credentials are
+      // broken as a whole rather than one segment being bad.
+      wholeAssetInvalid: this.#runtime.isInitInvalid(),
     };
 
     if (shouldEmit) {

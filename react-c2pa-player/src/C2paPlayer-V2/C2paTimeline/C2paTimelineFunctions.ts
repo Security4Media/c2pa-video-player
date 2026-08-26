@@ -74,11 +74,15 @@ interface TimelineFunctions {
     updateC2PATimeline: (
         currentTime: number,
         videoPlayer: TimelineVideoPlayer,
-        c2paControlBar: TimelineComponentLike,
         extendTrailingSegmentToPlayhead?: boolean,
     ) => void;
     replaceC2PATimelineSegments: (
         segments: C2PATimelineSegmentUpdate[],
+        videoPlayer: TimelineVideoPlayer,
+        c2paControlBar: TimelineComponentLike,
+    ) => void;
+    renderWholeAssetVerdict: (
+        verificationStatus: TimelineVerificationStatus,
         videoPlayer: TimelineVideoPlayer,
         c2paControlBar: TimelineComponentLike,
     ) => void;
@@ -116,6 +120,25 @@ function getEffectiveTimelineDuration(
     }
 
     return Math.max(currentTime, latestKnownEndTime, 1);
+}
+
+/**
+ * Places a segment over exactly its own stretch of the bar.
+ *
+ * Each segment is positioned (`left`) and sized (`width`) from its own
+ * [startTime, endTime), so unread stretches stay uncovered and show the track's
+ * grey through. Segments used to all start at `left: 0` and be layered by
+ * z-index, which made a gap impossible to express: colouring 8-16s necessarily
+ * painted 0-16s too.
+ */
+function positionTimelineSegment(segment: TimelineSegmentElement, effectiveDuration: number) {
+    const startTime = parseFloat(segment.dataset.startTime);
+    const endTime = parseFloat(segment.dataset.endTime);
+    const clamp = (value: number) => Math.min(100, Math.max(0, value));
+    const left = clamp((startTime / effectiveDuration) * 100);
+
+    segment.style.left = `${left}%`;
+    segment.style.width = `${clamp((endTime / effectiveDuration) * 100) - left}%`;
 }
 
 function getSegmentColor(verificationStatus: TimelineVerificationStatus, isManifestInvalid = false) {
@@ -189,10 +212,11 @@ export function getTimelineFunctions(
         progressSegments = [];
     };
 
+    // Repositions already-appended segments; it no longer needs the host
+    // element, since it does not create any.
     const updateC2PATimeline = function (
         currentTime: number,
         videoPlayer: TimelineVideoPlayer,
-        c2paControlBar: TimelineComponentLike,
         // Whether the trailing segment should be stretched to the playhead.
         // True only for the playhead-appended fallback (monolithic sources),
         // where one verdict covers the whole asset and a segment's extent is
@@ -205,12 +229,9 @@ export function getTimelineFunctions(
         // tampered-range alert.
         extendTrailingSegmentToPlayhead = false,
     ) {
-        console.log('[C2PA] Updating play bar');
-
-        if (progressSegments.length === 0) {
-            handleC2PAValidation('unknown', currentTime, c2paControlBar);
-        }
-
+        // No synthetic "unknown" placeholder when there is nothing to show: an
+        // empty list is the correct initial state now that the track's own grey
+        // means "not read yet".
         const lastSegment = progressSegments[progressSegments.length - 1];
         if (!lastSegment) {
             return;
@@ -230,33 +251,18 @@ export function getTimelineFunctions(
             latestKnownEndTime,
         );
 
-        let numSegments = progressSegments.length;
-
+        // No z-index laddering: positioned segments cover disjoint stretches of
+        // the bar, so none needs to paint over another.
         progressSegments.forEach((segment) => {
-            const segmentEndTime = parseFloat(segment.dataset.endTime);
-
-            // Each segment spans 0 -> its own endTime, layered with a
-            // descending z-index so earlier (narrower) segments paint on top;
-            // the visible result reads left-to-right in chronological order.
-            // Widths are NOT clamped to the playhead: a fragment whose verdict
-            // is already known must show its colour even if playback hasn't
-            // reached it yet.
-            const segmentProgressPercentage = Math.min(
-                100,
-                Math.max(0, (segmentEndTime / effectiveDuration) * 100),
-            );
-
-            segment.style.width = `${segmentProgressPercentage}%`;
-            segment.style.zIndex = String(numSegments);
-            numSegments--;
+            positionTimelineSegment(segment, effectiveDuration);
         });
 
         // The played-bar colour is intentionally left to CSS. Painting
         // `.vjs-play-progress` from a single segment flattened the whole
-        // played region to one verdict's colour, hiding the per-fragment
-        // segments layered above it. The menu button's invalid state is
-        // likewise owned solely by C2paMenuBridge now (see updateC2PAMenu) -
-        // this function used to be a second, competing writer of that class.
+        // played region to one verdict's colour. The menu button's invalid
+        // state is likewise owned solely by C2paMenuBridge now (see
+        // updateC2PAMenu) - this function used to be a second, competing
+        // writer of that class.
     };
 
     const handleSeekC2PATimeline = function (
@@ -297,7 +303,7 @@ export function getTimelineFunctions(
             }
         }
 
-        updateC2PATimeline(seekTime, videoPlayer, c2paControlBar, isMonolithic);
+        updateC2PATimeline(seekTime, videoPlayer, isMonolithic);
     };
 
     const handleOnSeeking = function (
@@ -437,14 +443,37 @@ export function getTimelineFunctions(
                 segment.pending ? undefined : segment,
             );
 
-            const width = Math.min(100, Math.max(0, (segment.endTime / effectiveDuration) * 100));
-            timelineSegment.style.width = `${width}%`;
-
+            positionTimelineSegment(timelineSegment, effectiveDuration);
             c2paControlBar.el().appendChild(timelineSegment);
             progressSegments.push(timelineSegment);
         });
 
-        updateC2PATimeline(videoPlayer.currentTime(), videoPlayer, c2paControlBar);
+        updateC2PATimeline(videoPlayer.currentTime(), videoPlayer);
+    };
+
+    /**
+     * Paints the entire bar with a single verdict, for an asset whose own
+     * credentials failed to verify. That is a property of the asset rather than
+     * of any region, so it is not built up as playback reads segments - it
+     * applies to the whole timeline from the moment it is known.
+     */
+    const renderWholeAssetVerdict = function (
+        verificationStatus: TimelineVerificationStatus,
+        videoPlayer: TimelineVideoPlayer,
+        c2paControlBar: TimelineComponentLike,
+    ) {
+        removeProgressSegments();
+
+        const duration = getEffectiveTimelineDuration(
+            videoPlayer.duration(),
+            videoPlayer.currentTime(),
+            0,
+        );
+        const segment = createTimelineSegment(0, duration, verificationStatus);
+        positionTimelineSegment(segment, duration);
+
+        c2paControlBar.el().appendChild(segment);
+        progressSegments.push(segment);
     };
 
     return {
@@ -455,5 +484,6 @@ export function getTimelineFunctions(
         formatTime,
         updateC2PATimeline,
         replaceC2PATimelineSegments,
+        renderWholeAssetVerdict,
     };
 }

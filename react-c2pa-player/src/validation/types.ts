@@ -137,6 +137,17 @@ export interface ValidationStatusSnapshot {
   result: NormalizedValidationResult | null;
   timelineSegments: ValidationTimelineSegment[];
   message: string;
+  /**
+   * The asset's own credentials failed validation, so no part of it is
+   * trustworthy - as opposed to a specific region being bad. Distinct from
+   * `timelineSegments` because it is knowable up front (from the manifest /
+   * init segment) rather than accumulated as playback reads segments, and the
+   * timeline renders it as a single whole-bar verdict instead of per-segment.
+   *
+   * Unsigned content is NOT this: no credentials to fail means Unknown, not
+   * invalid.
+   */
+  wholeAssetInvalid?: boolean;
 }
 
 export type ValidationSessionListener = (snapshot: ValidationStatusSnapshot) => void;

@@ -95,11 +95,17 @@ class MonolithicC2PASession implements ValidationSession {
   }
 
   #buildSnapshot(): ValidationStatusSnapshot {
+    const result = normalizeMonolithicManifestStore(this.#runtime.getManifestStore());
+
     return {
       adapterKind: this.adapterKind,
-      result: normalizeMonolithicManifestStore(this.#runtime.getManifestStore()),
+      result,
       timelineSegments: [],
       message: this.#runtime.getMessage(),
+      // A whole-file asset has exactly one verdict covering all of it, so an
+      // invalid one condemns the entire timeline from the moment it is known -
+      // it must not depend on how far playback has progressed.
+      wholeAssetInvalid: result.validationState === 'Invalid',
     };
   }
 

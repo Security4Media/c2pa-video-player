@@ -111,6 +111,10 @@ export class DashBridgeRuntime {
   // and the timeline projector's destructive-vs-non-destructive handling of
   // backward observations (see FragmentedTimelineProjector.setLiveMode).
   #isLive: boolean | null = null;
+  // Set once the init segment's C2PA processing fails outright, which
+  // invalidates the asset's credentials as a whole rather than one segment.
+  // Never set for unsigned content (see #onInitProcessed).
+  #initInvalid = false;
 
   constructor(context: ValidationAdapterContext) {
     this.#context = context;
@@ -230,6 +234,11 @@ export class DashBridgeRuntime {
     return this.#isLive;
   }
 
+  /** True when init-segment C2PA processing failed, condemning the whole asset. */
+  isInitInvalid(): boolean {
+    return this.#initInvalid;
+  }
+
   #onStreamInitialized = (): void => {
     const next = this.#player?.isDynamic() ?? null;
 
@@ -332,8 +341,11 @@ export class DashBridgeRuntime {
     }
 
     if (event.noC2paData) {
+      // Absent credentials are not broken credentials: this stays Unknown
+      // (grey), and #initInvalid is deliberately left false.
       this.#message = 'No Content Credentials found in this live stream';
     } else if (!event.success) {
+      this.#initInvalid = true;
       this.#errorReason = event.error ?? 'DASH init segment C2PA processing failed';
       this.#message = this.#errorReason;
     }

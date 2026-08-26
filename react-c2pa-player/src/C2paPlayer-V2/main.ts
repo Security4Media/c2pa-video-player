@@ -96,11 +96,15 @@ interface TimelineFunctions {
     updateC2PATimeline: (
         currentTime: number,
         videoPlayer: C2PAVideoJsPlayer,
-        c2paControlBar: TimelineComponentLike,
         extendTrailingSegmentToPlayhead?: boolean,
     ) => void;
     replaceC2PATimelineSegments: (
         segments: NonNullable<ValidationStatusSnapshot['timelineSegments']>,
+        videoPlayer: C2PAVideoJsPlayer,
+        c2paControlBar: TimelineComponentLike,
+    ) => void;
+    renderWholeAssetVerdict: (
+        verificationStatus: string,
         videoPlayer: C2PAVideoJsPlayer,
         c2paControlBar: TimelineComponentLike,
     ) => void;
@@ -153,6 +157,7 @@ export const C2PAPlayer = function (
         handleOnSeeking,
         updateC2PATimeline,
         replaceC2PATimelineSegments,
+        renderWholeAssetVerdict,
     } = getTimelineFunctions(handleTimelineSegmentClick) as TimelineFunctions;
 
     let isManifestInvalid = false;
@@ -239,18 +244,29 @@ export const C2PAPlayer = function (
             // including seeks and backward jumps, which the guard below skips.
             // Only the legacy playhead-appending fallback needs that guard,
             // since it infers a segment's extent from forward progression.
-            const ownsFullTimeline = Boolean(
-                snapshot?.timelineSegments && snapshot.timelineSegments.length > 0,
-            );
+            // The asset's own credentials failed to verify, so the verdict is
+            // whole-asset rather than per-region and applies from the moment
+            // it's known - it must not wait for playback to read segments.
+            const wholeAssetInvalid = Boolean(snapshot?.wholeAssetInvalid);
+            // Keyed on the adapter's capability, not on whether it happens to
+            // have produced segments yet. Deriving it from segment count sent
+            // fragment-reporting adapters down the playhead-appending fallback
+            // before their first verdict arrived, which synthesized a
+            // placeholder span - so the bar was never truly empty at load.
+            // With no segments yet the correct render is nothing at all: the
+            // track's own grey already means "not read".
+            const ownsFullTimeline = !useStaticTimelineFallback;
             const isOrdinaryForwardTick =
                 !seeking &&
                 currentTime >= lastPlaybackTime &&
                 currentTime - lastPlaybackTime < minSeekTime;
 
-            if (c2paControlBar && (ownsFullTimeline || isOrdinaryForwardTick)) {
-                if (ownsFullTimeline) {
+            if (c2paControlBar && (wholeAssetInvalid || ownsFullTimeline || isOrdinaryForwardTick)) {
+                if (wholeAssetInvalid) {
+                    renderWholeAssetVerdict('Invalid', videoPlayer, c2paControlBar);
+                } else if (ownsFullTimeline) {
                     replaceC2PATimelineSegments(
-                        snapshot!.timelineSegments!,
+                        snapshot?.timelineSegments ?? [],
                         videoPlayer,
                         c2paControlBar,
                     );
@@ -263,11 +279,14 @@ export const C2PAPlayer = function (
                     // Playhead-appended fallback: stretch the trailing segment
                     // to the playhead, since its verdict covers the asset from
                     // where it started through wherever playback has reached.
-                    updateC2PATimeline(currentTime, videoPlayer, c2paControlBar, true);
+                    updateC2PATimeline(currentTime, videoPlayer, true);
                 }
 
                 const timeline = getTimelineState(useStaticTimelineFallback, videoPlayer, currentTime);
-                isManifestInvalid = getValidationState(snapshot) === 'Invalid' || timeline.hasInvalidSegments;
+                isManifestInvalid =
+                    wholeAssetInvalid ||
+                    getValidationState(snapshot) === 'Invalid' ||
+                    timeline.hasInvalidSegments;
                 updatePlayerRootValidationState(
                     playerRoot,
                     c2paStatus,

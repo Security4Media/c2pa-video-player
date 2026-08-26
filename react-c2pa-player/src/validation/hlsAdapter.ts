@@ -17,10 +17,11 @@
 import { Emitter } from './emitter';
 import { createUnknownResult, normalizeHlsManifestHelper } from './normalization';
 import { HlsBridgeRuntime } from './runtimes';
-import type { FragmentVerdict } from './runtimes/hlsBridgeRuntime';
 import { detectAdapterKind } from './sourceDetection';
-import { FragmentedTimelineProjector } from './timeline';
+import { FragmentedTimelineProjector, readRegionKey, selectReadRegions } from './timeline';
+import type { ReadRegion } from './timeline';
 import type {
+  ManifestSource,
   MediaSourceDescriptor,
   MediaValidationAdapter,
   TimelineSegmentDiagnostic,
@@ -136,34 +137,24 @@ class HlsFragmentedFmp4Session implements ValidationSession {
         // instead of flickering to "unknown".
         : this.#snapshot.result;
 
-    // Record every fragment the bridge has already validated, with its real
-    // presentation bounds - including fragments buffered ahead of the playhead,
-    // which a playhead-only sample would never colour. This is what makes a
-    // determined verdict stick to its own fragment instead of being inferred
-    // from wherever the playhead happened to be.
-    this.#observeFragmentVerdicts();
-
-    if (reader && result) {
-      // Playhead-sampled floor, kept because the enumeration above is keyed on
-      // hls.currentLevel: it is empty until ABR settles and restarts on a level
-      // switch, so without this the current position could go uncoloured. No
-      // explicit boundary to pass here (see FragmentedTimelineProjector's
-      // `startTime` comment), but `result.manifestSource` is the real manifest
-      // active at this exact lookup, so it's still meaningful to attach.
-      this.#timelineProjector.observe(
-        this.#lastPlaybackTime,
-        result.validationState,
-        undefined,
-        undefined,
-        result.manifestSource,
-      );
-    }
+    // Project only what playback has actually read (see selectReadRegions).
+    // No playhead-sampled "floor" observation alongside this: the fragment the
+    // playhead is inside is already covered by the gate, and a bare playhead
+    // sample carries no boundary of its own, so it would smear one verdict
+    // across the whole visited range.
+    this.#observeReadRegions(result?.manifestSource);
 
     this.#snapshot = {
       adapterKind: this.adapterKind,
       result,
       timelineSegments: this.#timelineProjector.snapshot(),
       message: this.#runtime.getMessage(),
+      // The reader's verdict is that of the manifest *store*, not of one
+      // fragment (C2paManifestHelper.getManifestStoreValidationState), so an
+      // 'Invalid' here condemns the whole asset rather than a single region -
+      // and it is known as soon as any fragment validates, before playback has
+      // reached most of the timeline.
+      wholeAssetInvalid: this.#wholeAssetInvalid(),
     };
 
     if (shouldEmit) {
@@ -172,45 +163,58 @@ class HlsFragmentedFmp4Session implements ValidationSession {
   }
 
   /**
-   * Pushes each newly-known (or newly-changed) fragment verdict into the
-   * projector with its real presentation bounds, so every fragment the bridge
-   * has validated carries its own colour - not just the ones the playhead has
-   * visited.
+   * Projects the parts of validated fragments that playback has actually read,
+   * clipped at the playhead (see selectReadRegions).
    *
-   * Runs on every rebuild, so it only observes fragments whose (bounds,
-   * verdict) pair it hasn't seen: re-upserting the whole list each tick would
-   * be quadratic in fragment count for no benefit, since the projector's
-   * upsert is idempotent for an unchanged fragment.
+   * Runs on every rebuild, so it skips regions whose (bounds, verdict) it has
+   * already projected: a fully-read fragment settles on one key and is
+   * observed once, while the fragment being watched refreshes each tick as its
+   * clipped end advances. Without that, re-upserting every region per tick
+   * would be quadratic in fragment count for no benefit, the projector's
+   * upsert being idempotent for an unchanged region.
    */
-  #observeFragmentVerdicts(): void {
-    const verdicts = this.#runtime.getFragmentVerdicts();
+  #observeReadRegions(currentManifestSource: ManifestSource | undefined): void {
+    const regions = selectReadRegions(
+      this.#runtime.getFragmentVerdicts(),
+      this.#lastPlaybackTime,
+    );
     const seen = new Set<string>();
 
-    verdicts.forEach((verdict) => {
-      const key = `${verdict.startTime}-${verdict.endTime}-${verdict.validationState}`;
+    regions.forEach((region) => {
+      const key = readRegionKey(region);
       seen.add(key);
 
       if (this.#observedFragmentKeys.has(key)) {
         return;
       }
 
-      // Only the interesting fragments need a manifest reference (for
-      // click-to-inspect) or a diagnostic entry; a plain Valid/Trusted
-      // fragment has nothing more to say than its colour.
-      const isAnomalous = verdict.validationState !== 'Valid' && verdict.validationState !== 'Trusted';
-      const midpoint = (verdict.startTime + verdict.endTime) / 2;
-      const reader = isAnomalous ? this.#runtime.lookup(midpoint) : null;
+      // Only anomalous regions need a diagnostic entry or a manifest reference
+      // (for click-to-inspect); a Valid/Trusted one says everything in its
+      // colour. The manifest is shared across fragments here, so the current
+      // lookup's source is the right one to attach.
+      const isAnomalous =
+        region.validationState !== 'Valid' && region.validationState !== 'Trusted';
 
       this.#timelineProjector.observe(
-        verdict.endTime,
-        verdict.validationState,
-        isAnomalous ? [toFragmentDiagnostic(verdict)] : undefined,
-        verdict.startTime,
-        reader ? normalizeHlsManifestHelper(reader).manifestSource : undefined,
+        region.endTime,
+        region.validationState,
+        isAnomalous ? [toFragmentDiagnostic(region)] : undefined,
+        region.startTime,
+        isAnomalous ? currentManifestSource : undefined,
       );
     });
 
     this.#observedFragmentKeys = seen;
+  }
+
+  /**
+   * True when the manifest store itself failed validation, which condemns the
+   * whole asset rather than any one region.
+   */
+  #wholeAssetInvalid(): boolean {
+    return this.#runtime
+      .getFragmentVerdicts()
+      .some((verdict) => verdict.validationState === 'Invalid');
   }
 
   #emit(): void {
@@ -229,11 +233,11 @@ class HlsFragmentedFmp4Session implements ValidationSession {
  * seconds-into-stream orders correctly even though DASH puts wall-clock ms
  * there; the two never mix, since a session has exactly one adapter.
  */
-function toFragmentDiagnostic(verdict: FragmentVerdict): TimelineSegmentDiagnostic {
+function toFragmentDiagnostic(region: ReadRegion): TimelineSegmentDiagnostic {
   return {
-    segmentNumber: Math.floor(verdict.startTime),
+    segmentNumber: Math.floor(region.startTime),
     mediaType: 'video',
-    status: verdict.validationState === 'Invalid' ? 'invalid' : 'unverified',
-    timestamp: verdict.startTime,
+    status: region.validationState === 'Invalid' ? 'invalid' : 'unverified',
+    timestamp: region.startTime,
   };
 }

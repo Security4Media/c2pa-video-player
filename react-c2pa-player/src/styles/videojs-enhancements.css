@@ -246,10 +246,13 @@
   z-index: 3;
 }
 
+/* `left` and `width` are both set per segment (see positionTimelineSegment), so
+   each one covers only its own stretch of the bar and unread stretches show the
+   track's grey through. No `left: 0` here: that was what forced every segment
+   to start at the origin, making a grey gap impossible to express. */
 .seekbar-play-c2pa {
   position: absolute;
   height: 100%;
-  left: 0;
   top: 0;
   pointer-events: none;
 }
