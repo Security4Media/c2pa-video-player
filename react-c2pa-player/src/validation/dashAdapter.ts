@@ -19,7 +19,13 @@ import { createUnknownResult } from './normalization';
 import { DashBridgeRuntime } from './runtimes';
 import type { DashSegmentEntry } from './runtimes/dashBridgeRuntime';
 import { detectAdapterKind } from './sourceDetection';
-import { FragmentedTimelineProjector, readRegionKey, selectReadRegions } from './timeline';
+import {
+  FragmentedTimelineProjector,
+  isActuallyPlaying,
+  readRegionKey,
+  selectReadRegions,
+  WatchedTimeline,
+} from './timeline';
 import type {
   MediaSourceDescriptor,
   MediaValidationAdapter,
@@ -64,6 +70,8 @@ class DashFragmentedFmp4Session implements ValidationSession {
   // ahead of the playhead; #observeReadRegions decides what may be shown.
   readonly #knownSegments: DashSegmentEntry[] = [];
   #observedRegionKeys = new Set<string>();
+  readonly #watched = new WatchedTimeline();
+  readonly #videoElement: HTMLVideoElement;
   #snapshot: ValidationStatusSnapshot = {
     adapterKind: this.adapterKind,
     result: null,
@@ -73,6 +81,7 @@ class DashFragmentedFmp4Session implements ValidationSession {
 
   constructor(context: ValidationAdapterContext) {
     this.#runtime = new DashBridgeRuntime(context);
+    this.#videoElement = context.videoElement;
   }
 
   async load(): Promise<void> {
@@ -129,7 +138,7 @@ class DashFragmentedFmp4Session implements ValidationSession {
         validationState: segment.result.validationState,
         segment,
       })),
-      this.#lastPlaybackTime,
+      this.#watched,
     );
     const seen = new Set<string>();
 
@@ -166,6 +175,7 @@ class DashFragmentedFmp4Session implements ValidationSession {
       this.#lastPlaybackTime = time;
     }
 
+    this.#watched.observePlayhead(this.#lastPlaybackTime, isActuallyPlaying(this.#videoElement));
     this.#observeReadRegions();
 
     const lookedUp = this.#runtime.lookup(this.#lastPlaybackTime);

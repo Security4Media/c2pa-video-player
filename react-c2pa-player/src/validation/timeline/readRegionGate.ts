@@ -15,6 +15,7 @@
  */
 
 import type { PlayerValidationState } from '../types';
+import type { WatchedTimeline } from './watchedTimeline';
 
 /**
  * A verdict a validator has produced for one segment of the asset, independent
@@ -26,15 +27,15 @@ export interface SegmentVerdict {
   validationState: PlayerValidationState;
 }
 
-/** A verdict narrowed to the part of its segment that has actually been read. */
-export interface ReadRegion<TSource extends SegmentVerdict = SegmentVerdict>
-  extends SegmentVerdict {
-  /** The verdict's own, unclipped end - used to tell "fully read" from "in progress". */
-  segmentEndTime: number;
+/** A verdict narrowed to a stretch of its segment that was actually read. */
+export interface ReadRegion<TSource extends SegmentVerdict = SegmentVerdict> {
+  startTime: number;
+  endTime: number;
+  validationState: PlayerValidationState;
   /**
    * The verdict this region came from. Carried through rather than left to the
-   * caller to match up by index: the gate filters, so output positions do not
-   * correspond to input positions.
+   * caller to match up by index: one verdict can yield several regions (or
+   * none), so output positions do not correspond to input positions.
    */
   source: TSource;
 }
@@ -49,45 +50,40 @@ export interface ReadRegion<TSource extends SegmentVerdict = SegmentVerdict>
  * whole bar almost immediately, which misrepresents unwatched content as
  * verified.
  *
- * So a verdict is only surfaced once the playhead has entered its segment, and
- * its end is clipped to the playhead: the segment currently being watched
- * colours progressively, and nothing is ever coloured ahead of the playhead.
- * A verdict is dropped entirely (rather than clipped to nothing) until playback
- * actually reaches it.
+ * The verdict is therefore intersected with the watched record rather than
+ * compared against the playhead. A playhead alone cannot express this: after
+ * seeking from 5s to 60s it sits past every earlier segment, though almost
+ * none of that was played. Intersecting also means a segment watched only in
+ * part is coloured only in part, and a segment watched in two separate sittings
+ * yields two coloured pieces with grey between them.
  */
 export function selectReadRegions<TSource extends SegmentVerdict>(
   verdicts: TSource[],
-  playhead: number,
+  watched: WatchedTimeline,
 ): ReadRegion<TSource>[] {
-  if (!Number.isFinite(playhead) || playhead <= 0) {
-    return [];
-  }
-
   return verdicts
     .filter(
       (verdict) =>
         Number.isFinite(verdict.startTime) &&
         Number.isFinite(verdict.endTime) &&
-        verdict.endTime > verdict.startTime &&
-        // Strictly greater: a segment the playhead has not entered yet has
-        // been validated but not read, and must stay grey.
-        playhead > verdict.startTime,
+        verdict.endTime > verdict.startTime,
     )
-    .map((verdict) => ({
-      startTime: verdict.startTime,
-      endTime: Math.min(verdict.endTime, playhead),
-      segmentEndTime: verdict.endTime,
-      validationState: verdict.validationState,
-      source: verdict,
-    }));
+    .flatMap((verdict) =>
+      watched.intersect(verdict.startTime, verdict.endTime).map((piece) => ({
+        startTime: piece.startTime,
+        endTime: piece.endTime,
+        validationState: verdict.validationState,
+        source: verdict,
+      })),
+    );
 }
 
 /**
  * Stable identity for a read region, used to skip re-projecting work that
- * hasn't changed. Includes the clipped end and the verdict, so a fully-read
- * segment settles on one key and stops being re-observed, while the
- * in-progress one refreshes as the playhead advances and any segment whose
- * verdict is later revised is re-observed.
+ * hasn't changed. Includes the bounds and the verdict, so a fully-read segment
+ * settles on one key and stops being re-observed, the region currently growing
+ * refreshes as playback extends it, and any segment whose verdict is later
+ * revised is re-observed.
  */
 export function readRegionKey(region: ReadRegion<SegmentVerdict>): string {
   return `${region.startTime}-${region.endTime}-${region.validationState}`;

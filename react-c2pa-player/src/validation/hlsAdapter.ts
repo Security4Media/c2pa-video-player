@@ -18,7 +18,13 @@ import { Emitter } from './emitter';
 import { createUnknownResult, normalizeHlsManifestHelper } from './normalization';
 import { HlsBridgeRuntime } from './runtimes';
 import { detectAdapterKind } from './sourceDetection';
-import { FragmentedTimelineProjector, readRegionKey, selectReadRegions } from './timeline';
+import {
+  FragmentedTimelineProjector,
+  isActuallyPlaying,
+  readRegionKey,
+  selectReadRegions,
+  WatchedTimeline,
+} from './timeline';
 import type { ReadRegion } from './timeline';
 import type {
   ManifestSource,
@@ -74,14 +80,17 @@ class HlsFragmentedFmp4Session implements ValidationSession {
     message: 'HLS C2PA fragment validation pending',
   };
   #lastPlaybackTime = 0;
-  // Fragments already pushed into the projector, keyed by bounds *and* verdict
-  // so a fragment whose verdict later changes is re-observed. Rebuilt from
-  // each enumeration (see #observeFragmentVerdicts) rather than only added to,
-  // so it can never outgrow the bridge's own fragment list.
+  // Regions already pushed into the projector, keyed by bounds *and* verdict so
+  // a region whose verdict later changes is re-observed. Rebuilt on each pass
+  // (see #observeReadRegions) rather than only added to, so it can never
+  // outgrow the current set of read regions.
   #observedFragmentKeys = new Set<string>();
+  readonly #watched = new WatchedTimeline();
+  readonly #videoElement: HTMLVideoElement;
 
   constructor(context: ValidationAdapterContext) {
     this.#runtime = new HlsBridgeRuntime(context);
+    this.#videoElement = context.videoElement;
   }
 
   async load(): Promise<void> {
@@ -126,6 +135,8 @@ class HlsFragmentedFmp4Session implements ValidationSession {
     if (Number.isFinite(time)) {
       this.#lastPlaybackTime = time;
     }
+
+    this.#watched.observePlayhead(this.#lastPlaybackTime, isActuallyPlaying(this.#videoElement));
 
     const reader = this.#runtime.lookup(this.#lastPlaybackTime);
     const result = reader
@@ -174,10 +185,7 @@ class HlsFragmentedFmp4Session implements ValidationSession {
    * upsert being idempotent for an unchanged region.
    */
   #observeReadRegions(currentManifestSource: ManifestSource | undefined): void {
-    const regions = selectReadRegions(
-      this.#runtime.getFragmentVerdicts(),
-      this.#lastPlaybackTime,
-    );
+    const regions = selectReadRegions(this.#runtime.getFragmentVerdicts(), this.#watched);
     const seen = new Set<string>();
 
     regions.forEach((region) => {
