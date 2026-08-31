@@ -138,16 +138,3 @@ export interface AiOptOutSectionItem {
     assertion: AiOptOutAssertionItem;
 }
 
-export interface LiveSegmentDiagnosticEntry {
-    segmentNumber: number;
-    mediaType: string;
-    status: string;
-    sequenceReason?: string;
-    errorCodes?: string[];
-    quality?: string;
-}
-
-export interface LiveSegmentDiagnosticsSectionItem {
-    entries: LiveSegmentDiagnosticEntry[];
-    truncatedCount: number;
-}

@@ -26,7 +26,6 @@ import {
   HistoryDetailView,
   HistorySection,
   InvalidState,
-  LiveSegmentDiagnosticsSection,
   LoadingState,
   MenuHeader,
   NoManifestState,
@@ -60,14 +59,12 @@ export function C2paMenuContent({
   const [activeView, setActiveView] = useState<'default' | 'history'>('default');
   const [workExpanded, setWorkExpanded] = useState(false);
   const [aiOptOutExpanded, setAiOptOutExpanded] = useState(false);
-  const [liveSegmentsExpanded, setLiveSegmentsExpanded] = useState(false);
   const [ingredientsExpanded, setIngredientsExpanded] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     setActiveView('default');
     setWorkExpanded(false);
     setAiOptOutExpanded(false);
-    setLiveSegmentsExpanded(false);
     setIngredientsExpanded({});
   }, [resetKey]);
 
@@ -157,17 +154,6 @@ export function C2paMenuContent({
       <MenuHeader title={headerTitle} leadingAction={headerAction} />
       <ul className="vjs-menu-content c2pa-menu-content-list" role="menu">
         {mode === 'invalid' ? <InvalidState /> : null}
-        {/* Problems first: if any fragment failed validation, that is the most
-            important thing in this menu and shouldn't sit below the
-            provenance detail. */}
-        {sections.liveSegments ? (
-          <LiveSegmentDiagnosticsSection
-            section={sections.liveSegments}
-            title={sectionTitles.liveSegments}
-            isExpanded={liveSegmentsExpanded}
-            onToggle={() => setLiveSegmentsExpanded(current => !current)}
-          />
-        ) : null}
         <SummarySection section={sections.summary} sectionTitles={sectionTitles} />
         {sections.claimGenerator ? (
           <ClaimGeneratorSection

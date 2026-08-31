@@ -34,12 +34,9 @@ import type {
     AiOptOutSectionItem,
     ClaimGeneratorSectionItem,
     HistorySectionItem,
-    LiveSegmentDiagnosticsSectionItem,
     OrganizationSectionItem,
     WorkSectionItem,
 } from './models';
-
-const MAX_LIVE_SEGMENT_DIAGNOSTICS = 20;
 
 export const c2paMenuSectionTitles = {
     summaryIssuer: 'Issued by',
@@ -49,7 +46,6 @@ export const c2paMenuSectionTitles = {
     work: 'About the Producer',
     aiOptOut: 'About Training and Data mining',
     history: 'History of provenance',
-    liveSegments: 'Segment issues',
     validationStatus: 'Validation Status',
     alert: 'Alert',
 } as const;
@@ -71,7 +67,6 @@ export interface C2paMenuSections {
     work: WorkSectionItem | null;
     aiOptOut: AiOptOutSectionItem | null;
     history: HistorySectionItem | null;
-    liveSegments: LiveSegmentDiagnosticsSectionItem | null;
 }
 
 export interface C2paMenuRenderState {
@@ -80,33 +75,6 @@ export interface C2paMenuRenderState {
     sections: C2paMenuSections | null;
     /** True when showing a clicked timeline fragment rather than the live/current status. */
     isSegmentView: boolean;
-}
-
-function selectLiveSegmentsSection(
-    timelineSegments: C2PAStatus['timelineSegments'],
-): LiveSegmentDiagnosticsSectionItem | null {
-    const diagnostics = (timelineSegments ?? [])
-        .flatMap((segment) => segment.diagnostics ?? [])
-        // Every valid segment would otherwise flood this list; only the
-        // anomalies the user asked to see are worth surfacing here.
-        .filter((diagnostic) => diagnostic.status !== 'valid')
-        .sort((a, b) => b.timestamp - a.timestamp);
-
-    if (diagnostics.length === 0) {
-        return null;
-    }
-
-    return {
-        entries: diagnostics.slice(0, MAX_LIVE_SEGMENT_DIAGNOSTICS).map((diagnostic) => ({
-            segmentNumber: diagnostic.segmentNumber,
-            mediaType: diagnostic.mediaType,
-            status: diagnostic.status,
-            sequenceReason: diagnostic.sequenceReason,
-            errorCodes: diagnostic.errorCodes,
-            quality: diagnostic.quality,
-        })),
-        truncatedCount: Math.max(0, diagnostics.length - MAX_LIVE_SEGMENT_DIAGNOSTICS),
-    };
 }
 
 function formatClock(totalSeconds: number) {
@@ -238,24 +206,12 @@ export function buildMenuRenderState(
     // to show alongside the failure - surface only the failure message,
     // for every adapter (monolithic, HLS, DASH, live or VOD) alike.
     if (validationStatus === 'Invalid') {
-        // When the manifest or init segment is what failed, the whole asset is
-        // condemned and the alert already says so. Listing segments underneath
-        // would imply those particular ones are at fault, when in truth every
-        // fragment reports the same manifest-level failure - so the list is
-        // both redundant and misleading. A fragment that failed its own
-        // integrity check still earns an entry: there the list is the only
-        // place naming which fragments went bad.
-        const liveSegments = c2paStatus?.wholeAssetInvalid
-            ? null
-            : selectLiveSegmentsSection(c2paStatus?.timelineSegments);
-
         return {
             mode: 'invalid',
             manifestId,
             isSegmentView: false,
             sections: buildInvalidOnlySections(
                 buildAlertMessage(timeline, c2paStatus?.timelineSegments),
-                liveSegments,
             ),
         };
     }
@@ -278,7 +234,6 @@ export function buildMenuRenderState(
             history: selectorManifestStore
                 ? selectHistorySection(activeManifest, selectorManifestStore)
                 : null,
-            liveSegments: selectLiveSegmentsSection(c2paStatus?.timelineSegments),
         },
     };
 }
@@ -286,16 +241,11 @@ export function buildMenuRenderState(
 /**
  * Sections for the 'invalid' mode: nothing the manifest *claims* is
  * trustworthy enough to show, so claim generator, organization, work, AI
- * opt-out and history are all suppressed. The failure message is kept, and
- * with it the per-segment issue list when one is still meaningful - both
- * describe the failure itself rather than asserting anything on the
- * unverified manifest's behalf. The caller passes `null` for the list when
- * the failure is manifest-wide.
+ * opt-out and history are all suppressed. Only the failure message remains -
+ * it describes the failure itself rather than asserting anything on the
+ * unverified manifest's behalf.
  */
-function buildInvalidOnlySections(
-    alert: string | null,
-    liveSegments: LiveSegmentDiagnosticsSectionItem | null,
-): C2paMenuSections {
+function buildInvalidOnlySections(alert: string | null): C2paMenuSections {
     return {
         summary: {
             issuer: null,
@@ -308,7 +258,6 @@ function buildInvalidOnlySections(
         work: null,
         aiOptOut: null,
         history: null,
-        liveSegments,
     };
 }
 
@@ -359,7 +308,6 @@ function buildSegmentMenuRenderState(segment: ValidationTimelineSegment): C2paMe
                 work: null,
                 aiOptOut: null,
                 history: null,
-                liveSegments: null,
             },
         };
     }
@@ -369,10 +317,7 @@ function buildSegmentMenuRenderState(segment: ValidationTimelineSegment): C2paMe
             mode: 'invalid',
             manifestId: getManifestId(activeManifest, null),
             isSegmentView: true,
-            // No segment-issue list in a single-fragment view: that list is
-            // about anomalies across the whole timeline, not this fragment,
-            // whose own verdict is already the subject of this view.
-            sections: buildInvalidOnlySections(alert, null),
+            sections: buildInvalidOnlySections(alert),
         };
     }
 
@@ -401,7 +346,6 @@ function buildSegmentMenuRenderState(segment: ValidationTimelineSegment): C2paMe
                 : null,
             // Not relevant to a single-segment detail view - that list is
             // about anomalies across the whole timeline, not this fragment.
-            liveSegments: null,
         },
     };
 }
