@@ -17,7 +17,7 @@
 import type { Manifest, ManifestAssertion } from '@contentauth/c2pa-web';
 import type { C2paManifest, SegmentRecord } from '@qualabs/c2pa-live-dashjs-plugin';
 import { getDashSegmentValidationState } from '../rules';
-import type { ManifestSource, NormalizedValidationResult, TimelineSegmentDiagnostic } from '../types';
+import type { ManifestSource, NormalizedValidationResult } from '../types';
 
 function toCompatibilityAssertions(assertions: C2paManifest['assertions']): ManifestAssertion[] {
   if (!assertions) {
@@ -49,18 +49,6 @@ function toCompatibilityManifest(manifest: C2paManifest | null | undefined): Man
   };
 }
 
-function toDiagnostic(record: SegmentRecord): TimelineSegmentDiagnostic {
-  return {
-    segmentNumber: record.segmentNumber,
-    mediaType: record.mediaType,
-    status: record.status,
-    sequenceReason: record.sequenceReason,
-    errorCodes: record.errorCodes ? [...record.errorCodes] : undefined,
-    quality: record.quality,
-    timestamp: record.timestamp,
-  };
-}
-
 /**
  * Normalizes one plugin `SegmentRecord` into the shared validation result
  * shape. `manifestStore` is deliberately left `null` (same as HLS's
@@ -78,10 +66,7 @@ function toDiagnostic(record: SegmentRecord): TimelineSegmentDiagnostic {
 export function normalizeDashSegmentRecord(
   record: SegmentRecord,
   latestManifest: C2paManifest | null
-): {
-  result: NormalizedValidationResult;
-  diagnostic: TimelineSegmentDiagnostic;
-} {
+): { result: NormalizedValidationResult } {
   const validationState = getDashSegmentValidationState(record.status);
   const activeManifest = toCompatibilityManifest(record.manifest ?? latestManifest);
   // No `validationErrors` array exists in this adapter (unlike HLS) - DASH
@@ -103,6 +88,5 @@ export function normalizeDashSegmentRecord(
 
   return {
     result: { manifestStore: null, validationState, activeManifest, manifestSource },
-    diagnostic: toDiagnostic(record),
   };
 }

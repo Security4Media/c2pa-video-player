@@ -17,7 +17,6 @@
 import { Emitter } from './emitter';
 import { createUnknownResult, normalizeHlsManifestHelper } from './normalization';
 import { HlsBridgeRuntime } from './runtimes';
-import type { FragmentVerdict } from './runtimes/hlsBridgeRuntime';
 import { detectAdapterKind } from './sourceDetection';
 import {
   FragmentedTimelineProjector,
@@ -26,12 +25,10 @@ import {
   selectReadRegions,
   WatchedTimeline,
 } from './timeline';
-import type { ReadRegion } from './timeline';
 import type {
   ManifestSource,
   MediaSourceDescriptor,
   MediaValidationAdapter,
-  TimelineSegmentDiagnostic,
   ValidationAdapterContext,
   ValidationSession,
   ValidationSessionListener,
@@ -194,17 +191,16 @@ class HlsFragmentedFmp4Session implements ValidationSession {
         return;
       }
 
-      // Only anomalous regions need a diagnostic entry or a manifest reference
-      // (for click-to-inspect); a Valid/Trusted one says everything in its
-      // colour. The manifest is shared across fragments here, so the current
-      // lookup's source is the right one to attach.
+      // Only anomalous regions need a manifest reference (for
+      // click-to-inspect); a Valid/Trusted one says everything in its colour.
+      // The manifest is shared across fragments here, so the current lookup's
+      // source is the right one to attach.
       const isAnomalous =
         region.validationState !== 'Valid' && region.validationState !== 'Trusted';
 
       this.#timelineProjector.observe(
         region.endTime,
         region.validationState,
-        isAnomalous ? [toFragmentDiagnostic(region)] : undefined,
         region.startTime,
         isAnomalous ? currentManifestSource : undefined,
       );
@@ -233,26 +229,4 @@ class HlsFragmentedFmp4Session implements ValidationSession {
   #emit(): void {
     this.#emitter.emit(this.#snapshot);
   }
-}
-
-/**
- * Describes one non-Valid HLS fragment for the menu's "Segment issues" list.
- *
- * `segmentNumber` is the fragment's 1-based position in playback order, so the
- * menu reads "Segment 3" for the third fragment. It previously carried
- * seconds-into-stream, which rendered as e.g. "Segment 32" for the fifth
- * fragment - a number that looks like an index but is not one.
- *
- * `timestamp` is only ever used for relative sorting within one adapter's
- * diagnostics (see menuViewModel.ts#selectLiveSegmentsSection), so
- * seconds-into-stream orders correctly even though DASH puts wall-clock ms
- * there; the two never mix, since a session has exactly one adapter.
- */
-function toFragmentDiagnostic(region: ReadRegion<FragmentVerdict>): TimelineSegmentDiagnostic {
-  return {
-    segmentNumber: region.source.index,
-    mediaType: 'video',
-    status: region.validationState === 'Invalid' ? 'invalid' : 'unverified',
-    timestamp: region.startTime,
-  };
 }

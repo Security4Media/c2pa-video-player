@@ -25,7 +25,7 @@ import type {
 } from '@qualabs/c2pa-live-dashjs-plugin';
 import { Emitter, type EmitterListener } from '../emitter';
 import { normalizeDashSegmentRecord } from '../normalization/dash';
-import type { NormalizedValidationResult, TimelineSegmentDiagnostic, ValidationAdapterContext } from '../types';
+import type { NormalizedValidationResult, ValidationAdapterContext } from '../types';
 
 type RuntimeListener = EmitterListener<void>;
 
@@ -33,7 +33,6 @@ export interface DashSegmentEntry {
   startTime: number;
   endTime: number;
   result: NormalizedValidationResult;
-  diagnostic: TimelineSegmentDiagnostic;
 }
 
 interface PendingTiming {
@@ -201,7 +200,7 @@ export class DashBridgeRuntime {
     return this.#evictedSegmentCount + this.#segments.length;
   }
 
-  lookup(time: number): { result: NormalizedValidationResult; diagnostic: TimelineSegmentDiagnostic } | null {
+  lookup(time: number): { result: NormalizedValidationResult } | null {
     if (this.#segments.length === 0) {
       return null;
     }
@@ -211,14 +210,14 @@ export class DashBridgeRuntime {
     );
 
     if (covering) {
-      return { result: covering.result, diagnostic: covering.diagnostic };
+      return { result: covering.result };
     }
 
     const last = this.#segments[this.#segments.length - 1];
 
     // Playback can run slightly ahead of validation completion at the live
     // edge; report the most recently known state rather than "unknown".
-    return time >= last.endTime ? { result: last.result, diagnostic: last.diagnostic } : null;
+    return time >= last.endTime ? { result: last.result } : null;
   }
 
   getMessage(): string {
@@ -298,7 +297,7 @@ export class DashBridgeRuntime {
     }
 
     const timing = this.#pendingTiming.get(record.mediaType)?.shift() ?? null;
-    const { result, diagnostic } = normalizeDashSegmentRecord(record, this.#latestManifest);
+    const { result } = normalizeDashSegmentRecord(record, this.#latestManifest);
 
     if (!timing) {
       // The two event streams are paired purely by arrival order (see class
@@ -330,7 +329,7 @@ export class DashBridgeRuntime {
     const endTime = timing?.endTime ?? startTime + NOMINAL_SEGMENT_DURATION_SECONDS;
     this.#estimatedTimelineEnd = Math.max(this.#estimatedTimelineEnd, endTime);
 
-    this.#segments.push({ startTime, endTime, result, diagnostic });
+    this.#segments.push({ startTime, endTime, result });
     this.#evictStaleSegments();
     this.#emit();
   };

@@ -17,7 +17,6 @@
 import type {
   ManifestSource,
   PlayerValidationState,
-  TimelineSegmentDiagnostic,
   ValidationTimelineSegment,
 } from '../types';
 
@@ -29,13 +28,6 @@ import type {
 // runtime's own point-lookup segments) - kept as an independent constant here
 // rather than importing across the timeline/ -> runtimes/ boundary.
 const LIVE_SEGMENT_RETENTION_WINDOW_SECONDS = 600;
-
-// Caps how many diagnostics a single merged timeline segment can accumulate
-// once live (a long-running live session would otherwise grow this array
-// once per underlying fragment/segment forever, even once merged into one
-// visual run). Distinct from menuViewModel.ts's MAX_LIVE_SEGMENT_DIAGNOSTICS,
-// which truncates a different, display-layer list.
-const LIVE_SEGMENT_DIAGNOSTICS_CAP = 20;
 
 // Tolerance for treating two segments as touching/contiguous rather than
 // leaving a hairline gap between them, e.g. from floating-point rounding.
@@ -79,7 +71,6 @@ export class FragmentedTimelineProjector {
   observe(
     time: number,
     validationState: PlayerValidationState,
-    diagnostics?: TimelineSegmentDiagnostic[],
     startTime?: number,
     manifestRef?: ManifestSource
   ): void {
@@ -109,7 +100,6 @@ export class FragmentedTimelineProjector {
 
     const safeStart = Math.min(resolvedStartTime, time);
     const safeEnd = Math.max(resolvedStartTime, time);
-    const diagnosticsCap = this.#isLive ? LIVE_SEGMENT_DIAGNOSTICS_CAP : undefined;
     const lastSegment = this.#segments[this.#segments.length - 1];
 
     // Fast path: this observation only extends past the chronologically-latest
@@ -129,13 +119,6 @@ export class FragmentedTimelineProjector {
       if (lastSegment.validationState === validationState) {
         lastSegment.endTime = Math.max(lastSegment.endTime, safeEnd);
 
-        if (diagnostics?.length) {
-          lastSegment.diagnostics = capDiagnostics(
-            mergeDiagnostics(lastSegment.diagnostics, diagnostics),
-            diagnosticsCap
-          );
-        }
-
         if (manifestRef) {
           lastSegment.manifestRef = manifestRef;
         }
@@ -144,16 +127,16 @@ export class FragmentedTimelineProjector {
           startTime: safeStart,
           endTime: safeEnd,
           validationState,
-          diagnostics,
           manifestRef,
         });
       }
     } else {
-      this.#segments = upsertInterval(
-        this.#segments,
-        { startTime: safeStart, endTime: safeEnd, validationState, diagnostics, manifestRef },
-        diagnosticsCap
-      );
+      this.#segments = upsertInterval(this.#segments, {
+        startTime: safeStart,
+        endTime: safeEnd,
+        validationState,
+        manifestRef,
+      });
     }
 
     this.#lastObservedTime = time;
@@ -189,44 +172,6 @@ export class FragmentedTimelineProjector {
 }
 
 /**
- * Concatenates diagnostics, dropping any that describe a segment already
- * listed.
- *
- * A fragment being watched is re-observed as its clipped end advances, and each
- * pass carries that fragment's diagnostic again. Appending blindly listed the
- * same bad segment once per tick ("Segment 3" three times over); identity is
- * the segment it describes, not the object, so re-observation is idempotent.
- */
-function mergeDiagnostics(
-  existing: TimelineSegmentDiagnostic[] | undefined,
-  incoming: TimelineSegmentDiagnostic[]
-): TimelineSegmentDiagnostic[] {
-  const current = existing ?? [];
-  const seen = new Set(current.map(diagnosticIdentity));
-  const additions = incoming.filter((diagnostic) => !seen.has(diagnosticIdentity(diagnostic)));
-
-  return additions.length === 0 ? current : [...current, ...additions];
-}
-
-function diagnosticIdentity(diagnostic: TimelineSegmentDiagnostic): string {
-  return `${diagnostic.segmentNumber}-${diagnostic.mediaType}-${diagnostic.status}`;
-}
-
-function capDiagnostics(
-  diagnostics: TimelineSegmentDiagnostic[],
-  cap?: number
-): TimelineSegmentDiagnostic[] {
-  if (cap === undefined || diagnostics.length <= cap) {
-    return diagnostics;
-  }
-
-  // Keep the most recent entries - the truncated-count/anomaly-focused
-  // display (menuViewModel.ts's selectLiveSegmentsSection) cares about what's
-  // happening now on a long-running live session, not the oldest history.
-  return diagnostics.slice(-cap);
-}
-
-/**
  * Inserts one interval into the sorted, non-overlapping `segments` array:
  * trims or splits any existing segment(s) that overlap `newSegment`'s range
  * (a segment fully covered by `newSegment` contributes nothing; a segment
@@ -241,8 +186,7 @@ function capDiagnostics(
  */
 function upsertInterval(
   segments: ValidationTimelineSegment[],
-  newSegment: ValidationTimelineSegment,
-  diagnosticsCap?: number
+  newSegment: ValidationTimelineSegment
 ): ValidationTimelineSegment[] {
   const result: ValidationTimelineSegment[] = [];
   let inserted = false;
@@ -281,13 +225,10 @@ function upsertInterval(
     result.push(newSegment);
   }
 
-  return mergeSegments(result, diagnosticsCap);
+  return mergeSegments(result);
 }
 
-function mergeSegments(
-  segments: ValidationTimelineSegment[],
-  diagnosticsCap?: number
-): ValidationTimelineSegment[] {
+function mergeSegments(segments: ValidationTimelineSegment[]): ValidationTimelineSegment[] {
   const sortedSegments = [...segments].sort((left, right) => left.startTime - right.startTime);
   const merged: ValidationTimelineSegment[] = [];
 
@@ -304,13 +245,6 @@ function mergeSegments(
 
     if (overlaps && sameState) {
       previous.endTime = Math.max(previous.endTime, segment.endTime);
-
-      if (segment.diagnostics?.length) {
-        previous.diagnostics = capDiagnostics(
-          mergeDiagnostics(previous.diagnostics, segment.diagnostics),
-          diagnosticsCap
-        );
-      }
 
       if (segment.manifestRef) {
         previous.manifestRef = segment.manifestRef;

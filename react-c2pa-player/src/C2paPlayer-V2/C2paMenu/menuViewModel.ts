@@ -262,15 +262,6 @@ function buildInvalidOnlySections(alert: string | null): C2paMenuSections {
 }
 
 function buildSegmentAlertMessage(segment: ValidationTimelineSegment): string | null {
-    const anomaly = (segment.diagnostics ?? [])
-        .filter((diagnostic) => diagnostic.status !== 'valid')
-        .sort((a, b) => b.timestamp - a.timestamp)[0];
-
-    if (anomaly) {
-        return `${anomaly.mediaType} segment #${anomaly.segmentNumber}: ${anomaly.status}` +
-            (anomaly.sequenceReason ? ` — ${anomaly.sequenceReason}` : '');
-    }
-
     if (segment.manifestRef?.kind === 'integrity-only' && segment.manifestRef.integrityStatus !== 'valid') {
         const { integrityStatus, sequenceReason } = segment.manifestRef;
         return `Segment integrity: ${integrityStatus}` + (sequenceReason ? ` — ${sequenceReason}` : '');

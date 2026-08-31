@@ -58,7 +58,6 @@ export type {
   PlayerValidationState,
   SegmentIntegrityStatus,
   TimeInterval,
-  TimelineSegmentDiagnostic,
   TrustMaterial,
   TrustMaterialProvider,
   ValidationAdapterContext,

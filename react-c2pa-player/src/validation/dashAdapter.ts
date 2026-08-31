@@ -155,7 +155,6 @@ class DashFragmentedFmp4Session implements ValidationSession {
       this.#timelineProjector.observe(
         region.endTime,
         region.validationState,
-        [segment.diagnostic],
         region.startTime,
         segment.result.manifestSource,
       );
