@@ -22,6 +22,7 @@ import type {
 } from './menuViewModel';
 import {
   AiOptOutSection,
+  AlertItem,
   ClaimGeneratorSection,
   HistoryDetailView,
   HistorySection,
@@ -154,6 +155,13 @@ export function C2paMenuContent({
       <MenuHeader title={headerTitle} leadingAction={headerAction} />
       <ul className="vjs-menu-content c2pa-menu-content-list" role="menu">
         {mode === 'invalid' ? <InvalidState /> : null}
+        {/* Whatever went wrong leads the menu. It used to trail the summary's
+            issuer and date, which buried the one line saying something is
+            wrong under provenance detail that only matters once nothing is.
+            In 'invalid' mode it follows the headline block, which states the
+            failure in general terms, and adds which part of the timeline it
+            affects. */}
+        {sections.summary.alert ? <AlertItem itemValue={sections.summary.alert} /> : null}
         <SummarySection section={sections.summary} sectionTitles={sectionTitles} />
         {sections.claimGenerator ? (
           <ClaimGeneratorSection
