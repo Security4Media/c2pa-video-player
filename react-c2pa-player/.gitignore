@@ -4,3 +4,8 @@ dist
 *.log
 .vscode
 .idea
+
+# Tampered C2PA test streams (~30MB of fMP4 per fixture). Deliberately
+# untracked: they are derived from the WDR test stream and regenerated on
+# demand, so the binaries stay out of git.
+public/hls-fixtures/

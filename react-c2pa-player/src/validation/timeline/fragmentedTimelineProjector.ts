@@ -131,7 +131,7 @@ export class FragmentedTimelineProjector {
 
         if (diagnostics?.length) {
           lastSegment.diagnostics = capDiagnostics(
-            [...(lastSegment.diagnostics ?? []), ...diagnostics],
+            mergeDiagnostics(lastSegment.diagnostics, diagnostics),
             diagnosticsCap
           );
         }
@@ -186,6 +186,30 @@ export class FragmentedTimelineProjector {
       this.#segments.shift();
     }
   }
+}
+
+/**
+ * Concatenates diagnostics, dropping any that describe a segment already
+ * listed.
+ *
+ * A fragment being watched is re-observed as its clipped end advances, and each
+ * pass carries that fragment's diagnostic again. Appending blindly listed the
+ * same bad segment once per tick ("Segment 3" three times over); identity is
+ * the segment it describes, not the object, so re-observation is idempotent.
+ */
+function mergeDiagnostics(
+  existing: TimelineSegmentDiagnostic[] | undefined,
+  incoming: TimelineSegmentDiagnostic[]
+): TimelineSegmentDiagnostic[] {
+  const current = existing ?? [];
+  const seen = new Set(current.map(diagnosticIdentity));
+  const additions = incoming.filter((diagnostic) => !seen.has(diagnosticIdentity(diagnostic)));
+
+  return additions.length === 0 ? current : [...current, ...additions];
+}
+
+function diagnosticIdentity(diagnostic: TimelineSegmentDiagnostic): string {
+  return `${diagnostic.segmentNumber}-${diagnostic.mediaType}-${diagnostic.status}`;
 }
 
 function capDiagnostics(
@@ -283,7 +307,7 @@ function mergeSegments(
 
       if (segment.diagnostics?.length) {
         previous.diagnostics = capDiagnostics(
-          [...(previous.diagnostics ?? []), ...segment.diagnostics],
+          mergeDiagnostics(previous.diagnostics, segment.diagnostics),
           diagnosticsCap
         );
       }

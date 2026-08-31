@@ -26,10 +26,41 @@ import type { PlayerValidationState, TimeInterval, ValidationAdapterContext } fr
 type RuntimeListener = EmitterListener<void>;
 
 /** One fragment's real presentation bounds plus its own validation verdict. */
+/**
+ * How far a fragment's validation failure reaches.
+ *
+ * A BMFF hash assertion covers one fragment's media data, so a mismatch there
+ * condemns that fragment alone. Every other failure - claim signature, an
+ * assertion's hashed URI, the signing credential - is a property of the
+ * manifest itself and is therefore reported identically by every fragment,
+ * condemning the whole asset.
+ *
+ * Confirmed against tampered fixtures of the WDR test stream: altering an
+ * assertion in the init manifest store yields assertion.hashedURI.mismatch on
+ * all 16 fragments, while corrupting (or removing) individual fragments'
+ * Merkle proofs yields assertion.bmffHash.mismatch on exactly those fragments,
+ * the untouched ones staying Trusted with no errors at all.
+ */
+export type FragmentFailureScope = 'fragment' | 'manifest';
+
 export interface FragmentVerdict {
+  /** 1-based position in playback order, for display. */
+  index: number;
   startTime: number;
   endTime: number;
   validationState: PlayerValidationState;
+  /** `null` when the fragment did not fail validation. */
+  failureScope: FragmentFailureScope | null;
+}
+
+// The BMFF hash assertion is the only per-fragment integrity check, so its
+// codes (mismatch, and any future sibling) are the fragment-scoped ones.
+function classifyFailureScope(codes: readonly string[]): FragmentFailureScope | null {
+  if (codes.length === 0) {
+    return null;
+  }
+
+  return codes.every((code) => code.includes('bmffHash')) ? 'fragment' : 'manifest';
 }
 
 export class HlsBridgeRuntime {
@@ -184,18 +215,25 @@ export class HlsBridgeRuntime {
       .map(readInterval)
       .filter((interval): interval is TimeInterval => interval !== null)
       .filter((interval) => interval.endTime > interval.startTime)
-      .map((interval) => {
+      // Sorted so the display index below follows playback order rather than
+      // whatever order the bridge happens to enumerate in.
+      .sort((left, right) => left.startTime - right.startTime)
+      .map((interval, position) => {
         // Sample the middle of the fragment: the bounds are half-open, so an
         // endpoint can resolve to the neighbouring fragment.
         const midpoint = (interval.startTime + interval.endTime) / 2;
         const reader = bridge.getC2PAMetaByTimeCode(midpoint);
 
         return {
+          index: position + 1,
           startTime: interval.startTime,
           endTime: interval.endTime,
           validationState: reader
             ? getHlsValidationState(reader, reader.containsSignature())
             : ('Unknown' as PlayerValidationState),
+          failureScope: reader
+            ? classifyFailureScope((reader.getValidationErrors() ?? []).map((error) => error.code))
+            : null,
         };
       });
   }
