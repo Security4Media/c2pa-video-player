@@ -21,7 +21,10 @@ import type { NormalizedC2PAResult, ValidationStatusSnapshot } from './types';
 
 export function createC2PAStatusFromResult(
   result: NormalizedC2PAResult,
-  metadata: Pick<C2PAStatus, 'adapterKind' | 'timelineSegments' | 'message'> = {}
+  metadata: Pick<
+    C2PAStatus,
+    'adapterKind' | 'timelineSegments' | 'message' | 'wholeAssetInvalid'
+  > = {}
 ): C2PAStatus {
   return {
     manifestStore: result.manifestStore,
@@ -43,6 +46,7 @@ export function createC2PAStatusFromSnapshot(
     adapterKind: snapshot.adapterKind,
     timelineSegments: snapshot.timelineSegments,
     message: snapshot.message,
+    wholeAssetInvalid: snapshot.wholeAssetInvalid,
   });
 }
 

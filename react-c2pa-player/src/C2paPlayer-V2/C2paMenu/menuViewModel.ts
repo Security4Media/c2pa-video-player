@@ -238,13 +238,24 @@ export function buildMenuRenderState(
     // to show alongside the failure - surface only the failure message,
     // for every adapter (monolithic, HLS, DASH, live or VOD) alike.
     if (validationStatus === 'Invalid') {
+        // When the manifest or init segment is what failed, the whole asset is
+        // condemned and the alert already says so. Listing segments underneath
+        // would imply those particular ones are at fault, when in truth every
+        // fragment reports the same manifest-level failure - so the list is
+        // both redundant and misleading. A fragment that failed its own
+        // integrity check still earns an entry: there the list is the only
+        // place naming which fragments went bad.
+        const liveSegments = c2paStatus?.wholeAssetInvalid
+            ? null
+            : selectLiveSegmentsSection(c2paStatus?.timelineSegments);
+
         return {
             mode: 'invalid',
             manifestId,
             isSegmentView: false,
             sections: buildInvalidOnlySections(
                 buildAlertMessage(timeline, c2paStatus?.timelineSegments),
-                selectLiveSegmentsSection(c2paStatus?.timelineSegments),
+                liveSegments,
             ),
         };
     }
@@ -275,10 +286,11 @@ export function buildMenuRenderState(
 /**
  * Sections for the 'invalid' mode: nothing the manifest *claims* is
  * trustworthy enough to show, so claim generator, organization, work, AI
- * opt-out and history are all suppressed. The failure message and the
- * per-segment issue list are kept - they describe the failure itself rather
- * than asserting anything on the unverified manifest's behalf, and they are
- * the detail a user needs to understand what went wrong.
+ * opt-out and history are all suppressed. The failure message is kept, and
+ * with it the per-segment issue list when one is still meaningful - both
+ * describe the failure itself rather than asserting anything on the
+ * unverified manifest's behalf. The caller passes `null` for the list when
+ * the failure is manifest-wide.
  */
 function buildInvalidOnlySections(
     alert: string | null,

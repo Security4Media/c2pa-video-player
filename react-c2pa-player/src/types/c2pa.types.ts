@@ -34,6 +34,12 @@ export interface C2PAStatus {
   normalizedResult?: C2PANormalizedResult;
   timelineSegments?: C2PATimelineSegmentUpdate[];
   message?: string;
+  /**
+   * The manifest (or, for fragmented sources, the init segment) failed
+   * validation, so the whole asset is condemned rather than any one region.
+   * Distinct from a single fragment failing its own integrity check.
+   */
+  wholeAssetInvalid?: boolean;
 }
 
 export interface C2PAPlayerProps {
