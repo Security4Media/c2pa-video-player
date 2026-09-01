@@ -30,6 +30,8 @@
 
 import type { ManifestStore } from '@contentauth/c2pa-web';
 import type { C2paManifestHelper } from '@nettrek/c2pa-hls-bridge';
+import type { NormalizedValidationResult } from '../types';
+import type { DashSegmentEntry } from './dashBridgeRuntime';
 import type { FragmentVerdict } from './hlsBridgeRuntime';
 
 /** Notified whenever the runtime has new validation state to report. */
@@ -54,4 +56,19 @@ export interface HlsValidationRuntime extends ValidationRuntime {
 
 export interface MonolithicValidationRuntime extends ValidationRuntime {
   getManifestStore(): ManifestStore | null;
+}
+
+export interface DashValidationRuntime extends ValidationRuntime {
+  /** `null` until the manifest reveals whether the stream is dynamic. */
+  isLive(): boolean | null;
+  /** The init segment's own C2PA processing failed, condemning the asset. */
+  isInitInvalid(): boolean;
+  lookup(time: number): { result: NormalizedValidationResult } | null;
+  /**
+   * Segments added since a total-ever count, which is how the session drains
+   * without re-reading history the runtime may already have evicted.
+   */
+  getSegmentsSince(count: number): DashSegmentEntry[];
+  getSegmentCount(): number;
+  getErrorReason(): string | null;
 }
