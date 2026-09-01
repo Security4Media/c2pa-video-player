@@ -78,3 +78,23 @@ async function sha256Base64(der: Uint8Array<ArrayBuffer>): Promise<string> {
 
   return btoa(binary);
 }
+
+/**
+ * Restates trust settings in the shape the WebCrypto engine parses: the
+ * `allowedList` PEM becomes the digest lines it matches leaves against, while
+ * everything else (anchors, store config, `verifyTrustList`) passes through
+ * untouched.
+ *
+ * Every runtime that sets `enableExperimentalWebCrypto` needs this.
+ */
+export async function toWebCryptoTrustSettings<
+  TSettings extends { allowedList?: string | string[] },
+>(settings: TSettings): Promise<TSettings> {
+  const { allowedList } = settings;
+
+  if (typeof allowedList !== 'string') {
+    return settings;
+  }
+
+  return { ...settings, allowedList: await pemToAllowedListDigests(allowedList) };
+}

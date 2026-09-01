@@ -20,31 +20,12 @@ import {
 } from '@nettrek/c2pa-hls-bridge';
 import Hls from 'hls.js';
 import { Emitter, type EmitterListener } from '../emitter';
-import { pemToAllowedListDigests } from '../policy/webCryptoAllowedList';
+import { toWebCryptoTrustSettings } from '../policy/webCryptoAllowedList';
 import { getHlsValidationState } from '../rules';
 import type { PlayerValidationState, TimeInterval, ValidationAdapterContext } from '../types';
 
-/**
- * Restates trust settings in the shape the WebCrypto engine parses: the
- * `allowedList` PEM becomes the digest lines it matches leaves against, while
- * everything else (anchors, store config, `verifyTrustList`) passes through
- * untouched.
- */
-async function toWebCryptoTrustSettings<TSettings extends { allowedList?: string | string[] }>(
-  settings: TSettings,
-): Promise<TSettings> {
-  const { allowedList } = settings;
-
-  if (typeof allowedList !== 'string') {
-    return settings;
-  }
-
-  return { ...settings, allowedList: await pemToAllowedListDigests(allowedList) };
-}
-
 type RuntimeListener = EmitterListener<void>;
 
-/** One fragment's real presentation bounds plus its own validation verdict. */
 /**
  * How far a fragment's validation failure reaches.
  *

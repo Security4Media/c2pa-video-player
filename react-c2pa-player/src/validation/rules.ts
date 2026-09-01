@@ -50,7 +50,21 @@ export function getManifestStoreValidationState(manifestStore: ManifestStore): P
   const validationResults = manifestStore?.validation_results?.activeManifest;
 
   if (!validationResults) {
-    return 'Invalid';
+    // The WebCrypto engine (@nettrek/c2pa-web-crypto) never fills
+    // `validation_results`; it states the verdict outright in
+    // `validation_state` and lists only failures in `validation_status`.
+    // Treating that absence as 'Invalid' condemned every asset read through
+    // it - which was every monolithic asset - however well it validated.
+    //
+    // The verdict is taken as given rather than recomputed: the engine has
+    // already applied the same rule the coded branch below implements by
+    // hand, an untrusted CAWG identity included (it reports 'Valid' rather
+    // than 'Invalid' for one).
+    const declaredState = manifestStore?.validation_state;
+
+    return declaredState === 'Trusted' || declaredState === 'Valid' || declaredState === 'Invalid'
+      ? declaredState
+      : 'Invalid';
   }
 
   const { success, failure } = getValidationResultsForManifest(validationResults);
