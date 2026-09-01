@@ -229,6 +229,8 @@ function upsertInterval(
 }
 
 function mergeSegments(segments: ValidationTimelineSegment[]): ValidationTimelineSegment[] {
+  // Copied before sorting rather than Array.toSorted, which needs lib es2023
+  // while this project emits es2020; the copy is what matters here anyway.
   const sortedSegments = [...segments].sort((left, right) => left.startTime - right.startTime);
   const merged: ValidationTimelineSegment[] = [];
 

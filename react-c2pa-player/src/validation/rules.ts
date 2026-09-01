@@ -16,7 +16,7 @@
 
 import type { Manifest, ManifestStore } from '@contentauth/c2pa-web';
 import type { C2paManifestHelper } from '@nettrek/c2pa-hls-bridge';
-import { readReaderEvidence, readStoreEvidence } from './evidence';
+import { readReaderEvidence } from './evidence';
 import type { PlayerValidationState } from './types';
 
 export function getActiveManifest(manifestStore: ManifestStore): Manifest | null {
@@ -25,10 +25,6 @@ export function getActiveManifest(manifestStore: ManifestStore): Manifest | null
   }
 
   return manifestStore.manifests[manifestStore.active_manifest] ?? null;
-}
-
-export function getManifestStoreValidationState(manifestStore: ManifestStore): PlayerValidationState {
-  return readStoreEvidence(manifestStore).state;
 }
 
 export function getHlsValidationState(

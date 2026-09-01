@@ -14,6 +14,10 @@
  * limitations under the License.
  */
 
+// Runtimes are deliberately not re-exported. Nothing outside this directory
+// constructs one, and re-exporting them made every consumer of this barrel -
+// including the several that want only a type - pull hls.js, dash.js and both
+// C2PA engines into the module graph.
 export { ValidationAdapterRegistry } from './registry';
 export {
   createC2PAStatusFromResult,
@@ -35,9 +39,7 @@ export {
   getActiveManifest,
   getDashSegmentValidationState,
   getHlsValidationState,
-  getManifestStoreValidationState,
 } from './rules';
-export { DashBridgeRuntime, HlsBridgeRuntime, MonolithicBridgeRuntime } from './runtimes';
 export {
   createMediaSourceDescriptor,
   detectAdapterKind,

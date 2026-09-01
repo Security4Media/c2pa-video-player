@@ -15,7 +15,7 @@
  */
 
 import { Manifest, ManifestStore } from '@contentauth/c2pa-web';
-import { getCAWGValidationStatus } from '../../../services/c2pa_functions';
+import { readStoreEvidence } from '@/validation/evidence';
 import { CawgOrganizationItem, ManifestCawgAssertion } from '../models';
 import { selectCreativeWorkContent } from './creativeWorkSelectors';
 import { selectDublinCoreMetadata } from './dublinCoreSelectors';
@@ -57,9 +57,11 @@ export function selectOrganizationIdentity(manifest: Manifest, manifestStore?: M
     // this is routinely absent there — not an error.
     cawgItemBuilder.issuer = cawgAssertion.data.signature_info?.issuer ?? null;
     cawgItemBuilder.role = cawgAssertion.data.role ?? null;
-    cawgItemBuilder.validationStatus = manifestStore
-        ? getCAWGValidationStatus(manifestStore)
-        : 'Unknown';
+    // 'Absent' means the store's active manifest declares no identity. Reaching
+    // here means this manifest does declare one, so the two disagree and the
+    // claim cannot be shown as verified.
+    const identity = manifestStore ? readStoreEvidence(manifestStore).identity : 'Unknown';
+    cawgItemBuilder.validationStatus = identity === 'Absent' ? 'Invalid' : identity;
     cawgItemBuilder.creativeWork = null;
     cawgItemBuilder.dublinCore = null;
 

@@ -16,7 +16,7 @@
 
 import type { Manifest, ManifestStore } from '@contentauth/c2pa-web';
 import type { ManifestSource, PlayerValidationState } from '@/validation';
-import { getActiveManifest } from '../../../services/c2pa_functions';
+import { getActiveManifest } from '@/validation/rules';
 
 /**
  * Resolves an adapter-agnostic `ManifestSource` into the `ManifestStore`

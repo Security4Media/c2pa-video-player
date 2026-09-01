@@ -18,7 +18,8 @@ import type { Manifest } from '@contentauth/c2pa-web';
 import type { C2PAStatus } from '@/types/c2pa.types';
 import type { ValidationTimelineSegment } from '@/validation';
 import type { C2PATimelineState } from '../C2PAPlayerRoot.types';
-import { getActiveManifest, getActiveManifestValidationStatus } from '../../services/c2pa_functions';
+import { readStoreEvidence } from '@/validation/evidence';
+import { getActiveManifest } from '@/validation/rules';
 import {
     resolveManifestFromSource,
     resolveManifestStoreFromSource,
@@ -188,7 +189,7 @@ export function buildMenuRenderState(
     }
 
     const validationStatus = manifestStore
-        ? getActiveManifestValidationStatus(manifestStore)
+        ? readStoreEvidence(manifestStore).state
         : normalizedResult?.validationState ?? 'Unknown';
     const manifestId = getManifestId(activeManifest, c2paStatus);
     // Adapters like DASH deliberately never populate normalizedResult.manifestStore

@@ -75,11 +75,22 @@ an I/O loader, and move the cache onto the instance.
 
 ### A5. Conciseness pass
 
-- Drop `getValidationResultsForManifest` (a two-line wrapper, re-exported, used twice).
-- Fold `services/c2pa_functions.ts` into the verdict module.
-- `bundle-barrel-imports`: five barrels under `src/validation/`; import direct paths at app entry.
-- `js-tosorted-immutable`: `mergeSegments`, `getFragmentVerdicts`.
-- `async-parallel` is already satisfied.
+- Done in step 1: dropped `getValidationResultsForManifest`.
+- Done: `services/c2pa_functions.ts` deleted. It had become four pass-throughs
+  standing between the menu and the verdict module, with
+  `rules.getManifestStoreValidationState` a fifth. Consumers now read
+  `readStoreEvidence` / `readIngredientEvidence` directly: one layer, not three.
+- Done: the validation barrel no longer re-exports the runtimes. Nothing
+  outside `src/validation` constructs one, and re-exporting them made every
+  consumer of the barrel, including the six that want only a type, pull hls.js,
+  dash.js and both engines into the module graph. The adapter-level barrel
+  imports went in step 4.
+- Declined: `js-tosorted-immutable`. `Array.toSorted` needs `lib: es2023` while
+  this project emits ES2020, and raising `lib` would let other newer APIs
+  typecheck against a target that lacks them. Both call sites already copy
+  before sorting, which is what the rule protects against; one saved copy in a
+  cold path is not worth that trade. Left with a comment saying so.
+- `async-parallel` was already satisfied.
 
 ## Part B. Test infrastructure
 
@@ -161,7 +172,7 @@ stream from Trusted to Valid and flipped the identity indicator.
 3. Done. Trust fixtures selectable with `?trust=`; surfaced two defects.
 4. Done. Sessions split from runtimes, 21 cases now run without a browser.
 5. Done. `npm run test:browser`, 10 cases, asserting on data attributes.
-6. To do. A5 conciseness pass.
+6. Done. A5 conciseness pass, with one item declined (see A5).
 
 ### Running the tests
 

@@ -15,7 +15,8 @@
  */
 
 import type { ManifestStore } from '@contentauth/c2pa-web';
-import { getActiveManifest, getManifestStoreValidationState } from '../rules';
+import { readStoreEvidence } from '../evidence';
+import { getActiveManifest } from '../rules';
 import type { NormalizedValidationResult } from '../types';
 import { createUnknownResult } from './shared';
 
@@ -27,7 +28,7 @@ export function normalizeMonolithicManifestStore(
   }
 
   const activeManifest = getActiveManifest(manifestStore);
-  const validationState = getManifestStoreValidationState(manifestStore);
+  const validationState = readStoreEvidence(manifestStore).state;
 
   return {
     manifestStore,

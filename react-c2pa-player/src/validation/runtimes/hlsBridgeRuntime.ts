@@ -217,7 +217,8 @@ export class HlsBridgeRuntime {
       .filter((interval): interval is TimeInterval => interval !== null)
       .filter((interval) => interval.endTime > interval.startTime)
       // Sorted so the display index below follows playback order rather than
-      // whatever order the bridge happens to enumerate in.
+      // whatever order the bridge happens to enumerate in. Safe in place: the
+      // array is this chain's own, built by the map above.
       .sort((left, right) => left.startTime - right.startTime)
       .map((interval, position) => {
         // Sample the middle of the fragment: the bounds are half-open, so an
