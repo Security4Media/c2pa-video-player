@@ -81,6 +81,9 @@ export function StandalonePlayerPage() {
         'playToggle',
         'progressControl',
         'currentTimeDisplay',
+        // Video.js hides this unless the player is in live mode, which it
+        // detects correctly here, so it costs nothing on demand-sourced media.
+        'liveDisplay',
         'volumePanel',
         'pictureInPictureToggle',
         'fullscreenToggle',

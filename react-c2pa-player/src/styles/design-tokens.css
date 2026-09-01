@@ -37,6 +37,11 @@
   --c2pa-trusted: rgb(42, 243, 122);
   --c2pa-failed: #d31510;
   --c2pa-unknown: rgb(172, 172, 172);
+
+  /* Deliberately its own token rather than reusing --c2pa-failed: the two are
+     the same red today, but one means "this stream is running" and the other
+     means "this content failed", and they must be free to diverge. */
+  --c2pa-live-dot: #d31510;
   
   /* Neutral Colors */
   --color-background: #ffffff;

@@ -279,3 +279,55 @@
 .video-js.vjs-live .vjs-control-bar .vjs-progress-control {
   display: flex;
 }
+
+/* The live indicator. Video.js supplies the component and hides it unless the
+   player is in live mode, which it detects correctly for this DASH source, so
+   nothing here has to decide when to show it. This gives it the red dot and
+   keeps it legible against the control bar. */
+/* Over-qualified past video.js's own `.video-js .vjs-live-control { flex: auto }`,
+   which loads after this file and otherwise wins. Left to grow it took 384px of
+   a 1084px bar and halved the progress control with it, which is the whole
+   thing this player exists to show. */
+.video-js .vjs-control-bar .vjs-live-control {
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+  width: auto;
+  padding: 0 8px;
+}
+
+.video-js .vjs-control-bar .vjs-live-display {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+/* Drawn rather than loaded, so it cannot fail to appear, and pulsing so a
+   stalled stream still reads differently from a running one at a glance. */
+.video-js .vjs-control-bar .vjs-live-display::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: var(--c2pa-live-dot);
+  animation: c2pa-live-pulse 2s ease-in-out infinite;
+}
+
+@keyframes c2pa-live-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+/* Honour a reader who has asked for less motion. */
+@media (prefers-reduced-motion: reduce) {
+  .video-js .vjs-control-bar .vjs-live-display::before {
+    animation: none;
+  }
+}
