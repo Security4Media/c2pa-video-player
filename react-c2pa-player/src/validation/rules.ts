@@ -16,27 +16,8 @@
 
 import type { Manifest, ManifestStore } from '@contentauth/c2pa-web';
 import type { C2paManifestHelper } from '@nettrek/c2pa-hls-bridge';
+import { readReaderEvidence, readStoreEvidence } from './evidence';
 import type { PlayerValidationState } from './types';
-
-function isCawgIdentityUntrustedFailure(result: { code?: string; url?: string }) {
-  // The HLS bridge's WASM engine (@contentauth/c2pa-web) reports an
-  // untrusted CAWG identity as the generic `signingCredential.untrusted`,
-  // distinguishable from an untrusted C2PA claim signer only by checking the
-  // failure's URL. Its WebCrypto engine (@nettrek/c2pa-web-crypto, enabled in
-  // hlsBridgeRuntime.ts) reports the differentiated `cawg.identity.untrusted`
-  // code directly - no URL check needed, and one is not guaranteed present.
-  return (
-    result.code === 'cawg.identity.untrusted' ||
-    (result.code === 'signingCredential.untrusted' && result.url?.includes('cawg.identity'))
-  );
-}
-
-export function getValidationResultsForManifest(validationDeltas: { success?: unknown[]; failure?: unknown[] } = {}) {
-  return {
-    success: validationDeltas.success ?? [],
-    failure: validationDeltas.failure ?? [],
-  };
-}
 
 export function getActiveManifest(manifestStore: ManifestStore): Manifest | null {
   if (!manifestStore?.active_manifest || !manifestStore?.manifests) {
@@ -47,51 +28,7 @@ export function getActiveManifest(manifestStore: ManifestStore): Manifest | null
 }
 
 export function getManifestStoreValidationState(manifestStore: ManifestStore): PlayerValidationState {
-  const validationResults = manifestStore?.validation_results?.activeManifest;
-
-  if (!validationResults) {
-    // The WebCrypto engine (@nettrek/c2pa-web-crypto) never fills
-    // `validation_results`; it states the verdict outright in
-    // `validation_state` and lists only failures in `validation_status`.
-    // Treating that absence as 'Invalid' condemned every asset read through
-    // it - which was every monolithic asset - however well it validated.
-    //
-    // The verdict is taken as given rather than recomputed: the engine has
-    // already applied the same rule the coded branch below implements by
-    // hand, an untrusted CAWG identity included (it reports 'Valid' rather
-    // than 'Invalid' for one).
-    const declaredState = manifestStore?.validation_state;
-
-    return declaredState === 'Trusted' || declaredState === 'Valid' || declaredState === 'Invalid'
-      ? declaredState
-      : 'Invalid';
-  }
-
-  const { success, failure } = getValidationResultsForManifest(validationResults);
-  const normalizedFailure = failure as Array<{ code?: string; url?: string }>;
-  const normalizedSuccess = success as Array<{ code?: string }>;
-  const hasOnlyCawgIdentityUntrustedFailure =
-    normalizedFailure.length > 0 && normalizedFailure.every(isCawgIdentityUntrustedFailure);
-
-  if (normalizedFailure.length > 0 && !hasOnlyCawgIdentityUntrustedFailure) {
-    return 'Invalid';
-  }
-
-  if (normalizedSuccess.length === 0) {
-    return normalizedFailure.length > 0 ? 'Valid' : 'Invalid';
-  }
-
-  // Reaching here guarantees normalizedSuccess.length > 0 with no disqualifying
-  // failure. The previous version branched on specific success codes
-  // (timeStamp.trusted, signingCredential.trusted, claimSignature.validated,
-  // etc.) before falling through to an OR that always included
-  // `normalizedSuccess.length > 0` - already guaranteed true at this point -
-  // so every one of those branches, and the final `return 'Invalid'` below
-  // them, was unreachable dead code; the function always returned 'Trusted'
-  // whenever success was non-empty, regardless of which codes were present.
-  // Verified by exhaustive fuzzing (36,400 success/failure code
-  // combinations) against the original before removing.
-  return 'Trusted';
+  return readStoreEvidence(manifestStore).state;
 }
 
 export function getHlsValidationState(
@@ -102,13 +39,10 @@ export function getHlsValidationState(
     return 'Unknown';
   }
 
-  // reader.isValid() is a deprecated boolean that "considers both 'Valid'
-  // and 'Trusted' states as valid" - i.e. it collapses the two into one,
-  // which would leave the timeline permanently reporting 'Valid' (blue)
-  // even for content whose signer is fully trust-anchored. Use the reader's
-  // own three-state result instead so a genuinely trusted signer shows as
-  // 'Trusted' (green) here too, not just in the menu's summary status.
-  return reader.getManifestStoreValidationState() ?? 'Invalid';
+  // Deliberately not reader.isValid(): that deprecated boolean "considers both
+  // 'Valid' and 'Trusted' states as valid", collapsing the two, which would
+  // leave the timeline permanently blue even for a fully trust-anchored signer.
+  return readReaderEvidence(reader).state;
 }
 
 /**

@@ -21,6 +21,7 @@ import {
 import Hls from 'hls.js';
 import { Emitter, type EmitterListener } from '../emitter';
 import { toWebCryptoTrustSettings } from '../policy/webCryptoAllowedList';
+import { type FailureScope, readReaderEvidence, type ValidationFailure } from '../evidence';
 import { getHlsValidationState } from '../rules';
 import type { PlayerValidationState, TimeInterval, ValidationAdapterContext } from '../types';
 
@@ -41,8 +42,6 @@ type RuntimeListener = EmitterListener<void>;
  * Merkle proofs yields assertion.bmffHash.mismatch on exactly those fragments,
  * the untouched ones staying Trusted with no errors at all.
  */
-export type FragmentFailureScope = 'fragment' | 'manifest';
-
 export interface FragmentVerdict {
   /** 1-based position in playback order, for display. */
   index: number;
@@ -50,17 +49,24 @@ export interface FragmentVerdict {
   endTime: number;
   validationState: PlayerValidationState;
   /** `null` when the fragment did not fail validation. */
-  failureScope: FragmentFailureScope | null;
+  failureScope: FailureScope | null;
 }
 
-// The BMFF hash assertion is the only per-fragment integrity check, so its
-// codes (mismatch, and any future sibling) are the fragment-scoped ones.
-function classifyFailureScope(codes: readonly string[]): FragmentFailureScope | null {
-  if (codes.length === 0) {
+function worstScope(failures: readonly ValidationFailure[]): FailureScope | null {
+  if (failures.length === 0) {
     return null;
   }
 
-  return codes.every((code) => code.includes('bmffHash')) ? 'fragment' : 'manifest';
+  // Identity failures are ignored here: an untrusted CAWG identity does not
+  // make the fragment's media any less intact, and the store's own verdict
+  // already accounts for it.
+  const relevant = failures.filter((failure) => failure.scope !== 'identity');
+
+  if (relevant.length === 0) {
+    return null;
+  }
+
+  return relevant.every((failure) => failure.scope === 'fragment') ? 'fragment' : 'manifest';
 }
 
 export class HlsBridgeRuntime {
@@ -243,9 +249,7 @@ export class HlsBridgeRuntime {
           validationState: reader
             ? getHlsValidationState(reader, reader.containsSignature())
             : ('Unknown' as PlayerValidationState),
-          failureScope: reader
-            ? classifyFailureScope((reader.getValidationErrors() ?? []).map((error) => error.code))
-            : null,
+          failureScope: worstScope(readReaderEvidence(reader).failures),
         };
       });
   }
