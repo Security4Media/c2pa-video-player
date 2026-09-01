@@ -14,17 +14,16 @@
  * limitations under the License.
  */
 
-import { Emitter } from './emitter';
-import { normalizeMonolithicManifestStore } from './normalization';
-import { MonolithicBridgeRuntime } from './runtimes';
+import { MonolithicC2PASession } from './monolithicSession';
+// Imported straight from its module rather than through the runtimes barrel,
+// which would pull hls.js and dash.js in alongside it.
+import { MonolithicBridgeRuntime } from './runtimes/monolithicBridgeRuntime';
 import { detectAdapterKind } from './sourceDetection';
 import type {
   MediaSourceDescriptor,
   MediaValidationAdapter,
   ValidationAdapterContext,
   ValidationSession,
-  ValidationSessionListener,
-  ValidationStatusSnapshot,
 } from './types';
 
 const MONOLITHIC_CAPABILITIES = {
@@ -35,6 +34,13 @@ const MONOLITHIC_CAPABILITIES = {
   requiresPlayerOwnership: false,
 } as const;
 
+/**
+ * Wires the monolithic session to the runtime that drives it.
+ *
+ * Kept apart from the session so the session depends only on
+ * MonolithicValidationRuntime, and can therefore be exercised without a C2PA
+ * engine present.
+ */
 export class MonolithicC2PAAdapter implements MediaValidationAdapter {
   readonly kind = 'monolithic' as const;
   readonly capabilities = MONOLITHIC_CAPABILITIES;
@@ -44,72 +50,6 @@ export class MonolithicC2PAAdapter implements MediaValidationAdapter {
   }
 
   createSession(context: ValidationAdapterContext): ValidationSession {
-    return new MonolithicC2PASession(context);
-  }
-}
-
-class MonolithicC2PASession implements ValidationSession {
-  readonly adapterKind = 'monolithic' as const;
-
-  readonly #runtime: MonolithicBridgeRuntime;
-  readonly #emitter = new Emitter<ValidationStatusSnapshot>();
-  #unsubscribeRuntime: (() => void) | null = null;
-  #snapshot: ValidationStatusSnapshot = {
-    adapterKind: this.adapterKind,
-    result: null,
-    timelineSegments: [],
-    message: 'Monolithic C2PA validation pending',
-  };
-
-  constructor(context: ValidationAdapterContext) {
-    this.#runtime = new MonolithicBridgeRuntime(context);
-  }
-
-  async load(): Promise<void> {
-    this.#unsubscribeRuntime = this.#runtime.subscribe(() => {
-      this.#snapshot = this.#buildSnapshot();
-      this.#emit();
-    });
-
-    await this.#runtime.load();
-    this.#snapshot = this.#buildSnapshot();
-    this.#emit();
-  }
-
-  dispose(): void {
-    this.#unsubscribeRuntime?.();
-    this.#unsubscribeRuntime = null;
-    this.#runtime.dispose();
-    this.#emitter.clear();
-  }
-
-  getStatusAt(): ValidationStatusSnapshot {
-    return this.#snapshot;
-  }
-
-  subscribe(listener: ValidationSessionListener): () => void {
-    const unsubscribe = this.#emitter.subscribe(listener);
-    listener(this.#snapshot);
-
-    return unsubscribe;
-  }
-
-  #buildSnapshot(): ValidationStatusSnapshot {
-    const result = normalizeMonolithicManifestStore(this.#runtime.getManifestStore());
-
-    return {
-      adapterKind: this.adapterKind,
-      result,
-      timelineSegments: [],
-      message: this.#runtime.getMessage(),
-      // A whole-file asset has exactly one verdict covering all of it, so an
-      // invalid one condemns the entire timeline from the moment it is known -
-      // it must not depend on how far playback has progressed.
-      wholeAssetInvalid: result.validationState === 'Invalid',
-    };
-  }
-
-  #emit(): void {
-    this.#emitter.emit(this.#snapshot);
+    return new MonolithicC2PASession(new MonolithicBridgeRuntime(context));
   }
 }
