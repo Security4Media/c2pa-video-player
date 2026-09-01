@@ -264,3 +264,18 @@
   pointer-events: auto;
   cursor: pointer;
 }
+
+/* Video.js hides the progress control outright on a live stream
+   (`.video-js.vjs-live .vjs-progress-control { display: none }`), on the
+   reasonable assumption that there is nothing to seek. Here the bar is not a
+   seek control but a record of what has been validated, so it has to stay:
+   without this the C2PA segments are positioned correctly inside a container
+   that is never displayed, and the timeline appears simply not to work on live
+   sources.
+
+   Over-qualified past video.js's own rule, which is equally specific and, being
+   loaded from both the CDN link in index.html and the module import in
+   VideoJS.tsx, may come after this file. */
+.video-js.vjs-live .vjs-control-bar .vjs-progress-control {
+  display: flex;
+}
