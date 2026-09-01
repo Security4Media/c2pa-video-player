@@ -49,8 +49,20 @@ export function resolveManifestStoreFromSource(
                 active_manifest: manifestId,
                 manifests: source.manifests,
                 validation_state: validationStatus,
+                // The adapter's own failure list, carried verbatim rather than
+                // only when the asset is Invalid. A CAWG identity that failed
+                // its trust check does not by itself make the asset Invalid,
+                // so gating on that dropped exactly the evidence the identity
+                // status is read from.
+                validation_status: source.validationErrors ?? [],
                 validation_results: {
                     activeManifest: {
+                        // `[{}]` is a placeholder standing for "something
+                        // succeeded", not a coded result: adapters that arrive
+                        // here (HLS) report a verdict plus a failure list, not
+                        // the per-code success entries the WASM engine emits.
+                        // Readers must therefore not infer the absence of a
+                        // specific success code from this list.
                         success: validationStatus === 'Invalid' ? [] : [{}],
                         failure: validationStatus === 'Invalid' ? source.validationErrors : [],
                     },

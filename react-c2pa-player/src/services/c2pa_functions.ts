@@ -31,55 +31,103 @@ export function getActiveManifestValidationStatus(manifestStore: ManifestStore):
     return getManifestStoreValidationState(manifestStore) as ValidationState;
 }
 
+const CAWG_IDENTITY_LABEL = 'cawg.identity';
+
+function isCawgIdentityFailure(result: { code?: string; url?: string | null }) {
+    return Boolean(result.code?.startsWith('cawg.identity.') || result.url?.includes(CAWG_IDENTITY_LABEL));
+}
+
+function isCawgIdentityUntrusted(result: { code?: string; url?: string | null }) {
+    // Two spellings for one condition, because the two engines disagree. The
+    // WASM engine reports the generic `signingCredential.untrusted` and only
+    // the URL says it was the identity; the WebCrypto engine reports the
+    // differentiated code directly (mirrors validation/rules.ts).
+    return (
+        result.code === 'cawg.identity.untrusted' ||
+        (isUntrustedSigningCredentialFailure(result) && Boolean(result.url?.includes(CAWG_IDENTITY_LABEL)))
+    );
+}
+
+/**
+ * Status of the CAWG identity assertion's signer.
+ *
+ * Two manifest-store shapes have to be read, because the engines produce
+ * different ones. The WASM engine (@contentauth/c2pa-web, monolithic) fills
+ * `validation_results.activeManifest` with per-code success and failure lists,
+ * including a positive `signingCredential.trusted`. The WebCrypto engine
+ * (@nettrek/c2pa-web-crypto, HLS) leaves `validation_results` unset entirely
+ * and reports only `validation_status`, a flat list of *failures*, alongside
+ * the overall `validation_state`.
+ *
+ * Reading only the first shape meant every HLS stream fell through the
+ * `if (!validationResults) return 'Invalid'` guard and displayed the identity
+ * as invalid however it had actually validated - including streams whose
+ * identity was checked against the trust list and passed.
+ *
+ * On the flat shape, absence is the signal: the identity is checked
+ * independently of the media, so a stream whose fragments fail their BMFF hash
+ * still reports `cawg.identity.untrusted` when the identity is not trusted.
+ * No identity failure therefore means the identity passed every check the
+ * engine ran, which is what 'Trusted' says here - a tampered fragment is the
+ * asset's problem, reported separately, not the identity's.
+ */
 export function getCAWGValidationStatus(manifestStore: ManifestStore): ValidationState {
     const activeManifest = getActiveManifest(manifestStore);
     const cawgAssertion = activeManifest?.assertions?.find(
-        assertion => assertion.label === 'cawg.identity'
+        assertion => assertion.label === CAWG_IDENTITY_LABEL
     );
 
     if (!cawgAssertion) {
         return 'Invalid';
     }
 
-    const validationResults = manifestStore.validation_results;
-    if (!validationResults) {
-        return 'Invalid';
-    }
+    const activeManifestResults = manifestStore.validation_results?.activeManifest;
+    // Only the WASM engine fills these with coded entries. A store assembled
+    // from an adapter's verdict (see manifestSourceDispatch.ts) carries a
+    // code-less placeholder instead, and reading that as "no trusted code
+    // present" reported every such identity as invalid.
+    const hasCodedResults = [
+        ...(activeManifestResults?.success ?? []),
+        ...(activeManifestResults?.failure ?? []),
+    ].some(result => Boolean(result?.code));
 
-    const activeManifestResults = validationResults.activeManifest;
-    if (!activeManifestResults) {
-        return 'Invalid';
-    }
-
-    const successResults = activeManifestResults.success;
-    let isWellFormed;
-    let isTrusted = false;
-
-    if (successResults && successResults.length > 0) {
-        isTrusted = successResults.some(result =>
-            result.code === 'signingCredential.trusted' && result.url?.includes('cawg.identity')
+    if (activeManifestResults && hasCodedResults) {
+        const successResults = activeManifestResults.success ?? [];
+        const isWellFormed = successResults.some(
+            result => result.code === 'cawg.identity.well-formed'
+                && result.url?.includes(CAWG_IDENTITY_LABEL)
         );
-        isWellFormed = successResults.some(result =>
-            result.code === 'cawg.identity.well-formed' && result.url?.includes('cawg.identity')
+        const isTrusted = successResults.some(
+            result => result.code === 'signingCredential.trusted'
+                && result.url?.includes(CAWG_IDENTITY_LABEL)
         );
+
         if (isWellFormed && isTrusted) {
             return 'Trusted';
         }
-    }
 
-    if (isWellFormed) {
-        const failureResults = activeManifestResults.failure;
-        if (failureResults && failureResults.length > 0) {
-            const isUntrusted = failureResults.some(result =>
-                result.code === 'signingCredential.untrusted' && result.url?.includes('cawg.identity')
-            );
-            if (isUntrusted) {
-                return 'Valid';
-            }
+        if (isWellFormed && (activeManifestResults.failure ?? []).some(isCawgIdentityUntrusted)) {
+            return 'Valid';
         }
+
+        return 'Invalid';
     }
 
-    return 'Invalid';
+    const identityFailures = (manifestStore.validation_status ?? []).filter(isCawgIdentityFailure);
+
+    if (identityFailures.length > 0) {
+        // Well-formed but signed by someone not on the list is 'Valid': the
+        // claim is readable and intact, just not vouched for. Anything else
+        // wrong with the assertion makes it unusable.
+        return identityFailures.every(isCawgIdentityUntrusted) ? 'Valid' : 'Invalid';
+    }
+
+    // Nothing was reported against the identity, so it passed every check that
+    // ran. How far that goes is the store's own verdict to state: reaching
+    // 'Trusted' requires the identity signer to be trusted too (an untrusted
+    // one demotes the store to 'Valid'), so mirroring it never claims more
+    // trust than was established.
+    return manifestStore.validation_state === 'Trusted' ? 'Trusted' : 'Valid';
 }
 
 export function getIngredientValidationStatus(parentManifest: Manifest, ingredientManifestRef: string): ValidationState {
