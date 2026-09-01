@@ -14,6 +14,10 @@
  * limitations under the License.
  */
 
+import {
+    DEFAULT_LIVE_RETENTION_SECONDS,
+    MIN_LIVE_WINDOW_SECONDS,
+} from '@/validation/policy/liveRetention';
 import type { C2PATimelineSegmentUpdate, ValidationState } from '@/types/c2pa.types';
 import type { C2PATimelineState } from '../C2PAPlayerRoot.types';
 import type { VideoJsPlayerLike } from '../C2paMenu/C2paMenu.types';
@@ -82,12 +86,14 @@ interface TimelineFunctions {
         videoPlayer: TimelineVideoPlayer,
         c2paControlBar: TimelineComponentLike,
         isLive?: boolean,
+        retentionSeconds?: number,
     ) => void;
     renderWholeAssetVerdict: (
         verificationStatus: TimelineVerificationStatus,
         videoPlayer: TimelineVideoPlayer,
         c2paControlBar: TimelineComponentLike,
         isLive?: boolean,
+        retentionSeconds?: number,
     ) => void;
 }
 
@@ -119,17 +125,9 @@ function normalizeVerificationStatus(status: string): TimelineVerificationStatus
  * Fifteen minutes rather than an hour so segments stay wide enough to hover and
  * tap: at ~3.84s each that is roughly 234 across the bar.
  */
-export const LIVE_WINDOW_SECONDS = 15 * 60;
+export const LIVE_WINDOW_SECONDS = DEFAULT_LIVE_RETENTION_SECONDS;
 
-/**
- * The narrowest the live window is allowed to get.
- *
- * The window grows with the history behind it, so without a floor the very
- * first segment would be the entire window and fill the bar end to end,
- * implying the whole stream had been checked when about four seconds of it
- * had. A minute in means a segment is a legible slice rather than the world.
- */
-export const MIN_LIVE_WINDOW_SECONDS = 60;
+export { MIN_LIVE_WINDOW_SECONDS };
 
 /**
  * The stretch of stream the bar currently represents.
@@ -149,6 +147,7 @@ export function getTimelineWindow(
     latestKnownEndTime: number,
     isLive = false,
     earliestKnownStartTime = Number.POSITIVE_INFINITY,
+    retentionSeconds = LIVE_WINDOW_SECONDS,
 ): TimelineWindow {
     if (isLive) {
         // Anchored to the live edge, so the newest segment sits at the right.
@@ -161,7 +160,7 @@ export function getTimelineWindow(
             ? edge - earliestKnownStartTime
             : 0;
         const size = Math.min(
-            LIVE_WINDOW_SECONDS,
+            retentionSeconds,
             Math.max(MIN_LIVE_WINDOW_SECONDS, known),
         );
 
@@ -289,6 +288,7 @@ export function getTimelineFunctions(
         // tampered-range alert.
         extendTrailingSegmentToPlayhead = false,
         isLive = false,
+        retentionSeconds = DEFAULT_LIVE_RETENTION_SECONDS,
     ) {
         // No synthetic "unknown" placeholder when there is nothing to show: an
         // empty list is the correct initial state now that the track's own grey
@@ -316,6 +316,7 @@ export function getTimelineFunctions(
             latestKnownEndTime,
             isLive,
             earliestKnownStartTime,
+            retentionSeconds,
         );
 
         // No z-index laddering: positioned segments cover disjoint stretches of
@@ -478,6 +479,7 @@ export function getTimelineFunctions(
         videoPlayer: TimelineVideoPlayer,
         c2paControlBar: TimelineComponentLike,
         isLive = false,
+        retentionSeconds = DEFAULT_LIVE_RETENTION_SECONDS,
     ) {
         removeProgressSegments();
 
@@ -496,6 +498,7 @@ export function getTimelineFunctions(
             latestKnownEndTime,
             isLive,
             sortedSegments[0]?.startTime ?? Number.POSITIVE_INFINITY,
+            retentionSeconds,
         );
 
         sortedSegments.forEach((segment) => {
@@ -536,6 +539,7 @@ export function getTimelineFunctions(
         videoPlayer: TimelineVideoPlayer,
         c2paControlBar: TimelineComponentLike,
         isLive = false,
+        retentionSeconds = DEFAULT_LIVE_RETENTION_SECONDS,
     ) {
         removeProgressSegments();
 
@@ -544,6 +548,8 @@ export function getTimelineFunctions(
             videoPlayer.currentTime(),
             0,
             isLive,
+            Number.POSITIVE_INFINITY,
+            retentionSeconds,
         );
         // Spans the window itself, so a condemned live stream is red edge to
         // edge just as a condemned VOD asset is.

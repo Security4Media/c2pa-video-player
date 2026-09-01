@@ -16,6 +16,7 @@
 
 import { Emitter } from './emitter';
 import { createUnknownResult } from './normalization';
+import { DEFAULT_LIVE_RETENTION_SECONDS } from './policy/liveRetention';
 import type { DashValidationRuntime } from './runtimes/contracts';
 import type { DashSegmentEntry } from './runtimes/dashBridgeRuntime';
 import {
@@ -31,14 +32,7 @@ import type {
   ValidationStatusSnapshot,
 } from './types';
 
-/**
- * How much validated history a live session keeps.
- *
- * Matches the runtime's own retention and the timeline's window cap, so the
- * three agree on what "recent" means rather than each trimming to its own idea
- * of it.
- */
-const SEGMENT_HISTORY_WINDOW_SECONDS = 15 * 60;
+
 
 export class DashFragmentedFmp4Session implements ValidationSession {
   readonly adapterKind = 'dash-fragmented-fmp4' as const;
@@ -56,6 +50,7 @@ export class DashFragmentedFmp4Session implements ValidationSession {
   #observedRegionKeys = new Set<string>();
   readonly #watched = new WatchedTimeline();
   readonly #videoElement: HTMLVideoElement;
+  readonly #retentionSeconds: number;
   #snapshot: ValidationStatusSnapshot = {
     adapterKind: this.adapterKind,
     result: null,
@@ -63,9 +58,14 @@ export class DashFragmentedFmp4Session implements ValidationSession {
     message: 'Live DASH C2PA validation pending',
   };
 
-  constructor(runtime: DashValidationRuntime, videoElement: HTMLVideoElement) {
+  constructor(
+    runtime: DashValidationRuntime,
+    videoElement: HTMLVideoElement,
+    retentionSeconds: number = DEFAULT_LIVE_RETENTION_SECONDS,
+  ) {
     this.#runtime = runtime;
     this.#videoElement = videoElement;
+    this.#retentionSeconds = retentionSeconds;
   }
 
   async load(): Promise<void> {
@@ -124,7 +124,7 @@ export class DashFragmentedFmp4Session implements ValidationSession {
     }
 
     const edge = this.#knownSegments[this.#knownSegments.length - 1].endTime;
-    const cutoff = edge - SEGMENT_HISTORY_WINDOW_SECONDS;
+    const cutoff = edge - this.#retentionSeconds;
     const firstKept = this.#knownSegments.findIndex((segment) => segment.endTime >= cutoff);
 
     if (firstKept > 0) {
@@ -175,7 +175,7 @@ export class DashFragmentedFmp4Session implements ValidationSession {
     const liveSignal = this.#runtime.isLive();
 
     if (liveSignal !== null) {
-      this.#timelineProjector.setLiveMode(liveSignal);
+      this.#timelineProjector.setLiveMode(liveSignal, this.#retentionSeconds);
     }
 
     if (Number.isFinite(time)) {
@@ -203,6 +203,7 @@ export class DashFragmentedFmp4Session implements ValidationSession {
       // Drives the timeline's window: a live stream has no end to scale
       // against, and its times may be epoch-based.
       isLive: liveSignal ?? undefined,
+      liveRetentionSeconds: this.#retentionSeconds,
     };
 
     if (shouldEmit) {

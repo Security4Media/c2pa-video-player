@@ -50,6 +50,10 @@ export class DashFragmentedFmp4Adapter implements MediaValidationAdapter {
   }
 
   createSession(context: ValidationAdapterContext): ValidationSession {
-    return new DashFragmentedFmp4Session(new DashBridgeRuntime(context), context.videoElement);
+    return new DashFragmentedFmp4Session(
+      new DashBridgeRuntime(context),
+      context.videoElement,
+      context.policy.liveRetentionSeconds,
+    );
   }
 }

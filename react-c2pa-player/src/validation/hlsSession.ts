@@ -16,6 +16,7 @@
 
 import { Emitter } from './emitter';
 import { condemnsWholeAsset } from './evidence';
+import { DEFAULT_LIVE_RETENTION_SECONDS } from './policy/liveRetention';
 import { createUnknownResult, normalizeHlsManifestHelper } from './normalization';
 import type { HlsValidationRuntime } from './runtimes/contracts';
 import {
@@ -61,10 +62,16 @@ export class HlsFragmentedFmp4Session implements ValidationSession {
   #observedFragmentKeys = new Set<string>();
   readonly #watched = new WatchedTimeline();
   readonly #videoElement: HTMLVideoElement;
+  readonly #retentionSeconds: number;
 
-  constructor(runtime: HlsValidationRuntime, videoElement: HTMLVideoElement) {
+  constructor(
+    runtime: HlsValidationRuntime,
+    videoElement: HTMLVideoElement,
+    retentionSeconds: number = DEFAULT_LIVE_RETENTION_SECONDS,
+  ) {
     this.#runtime = runtime;
     this.#videoElement = videoElement;
+    this.#retentionSeconds = retentionSeconds;
   }
 
   async load(): Promise<void> {
@@ -99,7 +106,7 @@ export class HlsFragmentedFmp4Session implements ValidationSession {
     const liveSignal = this.#runtime.isLive();
 
     if (liveSignal !== null) {
-      this.#timelineProjector.setLiveMode(liveSignal);
+      this.#timelineProjector.setLiveMode(liveSignal, this.#retentionSeconds);
     }
 
     const isBackwardSeek = Number.isFinite(time) && time < this.#lastPlaybackTime;
@@ -138,6 +145,7 @@ export class HlsFragmentedFmp4Session implements ValidationSession {
       // fragment colours just its own span (see #wholeAssetInvalid).
       wholeAssetInvalid: this.#wholeAssetInvalid(),
       isLive: liveSignal ?? undefined,
+      liveRetentionSeconds: this.#retentionSeconds,
     };
 
     if (shouldEmit) {

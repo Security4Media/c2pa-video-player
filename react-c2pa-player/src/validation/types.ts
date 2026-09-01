@@ -70,6 +70,12 @@ export interface TrustMaterialProvider {
 export interface ValidationPolicy {
   enableTrustVerification: boolean;
   trustMaterialProvider: TrustMaterialProvider;
+  /**
+   * How much of a live stream to remember, in seconds. Governs the timeline
+   * window, the retained validation history and the per-segment metadata
+   * cache together, so they cannot disagree about what "recent" means.
+   */
+  liveRetentionSeconds: number;
 }
 
 /**
@@ -150,6 +156,11 @@ export interface ValidationStatusSnapshot {
    * edge rather than the whole asset. `undefined` while still unknown.
    */
   isLive?: boolean;
+  /**
+   * The live retention in force, so the timeline sizes its window from the
+   * same value the adapter prunes by rather than its own copy of the default.
+   */
+  liveRetentionSeconds?: number;
 }
 
 export type ValidationSessionListener = (snapshot: ValidationStatusSnapshot) => void;

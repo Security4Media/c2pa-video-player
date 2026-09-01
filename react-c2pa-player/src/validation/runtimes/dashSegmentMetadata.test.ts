@@ -51,9 +51,13 @@ const manifest = (title: string) => ({
   assertions: [{ label: 'cawg.metadata', data: { 'dc:title': title } }],
 });
 
-const reader = (pipeline: ReturnType<typeof stubPipeline>['pipeline']) =>
+const reader = (
+  pipeline: ReturnType<typeof stubPipeline>['pipeline'],
+  maxRetainedSegments?: number,
+) =>
   new DashSegmentMetadataReader(
     pipeline as unknown as ConstructorParameters<typeof DashSegmentMetadataReader>[0],
+    maxRetainedSegments,
   );
 
 describe('segmentNumberFromUrl', () => {
@@ -114,15 +118,18 @@ describe('DashSegmentMetadataReader', () => {
   });
 
   it('forgets the oldest once the cache is full, so a long stream stays bounded', async () => {
+    // Cap stated here rather than inherited, so the case is about eviction
+    // and not about whatever the configured retention happens to be.
     const { pipeline } = stubPipeline((i) => manifest(`title-${i}`));
-    const subject = reader(pipeline);
+    const subject = reader(pipeline, 10);
 
-    for (let i = 0; i < 320; i += 1) {
+    for (let i = 0; i < 15; i += 1) {
       await subject.read(i, new Uint8Array(), 'video');
     }
 
     expect(subject.get(0)).toBeNull();
-    expect(subject.get(319)).not.toBeNull();
+    expect(subject.get(4)).toBeNull();
+    expect(subject.get(14)).not.toBeNull();
   });
 
   it('reads nothing more once disposed', async () => {

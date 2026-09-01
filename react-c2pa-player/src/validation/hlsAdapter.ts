@@ -50,6 +50,10 @@ export class HlsFragmentedFmp4Adapter implements MediaValidationAdapter {
   }
 
   createSession(context: ValidationAdapterContext): ValidationSession {
-    return new HlsFragmentedFmp4Session(new HlsBridgeRuntime(context), context.videoElement);
+    return new HlsFragmentedFmp4Session(
+      new HlsBridgeRuntime(context),
+      context.videoElement,
+      context.policy.liveRetentionSeconds,
+    );
   }
 }

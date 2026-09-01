@@ -38,8 +38,7 @@
 
 import type { C2paManifest, MediaType } from '@qualabs/c2pa-live-dashjs-plugin';
 
-/** Bounds the cache to roughly the window the rest of the DASH stack retains. */
-const MAX_RETAINED_SEGMENTS = 300;
+
 
 interface MetadataPipeline {
   controller: {
@@ -60,9 +59,12 @@ export class DashSegmentMetadataReader {
   /** Set by the listener during the awaited route below, then consumed. */
   #lastManifest: C2paManifest | null = null;
   #disposed = false;
+  /** Bounded to the same window the rest of the DASH stack retains. */
+  readonly #maxRetainedSegments: number;
 
-  constructor(pipeline: MetadataPipeline) {
+  constructor(pipeline: MetadataPipeline, maxRetainedSegments = 450) {
     this.#pipeline = pipeline;
+    this.#maxRetainedSegments = maxRetainedSegments;
     this.#pipeline.controller.on('segmentValidated', (record) => {
       this.#lastManifest = record.manifest ?? null;
     });
@@ -110,7 +112,7 @@ export class DashSegmentMetadataReader {
 
   /** Insertion order is arrival order, so the front is the oldest. */
   #forgetOldest(): void {
-    while (this.#manifests.size > MAX_RETAINED_SEGMENTS) {
+    while (this.#manifests.size > this.#maxRetainedSegments) {
       const oldest = this.#manifests.keys().next();
 
       if (oldest.done) {

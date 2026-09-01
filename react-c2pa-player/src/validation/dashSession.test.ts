@@ -237,6 +237,34 @@ describe('DashFragmentedFmp4Session', () => {
       expect(session.getStatusAt(0).isLive).toBe(true);
     });
 
+    it('reports the retention it was configured with, which sizes the bar', () => {
+      // The timeline sizes its window from this rather than its own default,
+      // so the bar cannot outrun what the session still remembers.
+      const configured = new DashFragmentedFmp4Session(
+        runtime,
+        element as unknown as HTMLVideoElement,
+        120,
+      );
+
+      expect(configured.getStatusAt(0).liveRetentionSeconds).toBe(120);
+    });
+
+    it('prunes by the configured retention, not a fixed one', async () => {
+      const shortWindow = new DashFragmentedFmp4Session(
+        runtime,
+        element as unknown as HTMLVideoElement,
+        60,
+      );
+      runtime.segments = Array.from({ length: 100 }, (_, i) => segment(i * 4, (i + 1) * 4));
+      await shortWindow.load();
+      for (let time = 0; time <= 40; time += 0.25) shortWindow.getStatusAt(time);
+
+      const shown = shortWindow.getStatusAt(40).timelineSegments;
+      const span = Math.max(...shown.map((x) => x.endTime)) - Math.min(...shown.map((x) => x.startTime));
+
+      expect(span).toBeLessThanOrEqual(60);
+    });
+
     it('leaves live-ness undefined until the manifest says', () => {
       runtime.live = null;
 

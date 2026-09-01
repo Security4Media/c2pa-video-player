@@ -27,7 +27,7 @@ import type {
 // `SEGMENT_RETENTION_WINDOW_SECONDS`, which bounds a different list (that
 // runtime's own point-lookup segments) - kept as an independent constant here
 // rather than importing across the timeline/ -> runtimes/ boundary.
-const LIVE_SEGMENT_RETENTION_WINDOW_SECONDS = 600;
+const DEFAULT_LIVE_SEGMENT_RETENTION_WINDOW_SECONDS = 15 * 60;
 
 // Tolerance for treating two segments as touching/contiguous rather than
 // leaving a hairline gap between them, e.g. from floating-point rounding.
@@ -64,7 +64,13 @@ export class FragmentedTimelineProjector {
    * validation matters, so there's no meaningful window where guessing wrong
    * would lose data.
    */
-  setLiveMode(isLive: boolean): void {
+  #retentionWindowSeconds = DEFAULT_LIVE_SEGMENT_RETENTION_WINDOW_SECONDS;
+
+  setLiveMode(isLive: boolean, retentionSeconds?: number): void {
+    if (retentionSeconds !== undefined && retentionSeconds > 0) {
+      this.#retentionWindowSeconds = retentionSeconds;
+    }
+
     this.#isLive = isLive;
   }
 
@@ -156,14 +162,14 @@ export class FragmentedTimelineProjector {
   }
 
   /**
-   * Evicts segments older than `LIVE_SEGMENT_RETENTION_WINDOW_SECONDS`
+   * Evicts segments older than `this.#retentionWindowSeconds`
    * relative to the latest observed time. Only called while `#isLive` is
    * true - a VOD asset's duration is finite and known, so nothing needs to
    * expire, and doing so anyway would reintroduce the exact class of bug this
    * projector exists to avoid.
    */
   #pruneStaleSegments(): void {
-    const cutoff = this.#lastObservedTime - LIVE_SEGMENT_RETENTION_WINDOW_SECONDS;
+    const cutoff = this.#lastObservedTime - this.#retentionWindowSeconds;
 
     while (this.#segments.length > 1 && this.#segments[0].endTime < cutoff) {
       this.#segments.shift();

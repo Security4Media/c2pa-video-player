@@ -16,6 +16,7 @@
 
 import type { ValidationPolicy } from '../types';
 import { LocalTrustMaterialProvider } from './localTrustMaterialProvider';
+import { resolveLiveRetentionSeconds } from './liveRetention';
 import { isTrustFixtureName, trustFixtures } from './trustFixtures';
 
 const defaultTrustMaterialProvider = new LocalTrustMaterialProvider();
@@ -58,7 +59,13 @@ export function createDefaultValidationPolicy(): ValidationPolicy {
   return {
     enableTrustVerification: true,
     trustMaterialProvider: selectedTrustProvider(),
+    liveRetentionSeconds: resolveLiveRetentionSeconds(),
   };
 }
 
 export { LocalTrustMaterialProvider };
+export {
+  DEFAULT_LIVE_RETENTION_SECONDS,
+  MIN_LIVE_WINDOW_SECONDS,
+  resolveLiveRetentionSeconds,
+} from './liveRetention';

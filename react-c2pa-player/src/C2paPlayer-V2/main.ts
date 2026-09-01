@@ -98,18 +98,21 @@ interface TimelineFunctions {
         videoPlayer: C2PAVideoJsPlayer,
         extendTrailingSegmentToPlayhead?: boolean,
         isLive?: boolean,
+        retentionSeconds?: number,
     ) => void;
     replaceC2PATimelineSegments: (
         segments: NonNullable<ValidationStatusSnapshot['timelineSegments']>,
         videoPlayer: C2PAVideoJsPlayer,
         c2paControlBar: TimelineComponentLike,
         isLive?: boolean,
+        retentionSeconds?: number,
     ) => void;
     renderWholeAssetVerdict: (
         verificationStatus: string,
         videoPlayer: C2PAVideoJsPlayer,
         c2paControlBar: TimelineComponentLike,
         isLive?: boolean,
+        retentionSeconds?: number,
     ) => void;
 }
 
@@ -268,16 +271,20 @@ export const C2PAPlayer = function (
             // origins its times are epoch-based, so the timeline positions
             // against a window at the live edge instead of against zero.
             const isLive = Boolean(snapshot?.isLive);
+            // The adapter's own retention, so the bar cannot show a stretch
+            // whose verdicts have already been pruned behind it.
+            const retentionSeconds = snapshot?.liveRetentionSeconds;
 
             if (c2paControlBar && (wholeAssetInvalid || ownsFullTimeline || isOrdinaryForwardTick)) {
                 if (wholeAssetInvalid) {
-                    renderWholeAssetVerdict('Invalid', videoPlayer, c2paControlBar, isLive);
+                    renderWholeAssetVerdict('Invalid', videoPlayer, c2paControlBar, isLive, retentionSeconds);
                 } else if (ownsFullTimeline) {
                     replaceC2PATimelineSegments(
                         snapshot?.timelineSegments ?? [],
                         videoPlayer,
                         c2paControlBar,
                         isLive,
+                        retentionSeconds,
                     );
                 } else {
                     handleC2PAValidation(
@@ -288,7 +295,7 @@ export const C2PAPlayer = function (
                     // Playhead-appended fallback: stretch the trailing segment
                     // to the playhead, since its verdict covers the asset from
                     // where it started through wherever playback has reached.
-                    updateC2PATimeline(currentTime, videoPlayer, true, isLive);
+                    updateC2PATimeline(currentTime, videoPlayer, true, isLive, retentionSeconds);
                 }
 
                 const timeline = getTimelineState(useStaticTimelineFallback, videoPlayer, currentTime);

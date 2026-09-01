@@ -26,6 +26,7 @@ import type {
 import { Emitter, type EmitterListener } from '../emitter';
 import { normalizeDashSegmentRecord } from '../normalization/dash';
 import type { NormalizedValidationResult, ValidationAdapterContext } from '../types';
+import { retainedSegmentCount } from '../policy/liveRetention';
 import { DashSegmentMetadataReader, segmentNumberFromUrl } from './dashSegmentMetadata';
 
 type RuntimeListener = EmitterListener<void>;
@@ -73,10 +74,7 @@ const NOMINAL_SEGMENT_DURATION_SECONDS = 4;
 // forever on a long-running live stream.
 const VALIDATED_MEDIA_TYPES: readonly MediaType[] = ['video'];
 
-// How much segment history to retain for #segments/#lookup. Long-running live
-// sessions would otherwise grow this array (and its O(n) lookup scan) without
-// bound; anything older than this relative to the live edge is evicted.
-const SEGMENT_RETENTION_WINDOW_SECONDS = 600;
+
 
 /**
  * Owns the dash.js player instance and the @qualabs/c2pa-live-dashjs-plugin
@@ -106,6 +104,7 @@ export class DashBridgeRuntime {
   #errorReason: string | null = null;
   #estimatedTimelineEnd = 0;
   #latestManifest: C2paManifest | null = null;
+  readonly #retentionSeconds: number;
   #metadata: DashSegmentMetadataReader | null = null;
   #detachMetadata: (() => void) | null = null;
   // null until STREAM_INITIALIZED fires and reveals whether this is a
@@ -120,6 +119,7 @@ export class DashBridgeRuntime {
 
   constructor(context: ValidationAdapterContext) {
     this.#context = context;
+    this.#retentionSeconds = context.policy.liveRetentionSeconds;
   }
 
   async load(): Promise<void> {
@@ -412,7 +412,10 @@ export class DashBridgeRuntime {
       mediaTypes: [...VALIDATED_MEDIA_TYPES],
       logger: false,
     });
-    const reader = new DashSegmentMetadataReader(pipeline);
+    const reader = new DashSegmentMetadataReader(
+      pipeline,
+      retainedSegmentCount(this.#retentionSeconds),
+    );
     this.#metadata = reader;
 
     const interceptor = async (response: {
@@ -456,7 +459,7 @@ export class DashBridgeRuntime {
       return;
     }
 
-    const cutoff = this.#estimatedTimelineEnd - SEGMENT_RETENTION_WINDOW_SECONDS;
+    const cutoff = this.#estimatedTimelineEnd - this.#retentionSeconds;
 
     while (this.#segments.length > 1 && this.#segments[0].endTime < cutoff) {
       this.#segments.shift();

@@ -98,14 +98,27 @@ describe('live mode', () => {
 
   it('prunes segments older than the retention window', () => {
     const projector = new FragmentedTimelineProjector();
-    projector.setLiveMode(true);
+    // Retention stated rather than inherited, so the case does not move when
+    // the configured default does.
+    projector.setLiveMode(true, 600);
     projector.observe(2, 'Valid', 0);
     projector.observe(4, 'Invalid', 2);
-    // Far enough forward that the first segment falls outside the 600s window.
+    // Far enough forward that the first segment falls outside the window.
     projector.observe(700, 'Valid', 4);
 
     expect(projector.snapshot()).toHaveLength(1);
     expect(projector.snapshot()[0].startTime).toBe(4);
+  });
+
+  it('prunes by the retention it was given, not a fixed one', () => {
+    const projector = new FragmentedTimelineProjector();
+    projector.setLiveMode(true, 60);
+    projector.observe(2, 'Valid', 0);
+    projector.observe(4, 'Invalid', 2);
+    // Inside the old 600s default, outside the 60s asked for here.
+    projector.observe(120, 'Valid', 4);
+
+    expect(projector.snapshot()).toHaveLength(1);
   });
 
   it('never prunes in VOD mode', () => {
