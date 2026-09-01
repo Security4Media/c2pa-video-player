@@ -122,6 +122,16 @@ function normalizeVerificationStatus(status: string): TimelineVerificationStatus
 export const LIVE_WINDOW_SECONDS = 15 * 60;
 
 /**
+ * The narrowest the live window is allowed to get.
+ *
+ * The window grows with the history behind it, so without a floor the very
+ * first segment would be the entire window and fill the bar end to end,
+ * implying the whole stream had been checked when about four seconds of it
+ * had. A minute in means a segment is a legible slice rather than the world.
+ */
+export const MIN_LIVE_WINDOW_SECONDS = 60;
+
+/**
  * The stretch of stream the bar currently represents.
  *
  * VOD is the whole asset, `{ start: 0, size: duration }`, which reduces the
@@ -138,12 +148,24 @@ export function getTimelineWindow(
     currentTime: number,
     latestKnownEndTime: number,
     isLive = false,
+    earliestKnownStartTime = Number.POSITIVE_INFINITY,
 ): TimelineWindow {
     if (isLive) {
         // Anchored to the live edge, so the newest segment sits at the right.
         const edge = Math.max(currentTime, latestKnownEndTime);
+        // Grows with the history behind it, then rolls once it reaches the cap.
+        // A fixed window would spend its first quarter-hour almost entirely
+        // grey, since a live stream can only be validated as fast as it plays
+        // and its 30s DVR leaves nothing to seek back and fill with.
+        const known = Number.isFinite(earliestKnownStartTime)
+            ? edge - earliestKnownStartTime
+            : 0;
+        const size = Math.min(
+            LIVE_WINDOW_SECONDS,
+            Math.max(MIN_LIVE_WINDOW_SECONDS, known),
+        );
 
-        return { start: edge - LIVE_WINDOW_SECONDS, size: LIVE_WINDOW_SECONDS };
+        return { start: edge - size, size };
     }
 
     if (Number.isFinite(rawDuration) && rawDuration > 0) {
@@ -284,11 +306,16 @@ export function getTimelineFunctions(
             (max, segment) => Math.max(max, parseFloat(segment.dataset.endTime)),
             0,
         );
+        const earliestKnownStartTime = progressSegments.reduce(
+            (min, segment) => Math.min(min, parseFloat(segment.dataset.startTime)),
+            Number.POSITIVE_INFINITY,
+        );
         const window = getTimelineWindow(
             videoPlayer.duration(),
             currentTime,
             latestKnownEndTime,
             isLive,
+            earliestKnownStartTime,
         );
 
         // No z-index laddering: positioned segments cover disjoint stretches of
@@ -468,6 +495,7 @@ export function getTimelineFunctions(
             videoPlayer.currentTime(),
             latestKnownEndTime,
             isLive,
+            sortedSegments[0]?.startTime ?? Number.POSITIVE_INFINITY,
         );
 
         sortedSegments.forEach((segment) => {

@@ -15,7 +15,11 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { getTimelineWindow, LIVE_WINDOW_SECONDS } from './C2paTimelineFunctions';
+import {
+  getTimelineWindow,
+  LIVE_WINDOW_SECONDS,
+  MIN_LIVE_WINDOW_SECONDS,
+} from './C2paTimelineFunctions';
 
 /** What positionTimelineSegment does with a window, as a percentage of the bar. */
 const place = (
@@ -48,16 +52,47 @@ describe('getTimelineWindow', () => {
   });
 
   describe('live', () => {
-    it('ends at the live edge and is one window wide', () => {
-      const window = getTimelineWindow(Number.POSITIVE_INFINITY, 1_000_000, 1_000_004, true);
+    const INF = Number.POSITIVE_INFINITY;
 
-      expect(window.size).toBe(LIVE_WINDOW_SECONDS);
+    it('starts at the minimum before any history exists', () => {
+      // A stream just joined has nothing behind it; the floor stops the first
+      // segment from becoming the entire window.
+      const window = getTimelineWindow(INF, 1_000_000, 1_000_004, true, INF);
+
+      expect(window.size).toBe(MIN_LIVE_WINDOW_SECONDS);
       expect(window.start + window.size).toBe(1_000_004);
     });
 
-    it('follows whichever of the playhead or newest segment is further ahead', () => {
-      expect(getTimelineWindow(Number.NaN, 500, 900, true).start + LIVE_WINDOW_SECONDS).toBe(900);
-      expect(getTimelineWindow(Number.NaN, 900, 500, true).start + LIVE_WINDOW_SECONDS).toBe(900);
+    it('holds at the minimum until history outgrows it', () => {
+      const edge = 1_000_000;
+      const window = getTimelineWindow(INF, edge, edge, true, edge - 20);
+
+      expect(window.size).toBe(MIN_LIVE_WINDOW_SECONDS);
+    });
+
+    it('grows to match the history behind it', () => {
+      const edge = 1_000_000;
+      const window = getTimelineWindow(INF, edge, edge, true, edge - 300);
+
+      expect(window.size).toBe(300);
+      expect(window.start).toBe(edge - 300);
+    });
+
+    it('stops growing at the cap and rolls from there', () => {
+      const edge = 1_000_000;
+      const window = getTimelineWindow(INF, edge, edge, true, edge - 3600);
+
+      expect(window.size).toBe(LIVE_WINDOW_SECONDS);
+      expect(window.start).toBe(edge - LIVE_WINDOW_SECONDS);
+    });
+
+    it('always ends at the live edge, whichever side is further ahead', () => {
+      const INF_START = Number.POSITIVE_INFINITY;
+
+      expect(getTimelineWindow(Number.NaN, 500, 900, true, INF_START).start)
+        .toBe(900 - MIN_LIVE_WINDOW_SECONDS);
+      expect(getTimelineWindow(Number.NaN, 900, 500, true, INF_START).start)
+        .toBe(900 - MIN_LIVE_WINDOW_SECONDS);
     });
   });
 });
@@ -67,14 +102,15 @@ describe('placing segments in the window', () => {
   // currentTime arrives near 1.79e9; scaling that from zero put every segment
   // at left 100% with a width around 5e-8%, an invisible sliver.
   const EPOCH_EDGE = 1_788_292_531.15;
+  const INF = Number.POSITIVE_INFINITY;
 
-  it('gives an epoch-timed live segment a visible width', () => {
-    const window = getTimelineWindow(Number.POSITIVE_INFINITY, EPOCH_EDGE, EPOCH_EDGE, true);
+  it('gives the first epoch-timed live segment a legible width', () => {
+    const window = getTimelineWindow(INF, EPOCH_EDGE, EPOCH_EDGE, true, EPOCH_EDGE - 3.84);
     const { left, width } = place(window, EPOCH_EDGE - 3.84, EPOCH_EDGE);
 
-    expect(width).toBeGreaterThan(0.4);
-    expect(left).toBeGreaterThan(99);
-    expect(left).toBeLessThan(100);
+    // 3.84s of the 60s floor.
+    expect(width).toBeCloseTo(6.4, 1);
+    expect(left + width).toBeCloseTo(100, 5);
   });
 
   it('would have been invisible without the window', () => {
@@ -84,17 +120,27 @@ describe('placing segments in the window', () => {
     expect(asBefore.width).toBeLessThan(0.001);
   });
 
-  it('spreads a window of segments across the whole bar', () => {
-    const window = getTimelineWindow(Number.POSITIVE_INFINITY, EPOCH_EDGE, EPOCH_EDGE, true);
-    const oldest = place(window, window.start, window.start + 3.84);
-    const newest = place(window, EPOCH_EDGE - 3.84, EPOCH_EDGE);
+  it('narrows a segment as history accumulates behind it', () => {
+    const atOneMinute = getTimelineWindow(INF, EPOCH_EDGE, EPOCH_EDGE, true, EPOCH_EDGE - 60);
+    const atFull = getTimelineWindow(INF, EPOCH_EDGE, EPOCH_EDGE, true, EPOCH_EDGE - 3600);
 
-    expect(oldest.left).toBeCloseTo(0, 5);
-    expect(newest.left + newest.width).toBeCloseTo(100, 5);
+    const early = place(atOneMinute, EPOCH_EDGE - 3.84, EPOCH_EDGE).width;
+    const late = place(atFull, EPOCH_EDGE - 3.84, EPOCH_EDGE).width;
+
+    expect(early).toBeGreaterThan(late);
+    expect(late).toBeCloseTo((3.84 / LIVE_WINDOW_SECONDS) * 100, 4);
+  });
+
+  it('fills the bar with whatever history is known', () => {
+    const window = getTimelineWindow(INF, EPOCH_EDGE, EPOCH_EDGE, true, EPOCH_EDGE - 300);
+    const whole = place(window, EPOCH_EDGE - 300, EPOCH_EDGE);
+
+    expect(whole.left).toBeCloseTo(0, 5);
+    expect(whole.width).toBeCloseTo(100, 5);
   });
 
   it('drops a segment that has fallen out of the back of the window', () => {
-    const window = getTimelineWindow(Number.POSITIVE_INFINITY, EPOCH_EDGE, EPOCH_EDGE, true);
+    const window = getTimelineWindow(INF, EPOCH_EDGE, EPOCH_EDGE, true, EPOCH_EDGE - 3600);
     const stale = place(window, window.start - 120, window.start - 116);
 
     expect(stale.width).toBe(0);
