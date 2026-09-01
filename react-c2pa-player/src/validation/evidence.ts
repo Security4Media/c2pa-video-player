@@ -291,6 +291,43 @@ function ingredientStateFromFailures(
 }
 
 /**
+ * How far a set of failures reaches, taken together.
+ *
+ * Used to decide whether one fragment's failure condemns only that fragment or
+ * the whole asset. Identity failures are excluded: an untrusted CAWG identity
+ * does not make a fragment's media any less intact, and the store's own verdict
+ * already accounts for it. Counting them would have painted the timeline red
+ * for content that is merely valid-but-untrusted.
+ */
+export function worstScope(failures: readonly ValidationFailure[]): FailureScope | null {
+  const relevant = failures.filter((failure) => failure.scope !== 'identity');
+
+  if (relevant.length === 0) {
+    return null;
+  }
+
+  return relevant.every((failure) => failure.scope === 'fragment') ? 'fragment' : 'manifest';
+}
+
+/**
+ * Whether any fragment's failure condemns the whole asset.
+ *
+ * Both halves are needed. Scope alone is not enough, because an untrusted claim
+ * signer is reported against the manifest while the engine still returns
+ * 'Valid': the content is intact and merely unvouched for, so filling the
+ * timeline red would misstate it. An invalid verdict alone is not enough
+ * either, because a tampered fragment is invalid too, and condemning the asset
+ * for it would hide which parts were actually altered.
+ */
+export function condemnsWholeAsset(
+  verdicts: readonly { validationState: PlayerValidationState; failureScope: FailureScope | null }[],
+): boolean {
+  return verdicts.some(
+    (verdict) => verdict.validationState === 'Invalid' && verdict.failureScope === 'manifest',
+  );
+}
+
+/**
  * Evidence from a bridge reader, which states its verdict directly instead of
  * leaving it to be inferred.
  */

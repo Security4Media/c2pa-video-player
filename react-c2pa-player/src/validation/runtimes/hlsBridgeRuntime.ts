@@ -21,7 +21,7 @@ import {
 import Hls from 'hls.js';
 import { Emitter, type EmitterListener } from '../emitter';
 import { toWebCryptoTrustSettings } from '../policy/webCryptoAllowedList';
-import { type FailureScope, readReaderEvidence, type ValidationFailure } from '../evidence';
+import { type FailureScope, readReaderEvidence, worstScope } from '../evidence';
 import { getHlsValidationState } from '../rules';
 import type { PlayerValidationState, TimeInterval, ValidationAdapterContext } from '../types';
 
@@ -50,23 +50,6 @@ export interface FragmentVerdict {
   validationState: PlayerValidationState;
   /** `null` when the fragment did not fail validation. */
   failureScope: FailureScope | null;
-}
-
-function worstScope(failures: readonly ValidationFailure[]): FailureScope | null {
-  if (failures.length === 0) {
-    return null;
-  }
-
-  // Identity failures are ignored here: an untrusted CAWG identity does not
-  // make the fragment's media any less intact, and the store's own verdict
-  // already accounts for it.
-  const relevant = failures.filter((failure) => failure.scope !== 'identity');
-
-  if (relevant.length === 0) {
-    return null;
-  }
-
-  return relevant.every((failure) => failure.scope === 'fragment') ? 'fragment' : 'manifest';
 }
 
 export class HlsBridgeRuntime {

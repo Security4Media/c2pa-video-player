@@ -15,6 +15,7 @@
  */
 
 import { Emitter } from './emitter';
+import { condemnsWholeAsset } from './evidence';
 import { createUnknownResult, normalizeHlsManifestHelper } from './normalization';
 import { HlsBridgeRuntime } from './runtimes';
 import { detectAdapterKind } from './sourceDetection';
@@ -219,11 +220,14 @@ class HlsFragmentedFmp4Session implements ValidationSession {
    * with - exactly what the per-fragment colouring exists to show. A
    * manifest-scoped failure, by contrast, is reported by every fragment alike,
    * so one is enough to condemn the asset.
+   *
+   * The verdict has to agree, though. Not every manifest-scoped failure makes
+   * an asset invalid: an untrusted claim signer is reported against the
+   * manifest, yet the engine still returns 'Valid' because the content is
+   * intact and merely unvouched for. Scope alone painted those red.
    */
   #wholeAssetInvalid(): boolean {
-    return this.#runtime
-      .getFragmentVerdicts()
-      .some((verdict) => verdict.failureScope === 'manifest');
+    return condemnsWholeAsset(this.#runtime.getFragmentVerdicts());
   }
 
   #emit(): void {

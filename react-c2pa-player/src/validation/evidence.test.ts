@@ -18,9 +18,11 @@ import type { ManifestStore } from '@contentauth/c2pa-web';
 import { describe, expect, it } from 'vitest';
 import {
   classifyFailureScope,
+  condemnsWholeAsset,
   readIngredientEvidence,
   readReaderEvidence,
   readStoreEvidence,
+  worstScope,
 } from './evidence';
 
 // Codes and URLs below are the ones the engines actually emitted against the
@@ -259,5 +261,84 @@ describe('readReaderEvidence', () => {
 
   it('reports unknown for a missing reader instead of guessing', () => {
     expect(readReaderEvidence(null).state).toBe('Unknown');
+  });
+});
+
+describe('worstScope', () => {
+  const failure = (code: string, url?: string) => ({
+    code,
+    scope: classifyFailureScope(code, url),
+    ...(url ? { url } : {}),
+  });
+
+  it('is null when nothing failed, so the fragment is coloured by its verdict alone', () => {
+    expect(worstScope([])).toBeNull();
+  });
+
+  it('confines a BMFF hash mismatch to the fragment', () => {
+    // The tampered fixtures report exactly this on the fragments that were
+    // altered, and nothing on the ones that were not.
+    expect(worstScope([failure('assertion.bmffHash.mismatch', BMFF_URL)])).toBe('fragment');
+  });
+
+  it('lets a manifest failure condemn the asset', () => {
+    // Altering an assertion in the init manifest reports this on every
+    // fragment, including untouched ones.
+    expect(worstScope([failure('assertion.hashedURI.mismatch')])).toBe('manifest');
+  });
+
+  it('takes the worse scope when a fragment failure sits alongside a manifest one', () => {
+    expect(
+      worstScope([failure('assertion.bmffHash.mismatch', BMFF_URL), failure('claimSignature.mismatch')]),
+    ).toBe('manifest');
+  });
+
+  it('ignores an untrusted identity, which condemns neither', () => {
+    // Counting it painted the whole timeline red for content that is merely
+    // valid-but-untrusted.
+    expect(worstScope([failure('cawg.identity.untrusted', IDENTITY_URL)])).toBeNull();
+  });
+
+  it('still confines the fragment when an identity failure accompanies it', () => {
+    expect(
+      worstScope([
+        failure('assertion.bmffHash.mismatch', BMFF_URL),
+        failure('cawg.identity.untrusted', IDENTITY_URL),
+      ]),
+    ).toBe('fragment');
+  });
+});
+
+describe('condemnsWholeAsset', () => {
+  const fragment = (validationState: 'Trusted' | 'Valid' | 'Invalid', failureScope: 'fragment' | 'manifest' | null) =>
+    ({ validationState, failureScope }) as const;
+
+  it('leaves a clean asset alone', () => {
+    expect(condemnsWholeAsset([fragment('Trusted', null), fragment('Trusted', null)])).toBe(false);
+  });
+
+  it('condemns the asset when the manifest itself failed', () => {
+    // Altering an assertion in the init manifest reports this on every
+    // fragment, so one is enough.
+    expect(condemnsWholeAsset([fragment('Invalid', 'manifest')])).toBe(true);
+  });
+
+  it('does not condemn the asset for a tampered fragment', () => {
+    // Otherwise the whole timeline goes red and hides which parts were altered.
+    expect(
+      condemnsWholeAsset([fragment('Trusted', null), fragment('Invalid', 'fragment')]),
+    ).toBe(false);
+  });
+
+  it('does not condemn the asset for an untrusted signer', () => {
+    // Reported against the manifest, yet the verdict stays 'Valid': the content
+    // is intact and merely unvouched for. Scope alone painted this red.
+    expect(condemnsWholeAsset([fragment('Valid', 'manifest')])).toBe(false);
+  });
+
+  it('still condemns when a manifest failure sits among fragment ones', () => {
+    expect(
+      condemnsWholeAsset([fragment('Invalid', 'fragment'), fragment('Invalid', 'manifest')]),
+    ).toBe(true);
   });
 });
