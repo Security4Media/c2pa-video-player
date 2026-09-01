@@ -26,6 +26,7 @@ import type {
 import { Emitter, type EmitterListener } from '../emitter';
 import { normalizeDashSegmentRecord } from '../normalization/dash';
 import type { NormalizedValidationResult, ValidationAdapterContext } from '../types';
+import { DashSegmentMetadataReader, segmentNumberFromUrl } from './dashSegmentMetadata';
 
 type RuntimeListener = EmitterListener<void>;
 
@@ -105,6 +106,8 @@ export class DashBridgeRuntime {
   #errorReason: string | null = null;
   #estimatedTimelineEnd = 0;
   #latestManifest: C2paManifest | null = null;
+  #metadata: DashSegmentMetadataReader | null = null;
+  #detachMetadata: (() => void) | null = null;
   // null until STREAM_INITIALIZED fires and reveals whether this is a
   // live/dynamic MPD or a static (VOD) one - used to gate the eviction below
   // and the timeline projector's destructive-vs-non-destructive handling of
@@ -120,7 +123,7 @@ export class DashBridgeRuntime {
   }
 
   async load(): Promise<void> {
-    const [{ MediaPlayer }, { attachC2pa }] = await Promise.all([
+    const [{ MediaPlayer }, { attachC2pa, createC2paPipeline }] = await Promise.all([
       import('dashjs'),
       import('@qualabs/c2pa-live-dashjs-plugin'),
     ]);
@@ -135,6 +138,12 @@ export class DashBridgeRuntime {
     player.on(this.#streamInitializedEventName, this.#onStreamInitialized);
 
     this.#context.videoElement.addEventListener('seeking', this.#onVideoSeeking);
+
+    // Registered before attachC2pa so it runs first. The primary pipeline
+    // defers its VSI validation to a microtask, so completing the metadata
+    // read here means a segment's manifest is already cached by the time its
+    // verdict arrives, and the two can be joined without waiting.
+    this.#registerMetadataReader(player, createC2paPipeline);
 
     const controller = attachC2pa(player as unknown as DashjsPlayer, {
       mediaTypes: [...VALIDATED_MEDIA_TYPES],
@@ -151,6 +160,10 @@ export class DashBridgeRuntime {
   }
 
   dispose(): void {
+    this.#detachMetadata?.();
+    this.#detachMetadata = null;
+    this.#metadata?.dispose();
+    this.#metadata = null;
     if (this.#player && this.#fragmentLoadingEventName) {
       this.#player.off(this.#fragmentLoadingEventName, this.#onFragmentLoadingCompleted);
     }
@@ -297,7 +310,13 @@ export class DashBridgeRuntime {
     }
 
     const timing = this.#pendingTiming.get(record.mediaType)?.shift() ?? null;
-    const { result } = normalizeDashSegmentRecord(record, this.#latestManifest);
+    // The segment's own manifest where the metadata pipeline has one, since on
+    // the VSI path `record.manifest` is the init's and carries no CAWG.
+    const perSegmentManifest = this.#metadata?.get(record.segmentNumber) ?? null;
+    const { result } = normalizeDashSegmentRecord(
+      perSegmentManifest ? { ...record, manifest: perSegmentManifest } : record,
+      this.#latestManifest,
+    );
 
     if (!timing) {
       // The two event streams are paired purely by arrival order (see class
@@ -369,6 +388,66 @@ export class DashBridgeRuntime {
    * space via #evictedSegmentCount) so a long-running live session doesn't
    * grow this array — and its O(n) lookup() scan — without limit.
    */
+  /**
+   * Feeds a second, metadata-only pipeline from the same responses.
+   *
+   * Deliberately media-only: withholding the init keeps it on the ManifestBox
+   * path, which parses each segment's own manifest and so yields the CAWG
+   * identity and Dublin Core the VSI path never reports. See
+   * dashSegmentMetadata.ts for why its verdict is ignored.
+   */
+  #registerMetadataReader(
+    player: DashMediaPlayerLike,
+    createPipeline: typeof import('@qualabs/c2pa-live-dashjs-plugin').createC2paPipeline,
+  ): void {
+    const addInterceptor = (player as unknown as DashjsPlayer).addResponseInterceptor;
+
+    if (typeof addInterceptor !== 'function') {
+      // dash.js 4.x, which the plugin supports through a different hook. The
+      // verdict still works; only the per-segment metadata is unavailable.
+      return;
+    }
+
+    const pipeline = createPipeline({
+      mediaTypes: [...VALIDATED_MEDIA_TYPES],
+      logger: false,
+    });
+    const reader = new DashSegmentMetadataReader(pipeline);
+    this.#metadata = reader;
+
+    const interceptor = async (response: {
+      request?: { url?: string; customData?: { request?: { type?: string | null; mediaType?: string } } };
+      data?: unknown;
+    }) => {
+      const request = response?.request?.customData?.request;
+      const segmentNumber = segmentNumberFromUrl(response?.request?.url);
+
+      if (
+        request?.type === 'MediaSegment' &&
+        request.mediaType &&
+        (VALIDATED_MEDIA_TYPES as readonly string[]).includes(request.mediaType) &&
+        segmentNumber !== null &&
+        response.data instanceof ArrayBuffer
+      ) {
+        await reader.read(
+          segmentNumber,
+          new Uint8Array(response.data),
+          request.mediaType as MediaType,
+        );
+      }
+
+      // Interceptors are chained by reducing over their results, so the
+      // response has to come back out untouched or the next one receives
+      // nothing.
+      return response;
+    };
+
+    (player as unknown as DashjsPlayer).addResponseInterceptor?.(interceptor);
+    this.#detachMetadata = () => {
+      (player as unknown as DashjsPlayer).removeResponseInterceptor?.(interceptor);
+    };
+  }
+
   #evictStaleSegments(): void {
     // VOD (or not-yet-known) sources: never evict. A VOD asset's duration is
     // finite and known, so there's nothing to bound memory against, and
