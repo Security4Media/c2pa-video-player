@@ -305,23 +305,34 @@
 }
 
 /* Drawn rather than loaded, so it cannot fail to appear, and pulsing so a
-   stalled stream still reads differently from a running one at a glance. */
+   stalled stream still reads differently from a running one at a glance.
+
+   The pulse is a ring expanding out of the dot rather than the dot fading.
+   At 8px a fade is too small a change to register in peripheral vision, which
+   is where a status light spends its life; an expanding halo reads at a
+   glance and is the convention viewers already know from broadcast. */
 .video-js .vjs-control-bar .vjs-live-display::before {
   content: '';
   width: 8px;
   height: 8px;
   border-radius: 50%;
   background-color: var(--c2pa-live-dot);
-  animation: c2pa-live-pulse 2s ease-in-out infinite;
+  animation: c2pa-live-pulse 1.6s ease-out infinite;
 }
 
 @keyframes c2pa-live-pulse {
-  0%,
+  0% {
+    opacity: 1;
+    box-shadow: 0 0 0 0 rgba(var(--c2pa-live-dot-rgb), 0.75);
+  }
+  70% {
+    opacity: 0.6;
+    /* Ring has travelled out and faded; the dot is at its dimmest. */
+    box-shadow: 0 0 0 7px rgba(var(--c2pa-live-dot-rgb), 0);
+  }
   100% {
     opacity: 1;
-  }
-  50% {
-    opacity: 0.35;
+    box-shadow: 0 0 0 0 rgba(var(--c2pa-live-dot-rgb), 0);
   }
 }
 

@@ -42,6 +42,8 @@
      the same red today, but one means "this stream is running" and the other
      means "this content failed", and they must be free to diverge. */
   --c2pa-live-dot: #d31510;
+  /* Same colour as a channel triplet, so the halo below can vary its alpha. */
+  --c2pa-live-dot-rgb: 211, 21, 16;
   
   /* Neutral Colors */
   --color-background: #ffffff;
