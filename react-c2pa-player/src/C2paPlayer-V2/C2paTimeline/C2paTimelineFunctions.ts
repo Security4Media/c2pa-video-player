@@ -75,16 +75,19 @@ interface TimelineFunctions {
         currentTime: number,
         videoPlayer: TimelineVideoPlayer,
         extendTrailingSegmentToPlayhead?: boolean,
+        isLive?: boolean,
     ) => void;
     replaceC2PATimelineSegments: (
         segments: C2PATimelineSegmentUpdate[],
         videoPlayer: TimelineVideoPlayer,
         c2paControlBar: TimelineComponentLike,
+        isLive?: boolean,
     ) => void;
     renderWholeAssetVerdict: (
         verificationStatus: TimelineVerificationStatus,
         videoPlayer: TimelineVideoPlayer,
         c2paControlBar: TimelineComponentLike,
+        isLive?: boolean,
     ) => void;
 }
 
@@ -105,21 +108,51 @@ function normalizeVerificationStatus(status: string): TimelineVerificationStatus
 }
 
 /**
- * Live sources report an indefinite/growing `duration()` (Infinity or NaN).
- * Falling back to the current playhead (or the latest known segment
- * boundary, whichever is larger) keeps the bar reading as "filled to the
- * live edge" instead of leaving every segment at its default 0% width.
+ * How much of a live stream the bar covers.
+ *
+ * A live timeline has no end to scale against, and on this origin its times are
+ * epoch-based (a DASH `availabilityStartTime` of 1970 puts `currentTime` near
+ * 1.79e9). Scaling those from zero put every segment at `left: 100%` with a
+ * width of about 5e-8%, an invisible sliver at the right edge - which is what
+ * made validated DASH segments appear not to render at all.
+ *
+ * Fifteen minutes rather than an hour so segments stay wide enough to hover and
+ * tap: at ~3.84s each that is roughly 234 across the bar.
  */
-function getEffectiveTimelineDuration(
+export const LIVE_WINDOW_SECONDS = 15 * 60;
+
+/**
+ * The stretch of stream the bar currently represents.
+ *
+ * VOD is the whole asset, `{ start: 0, size: duration }`, which reduces the
+ * positioning below to exactly what it was. Live is a window ending at the live
+ * edge, so positions are relative to `start` rather than to zero.
+ */
+export interface TimelineWindow {
+    start: number;
+    size: number;
+}
+
+export function getTimelineWindow(
     rawDuration: number,
     currentTime: number,
     latestKnownEndTime: number,
-): number {
-    if (Number.isFinite(rawDuration) && rawDuration > 0) {
-        return rawDuration;
+    isLive = false,
+): TimelineWindow {
+    if (isLive) {
+        // Anchored to the live edge, so the newest segment sits at the right.
+        const edge = Math.max(currentTime, latestKnownEndTime);
+
+        return { start: edge - LIVE_WINDOW_SECONDS, size: LIVE_WINDOW_SECONDS };
     }
 
-    return Math.max(currentTime, latestKnownEndTime, 1);
+    if (Number.isFinite(rawDuration) && rawDuration > 0) {
+        return { start: 0, size: rawDuration };
+    }
+
+    // Indefinite duration but not flagged live: fall back to filling to the
+    // furthest point known, as before.
+    return { start: 0, size: Math.max(currentTime, latestKnownEndTime, 1) };
 }
 
 /**
@@ -130,15 +163,20 @@ function getEffectiveTimelineDuration(
  * grey through. Segments used to all start at `left: 0` and be layered by
  * z-index, which made a gap impossible to express: colouring 8-16s necessarily
  * painted 0-16s too.
+ *
+ * Positions are relative to the window's own origin, so a live bar whose times
+ * are epoch-based places segments by their offset from the window start rather
+ * than by their absolute value.
  */
-function positionTimelineSegment(segment: TimelineSegmentElement, effectiveDuration: number) {
+function positionTimelineSegment(segment: TimelineSegmentElement, window: TimelineWindow) {
     const startTime = parseFloat(segment.dataset.startTime);
     const endTime = parseFloat(segment.dataset.endTime);
     const clamp = (value: number) => Math.min(100, Math.max(0, value));
-    const left = clamp((startTime / effectiveDuration) * 100);
+    const toPercent = (time: number) => ((time - window.start) / window.size) * 100;
+    const left = clamp(toPercent(startTime));
 
     segment.style.left = `${left}%`;
-    segment.style.width = `${clamp((endTime / effectiveDuration) * 100) - left}%`;
+    segment.style.width = `${clamp(toPercent(endTime)) - left}%`;
 }
 
 function getSegmentColor(verificationStatus: TimelineVerificationStatus, isManifestInvalid = false) {
@@ -228,6 +266,7 @@ export function getTimelineFunctions(
         // which getTimelineState then reads back out of the DOM to build the
         // tampered-range alert.
         extendTrailingSegmentToPlayhead = false,
+        isLive = false,
     ) {
         // No synthetic "unknown" placeholder when there is nothing to show: an
         // empty list is the correct initial state now that the track's own grey
@@ -245,16 +284,17 @@ export function getTimelineFunctions(
             (max, segment) => Math.max(max, parseFloat(segment.dataset.endTime)),
             0,
         );
-        const effectiveDuration = getEffectiveTimelineDuration(
+        const window = getTimelineWindow(
             videoPlayer.duration(),
             currentTime,
             latestKnownEndTime,
+            isLive,
         );
 
         // No z-index laddering: positioned segments cover disjoint stretches of
         // the bar, so none needs to paint over another.
         progressSegments.forEach((segment) => {
-            positionTimelineSegment(segment, effectiveDuration);
+            positionTimelineSegment(segment, window);
         });
 
         // The played-bar colour is intentionally left to CSS. Painting
@@ -410,6 +450,7 @@ export function getTimelineFunctions(
         segments: C2PATimelineSegmentUpdate[],
         videoPlayer: TimelineVideoPlayer,
         c2paControlBar: TimelineComponentLike,
+        isLive = false,
     ) {
         removeProgressSegments();
 
@@ -422,10 +463,11 @@ export function getTimelineFunctions(
             (max, segment) => Math.max(max, segment.endTime),
             0,
         );
-        const effectiveDuration = getEffectiveTimelineDuration(
+        const window = getTimelineWindow(
             videoPlayer.duration(),
             videoPlayer.currentTime(),
             latestKnownEndTime,
+            isLive,
         );
 
         sortedSegments.forEach((segment) => {
@@ -443,12 +485,16 @@ export function getTimelineFunctions(
                 segment.pending ? undefined : segment,
             );
 
-            positionTimelineSegment(timelineSegment, effectiveDuration);
+            positionTimelineSegment(timelineSegment, window);
             c2paControlBar.el().appendChild(timelineSegment);
             progressSegments.push(timelineSegment);
         });
 
-        updateC2PATimeline(videoPlayer.currentTime(), videoPlayer);
+        // Deliberately no updateC2PATimeline() here. Every segment above is
+        // already placed against `window`, so re-running the pass only
+        // recomputed the same positions - and it did so without `isLive`,
+        // which on a live stream replaced the correct window with one scaled
+        // from zero and collapsed every segment back to a sliver.
     };
 
     /**
@@ -461,16 +507,24 @@ export function getTimelineFunctions(
         verificationStatus: TimelineVerificationStatus,
         videoPlayer: TimelineVideoPlayer,
         c2paControlBar: TimelineComponentLike,
+        isLive = false,
     ) {
         removeProgressSegments();
 
-        const duration = getEffectiveTimelineDuration(
+        const window = getTimelineWindow(
             videoPlayer.duration(),
             videoPlayer.currentTime(),
             0,
+            isLive,
         );
-        const segment = createTimelineSegment(0, duration, verificationStatus);
-        positionTimelineSegment(segment, duration);
+        // Spans the window itself, so a condemned live stream is red edge to
+        // edge just as a condemned VOD asset is.
+        const segment = createTimelineSegment(
+            window.start,
+            window.start + window.size,
+            verificationStatus,
+        );
+        positionTimelineSegment(segment, window);
 
         c2paControlBar.el().appendChild(segment);
         progressSegments.push(segment);

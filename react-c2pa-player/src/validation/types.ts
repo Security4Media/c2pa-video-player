@@ -145,6 +145,11 @@ export interface ValidationStatusSnapshot {
    * invalid.
    */
   wholeAssetInvalid?: boolean;
+  /**
+   * The source has no fixed end, so the timeline is a window onto the live
+   * edge rather than the whole asset. `undefined` while still unknown.
+   */
+  isLive?: boolean;
 }
 
 export type ValidationSessionListener = (snapshot: ValidationStatusSnapshot) => void;

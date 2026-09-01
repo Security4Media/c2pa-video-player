@@ -137,6 +137,7 @@ export class HlsFragmentedFmp4Session implements ValidationSession {
       // Only a manifest-scoped failure condemns the whole asset; a bad
       // fragment colours just its own span (see #wholeAssetInvalid).
       wholeAssetInvalid: this.#wholeAssetInvalid(),
+      isLive: liveSignal ?? undefined,
     };
 
     if (shouldEmit) {

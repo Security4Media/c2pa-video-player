@@ -97,16 +97,19 @@ interface TimelineFunctions {
         currentTime: number,
         videoPlayer: C2PAVideoJsPlayer,
         extendTrailingSegmentToPlayhead?: boolean,
+        isLive?: boolean,
     ) => void;
     replaceC2PATimelineSegments: (
         segments: NonNullable<ValidationStatusSnapshot['timelineSegments']>,
         videoPlayer: C2PAVideoJsPlayer,
         c2paControlBar: TimelineComponentLike,
+        isLive?: boolean,
     ) => void;
     renderWholeAssetVerdict: (
         verificationStatus: string,
         videoPlayer: C2PAVideoJsPlayer,
         c2paControlBar: TimelineComponentLike,
+        isLive?: boolean,
     ) => void;
 }
 
@@ -261,14 +264,20 @@ export const C2PAPlayer = function (
                 currentTime >= lastPlaybackTime &&
                 currentTime - lastPlaybackTime < minSeekTime;
 
+            // A live source has no end to scale the bar against, and on some
+            // origins its times are epoch-based, so the timeline positions
+            // against a window at the live edge instead of against zero.
+            const isLive = Boolean(snapshot?.isLive);
+
             if (c2paControlBar && (wholeAssetInvalid || ownsFullTimeline || isOrdinaryForwardTick)) {
                 if (wholeAssetInvalid) {
-                    renderWholeAssetVerdict('Invalid', videoPlayer, c2paControlBar);
+                    renderWholeAssetVerdict('Invalid', videoPlayer, c2paControlBar, isLive);
                 } else if (ownsFullTimeline) {
                     replaceC2PATimelineSegments(
                         snapshot?.timelineSegments ?? [],
                         videoPlayer,
                         c2paControlBar,
+                        isLive,
                     );
                 } else {
                     handleC2PAValidation(
@@ -279,7 +288,7 @@ export const C2PAPlayer = function (
                     // Playhead-appended fallback: stretch the trailing segment
                     // to the playhead, since its verdict covers the asset from
                     // where it started through wherever playback has reached.
-                    updateC2PATimeline(currentTime, videoPlayer, true);
+                    updateC2PATimeline(currentTime, videoPlayer, true, isLive);
                 }
 
                 const timeline = getTimelineState(useStaticTimelineFallback, videoPlayer, currentTime);

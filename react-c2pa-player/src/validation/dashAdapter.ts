@@ -192,6 +192,9 @@ class DashFragmentedFmp4Session implements ValidationSession {
       // Init-segment C2PA processing failed, so the asset's credentials are
       // broken as a whole rather than one segment being bad.
       wholeAssetInvalid: this.#runtime.isInitInvalid(),
+      // Drives the timeline's window: a live stream has no end to scale
+      // against, and its times may be epoch-based.
+      isLive: liveSignal ?? undefined,
     };
 
     if (shouldEmit) {
