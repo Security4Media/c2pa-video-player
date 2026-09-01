@@ -1,3 +1,5 @@
+@import './design-tokens.css';
+
 /*
  * Copyright 2026 European Broadcasting Union
  *
@@ -284,22 +286,32 @@
    player is in live mode, which it detects correctly for this DASH source, so
    nothing here has to decide when to show it. This gives it the red dot and
    keeps it legible against the control bar. */
-/* Over-qualified past video.js's own `.video-js .vjs-live-control { flex: auto }`,
-   which loads after this file and otherwise wins. Left to grow it took 384px of
-   a 1084px bar and halved the progress control with it, which is the whole
-   thing this player exists to show. */
-.video-js .vjs-control-bar .vjs-live-control {
+/* Two rules have to be beaten here, from opposite directions.
+
+   Video.js gives the live control `flex: auto`; left to grow it took 384px of a
+   1084px bar and halved the progress control with it. Hence `flex: 0 0 auto`.
+
+   This file's own blanket `.video-js .vjs-control { width: 4em !important }`
+   (see above) then pins it to a box narrower than its contents. `!important`
+   ignores specificity, so `width: auto` alone loses, and since the dot below is
+   an empty flex item its min-content is zero: it absorbs the whole overflow and
+   renders at zero width. The pulse still runs, on a box with no size, which is
+   an unusually quiet way to fail. Hence `width: auto !important`.
+
+   Sized in em so the indicator tracks the bar, which is set in em throughout
+   and drops to 3em at the mobile breakpoint. */
+.video-js.vjs-live .vjs-control-bar .vjs-live-control {
   display: flex;
   align-items: center;
   flex: 0 0 auto;
-  width: auto;
-  padding: 0 8px;
+  width: auto !important;
+  padding: 0 0.6em;
 }
 
 .video-js .vjs-control-bar .vjs-live-display {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 0.5em;
   font-weight: 600;
   letter-spacing: 0.04em;
 }
@@ -313,8 +325,11 @@
    glance and is the convention viewers already know from broadcast. */
 .video-js .vjs-control-bar .vjs-live-display::before {
   content: '';
-  width: 8px;
-  height: 8px;
+  /* Never shrink: as an empty flex item its min-content is zero, so under any
+     width pressure it is the first thing sacrificed, silently. */
+  flex: 0 0 auto;
+  width: 0.7em;
+  height: 0.7em;
   border-radius: 50%;
   background-color: var(--c2pa-live-dot);
   animation: c2pa-live-pulse 1.6s ease-out infinite;
@@ -323,16 +338,16 @@
 @keyframes c2pa-live-pulse {
   0% {
     opacity: 1;
-    box-shadow: 0 0 0 0 rgba(var(--c2pa-live-dot-rgb), 0.75);
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--c2pa-live-dot) 75%, transparent);
   }
   70% {
     opacity: 0.6;
     /* Ring has travelled out and faded; the dot is at its dimmest. */
-    box-shadow: 0 0 0 7px rgba(var(--c2pa-live-dot-rgb), 0);
+    box-shadow: 0 0 0 0.6em color-mix(in srgb, var(--c2pa-live-dot) 0%, transparent);
   }
   100% {
     opacity: 1;
-    box-shadow: 0 0 0 0 rgba(var(--c2pa-live-dot-rgb), 0);
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--c2pa-live-dot) 0%, transparent);
   }
 }
 
