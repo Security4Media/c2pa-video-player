@@ -237,8 +237,15 @@ export function readStoreEvidence(manifestStore: ManifestStore | null | undefine
 /**
  * Evidence for one ingredient.
  *
- * An ingredient that carries no evidence of its own yields 'Unknown' rather
- * than 'Invalid': under WebCrypto nothing populates per-ingredient results, and
+ * Ingredients are judged more leniently than the active manifest, deliberately.
+ * An ingredient signed by someone outside the trust list is still intact
+ * provenance worth showing, so it reports 'Valid'; only the active manifest's
+ * own signer decides whether the asset as a whole is trusted. For the same
+ * reason 'Trusted' requires the positive `signingCredential.trusted` code,
+ * while a validated-but-untrusted ingredient stops at 'Valid'.
+ *
+ * An ingredient carrying no evidence at all yields 'Unknown' rather than
+ * 'Invalid': under WebCrypto nothing populates per-ingredient results, and
  * reporting absence as failure mislabelled every ingredient in the provenance
  * history.
  */
@@ -257,12 +264,30 @@ export function readIngredientEvidence(ingredient: {
   const failure = (coded?.failure ?? []) as RawStatus[];
 
   if (coded && hasCodedResults(success, failure)) {
-    return fromCodedResults(success, failure, null);
+    const failures = toFailures(failure);
+    const state: PlayerValidationState = failures.length > 0
+      ? ingredientStateFromFailures(failures)
+      : success.some((entry) => entry.code === 'signingCredential.trusted')
+        ? 'Trusted'
+        : 'Valid';
+
+    return { state, failures, identity: 'Absent' };
   }
 
-  const statuses = (ingredient.validation_status ?? []) as RawStatus[];
+  const failures = toFailures(ingredient.validation_status as RawStatus[] | null | undefined);
 
-  return fromDeclaredVerdict(statuses.length > 0 ? 'Invalid' : 'Unknown', statuses, null);
+  return {
+    state: failures.length > 0 ? ingredientStateFromFailures(failures) : 'Unknown',
+    failures,
+    identity: 'Absent',
+  };
+}
+
+/** Untrusted is survivable for an ingredient; anything else is not. */
+function ingredientStateFromFailures(
+  failures: readonly ValidationFailure[],
+): PlayerValidationState {
+  return failures.every((failure) => failure.code.endsWith('.untrusted')) ? 'Valid' : 'Invalid';
 }
 
 /**
