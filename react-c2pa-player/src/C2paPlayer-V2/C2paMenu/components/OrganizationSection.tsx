@@ -141,6 +141,8 @@ export function OrganizationSection({
               className="c2pa-org-section__status"
               aria-label={`Organization identity status: ${section.cawg?.validationStatus}`}
               title={validationIndicator.message}
+              data-testid="c2pa-identity-status"
+              data-validation-state={section.cawg?.validationStatus ?? 'Unknown'}
             >
               {validationIndicator.icon}
             </span>

@@ -13,7 +13,8 @@
         "preview": "vite preview",
         "start": "http-server -p 9000 -c-1 -d false -g",
         "test": "vitest run",
-        "test:watch": "vitest"
+        "test:watch": "vitest",
+        "test:browser": "node tests/browser/trustMatrix.mjs"
     },
     "dependencies": {
         "@contentauth/c2pa-web": "^0.7.1",
@@ -35,6 +36,7 @@
         "@types/video.js": "^7.3.58",
         "@vitejs/plugin-react": "^4.2.1",
         "concurrently": "^9.1.2",
+        "playwright-core": "^1.62.1",
         "typescript": "^5.3.3",
         "vite": "^5.1.0",
         "vitest": "^4.1.11"

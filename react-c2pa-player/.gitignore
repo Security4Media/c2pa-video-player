@@ -5,7 +5,8 @@ dist
 .vscode
 .idea
 
-# Tampered C2PA test streams (~30MB of fMP4 per fixture). Deliberately
-# untracked: they are derived from the WDR test stream and regenerated on
-# demand, so the binaries stay out of git.
+# Tampered C2PA test media. Deliberately untracked: large, and derived from
+# the WDR test stream or from an asset already here. Rebuild either with
+# scripts/make-tamper-fixtures.py.
 public/hls-fixtures/
+public/mp4s/TAMPERED_*.mp4

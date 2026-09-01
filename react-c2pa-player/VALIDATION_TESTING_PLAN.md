@@ -156,13 +156,22 @@ stream from Trusted to Valid and flipped the identity indicator.
 
 ## Part E. Sequencing
 
-1. A1 and A2, migrating all six sites. No behaviour change, and it fixes the
-   ingredient bug as a side effect.
-2. Vitest, port the three existing suites.
-3. Trust fixtures and the unit matrix.
-4. A3, adapter tests with a fake bridge.
-5. Browser smoke matrix and testids.
-6. A5 conciseness pass.
+1. Done. A1 and A2, all six sites migrated; fixed the ingredient bug on the way.
+2. Done. Vitest, three suites ported; caught an ingredient regression from step 1.
+3. Done. Trust fixtures selectable with `?trust=`; surfaced two defects.
+4. Done. Sessions split from runtimes, 21 cases now run without a browser.
+5. Done. `npm run test:browser`, 10 cases, asserting on data attributes.
+6. To do. A5 conciseness pass.
+
+### Running the tests
+
+    npm test                       # unit, ~100 cases, under a second
+    npm run dev -- --port 5199     # then, in another shell:
+    npm run test:browser           # 10 cases against the real engines
+
+The browser matrix needs the WDR stream for its HLS cases and the generated
+fixtures for the tampered ones (`scripts/make-tamper-fixtures.py`); it is kept
+out of `npm test` for that reason.
 
 ## Open decisions
 

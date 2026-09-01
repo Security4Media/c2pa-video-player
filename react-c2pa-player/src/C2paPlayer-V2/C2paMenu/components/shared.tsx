@@ -103,7 +103,7 @@ export function NoManifestState() {
 
 export function InvalidState() {
   return (
-    <li className="vjs-menu-item validation-padding">
+    <li className="vjs-menu-item validation-padding" data-testid="c2pa-invalid-state">
       <div className="alert-div">
         <div>
           <strong>Content Credentials are Invalid</strong>
@@ -150,7 +150,17 @@ export function WebsiteLink({ href }: { href: string }) {
 }
 
 export function ValidationBadge({ value }: { value: string }) {
-  return <span className={`validation-${value.toLowerCase()}`}>{value}</span>;
+  // `data-validation-state` carries the verdict itself so a test can read it
+  // without depending on the label's wording or its styling.
+  return (
+    <span
+      className={`validation-${value.toLowerCase()}`}
+      data-testid="c2pa-validation-status"
+      data-validation-state={value}
+    >
+      {value}
+    </span>
+  );
 }
 
 export function AlertItem({ itemValue }: { itemValue: string }) {
