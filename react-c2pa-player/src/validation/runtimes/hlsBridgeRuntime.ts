@@ -20,8 +20,27 @@ import {
 } from '@nettrek/c2pa-hls-bridge';
 import Hls from 'hls.js';
 import { Emitter, type EmitterListener } from '../emitter';
+import { pemToAllowedListDigests } from '../policy/webCryptoAllowedList';
 import { getHlsValidationState } from '../rules';
 import type { PlayerValidationState, TimeInterval, ValidationAdapterContext } from '../types';
+
+/**
+ * Restates trust settings in the shape the WebCrypto engine parses: the
+ * `allowedList` PEM becomes the digest lines it matches leaves against, while
+ * everything else (anchors, store config, `verifyTrustList`) passes through
+ * untouched.
+ */
+async function toWebCryptoTrustSettings<TSettings extends { allowedList?: string | string[] }>(
+  settings: TSettings,
+): Promise<TSettings> {
+  const { allowedList } = settings;
+
+  if (typeof allowedList !== 'string') {
+    return settings;
+  }
+
+  return { ...settings, allowedList: await pemToAllowedListDigests(allowedList) };
+}
 
 type RuntimeListener = EmitterListener<void>;
 
@@ -98,6 +117,16 @@ export class HlsBridgeRuntime {
       return;
     }
 
+    // This bridge runs the WebCrypto engine (enableExperimentalWebCrypto
+    // below), whose allow-list parser wants base64 SHA-256 digests rather than
+    // the PEM the trust material holds - see policy/webCryptoAllowedList.ts.
+    const [trustSettings, cawgTrustSettings] = this.#context.policy.enableTrustVerification
+      ? await Promise.all([
+          toWebCryptoTrustSettings(trustMaterial.trust),
+          toWebCryptoTrustSettings(trustMaterial.cawgTrust),
+        ])
+      : [undefined, undefined];
+
     const hls = new Hls({ enableWorker: true });
     const bridge = new C2paHlsBridge(
       {
@@ -115,15 +144,17 @@ export class HlsBridgeRuntime {
         // different, more specific status code than WASM does.
         enableExperimentalWebCrypto: true,
         wasmSrc: trustMaterial.wasmSrc,
-        trust: this.#context.policy.enableTrustVerification ? trustMaterial.trust : undefined,
-        // Evaluate the `cawg.identity` assertion's signer against the same
-        // C2PA trust material rather than a separate CAWG-only policy. Per
-        // c2pa-rs the CAWG identity is otherwise checked against its own
-        // (effectively empty) policy, so a signer we do trust for the claim
-        // still reports `cawg.identity.untrusted` and the asset can never
-        // reach 'Trusted'. This is the bridge's documented opt-in for exactly
-        // that case (dist/C2paBridge.d.ts:38-47), and it keeps one list to
-        // maintain instead of two that have already drifted apart.
+        trust: trustSettings,
+        // Supplied explicitly rather than relying on
+        // enableCawgIdentityTrustVerification alone: that flag reuses the
+        // resolved C2PA resources for the identity only when no cawgTrust is
+        // given (dist/C2paBridge.d.ts:38-47), whereas this list is the C2PA
+        // one unioned with the CAWG-only entries, and it carries
+        // `verifyTrustList`. Without either, per c2pa-rs the CAWG identity is
+        // checked against its own effectively-empty policy, so a signer we do
+        // trust for the claim still reports untrusted and the asset can never
+        // reach 'Trusted'.
+        cawgTrust: cawgTrustSettings,
         enableCawgIdentityTrustVerification: this.#context.policy.enableTrustVerification,
       },
       hls as never,

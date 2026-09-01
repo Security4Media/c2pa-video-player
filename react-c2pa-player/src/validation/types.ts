@@ -14,7 +14,12 @@
  * limitations under the License.
  */
 
-import type { Manifest, ManifestStore, TrustSettings } from '@contentauth/c2pa-web';
+import type {
+  CawgTrustSettings,
+  Manifest,
+  ManifestStore,
+  TrustSettings,
+} from '@contentauth/c2pa-web';
 
 export type PlayerValidationState = 'Trusted' | 'Valid' | 'Invalid' | 'Unknown';
 
@@ -52,7 +57,10 @@ export interface AdapterCapabilities {
 export interface TrustMaterial {
   wasmSrc: string;
   trust: TrustSettings;
-  cawgTrust: TrustSettings;
+  // CawgTrustSettings rather than TrustSettings: it adds `verifyTrustList`,
+  // which is what turns CAWG identity trust validation on and has an effect
+  // only here.
+  cawgTrust: CawgTrustSettings;
 }
 
 export interface TrustMaterialProvider {
