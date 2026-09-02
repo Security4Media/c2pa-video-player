@@ -46,10 +46,12 @@ export interface SegmentPreview {
    * `metadata`. False means "shown, but nobody verified it".
    */
   metadataVerified: boolean;
-  /** One sentence a viewer can act on, when the segment failed. */
+  /**
+   * One sentence a viewer can act on, when the segment failed or was not
+   * verified. Never null for those two cases: an unexplained colour is worse
+   * than a general explanation.
+   */
   reason: string | null;
-  /** The raw codes behind `reason`, so nothing is hidden behind the wording. */
-  codes: string[];
 }
 
 /**
@@ -132,6 +134,33 @@ const INTEGRITY_SENTENCES: Record<string, string> = {
   invalid: 'This fragment failed its integrity check.',
 };
 
+/**
+ * What a failed fragment says when nothing more specific is known.
+ *
+ * The preview no longer shows raw codes, so this is the floor rather than a
+ * nicety: without it a fragment whose code has no plain-language reading would
+ * be a red block with a time range and no statement of what happened.
+ */
+const GENERIC_FAILURE_SENTENCE = 'This fragment failed its integrity check.';
+
+/** The same floor for a grey fragment. */
+const GENERIC_UNKNOWN_SENTENCE =
+  'No verified content credentials were found for this fragment.';
+
+/**
+ * A fragment that settled without ever being played.
+ *
+ * It sat in the past long enough to fall out of the DVR, so it can no longer
+ * be reached, and this player never showed it to anyone - which is why it is
+ * grey rather than carrying a colour. Said plainly, because a grey block in
+ * the middle of validated history is otherwise unexplained.
+ */
+const UNPLAYED_SENTENCE =
+  'This fragment was never played, so this player did not verify it, and it is now too far in the past to reach.';
+
+/** Nothing has come back for this stretch yet. */
+const PENDING_SENTENCE = 'No verdict has arrived for this fragment yet.';
+
 export function describeFailureCode(code: string): string | null {
   return FAILURE_SENTENCES[code] ?? null;
 }
@@ -201,41 +230,94 @@ function readMetadata(manifestRef: ManifestSource | undefined): SegmentPreviewMe
   return title || publisher || rights ? { title, publisher, rights } : null;
 }
 
-/** A segment that passed has, by definition, no failure to report. */
-function isHealthy(segment: C2PATimelineSegmentUpdate): boolean {
-  return !segment.pending && (segment.validationState === 'Valid' || segment.validationState === 'Trusted');
+/**
+ * Why a grey segment is grey.
+ *
+ * Ordered from the most specific thing known to the least, and never empty:
+ * grey is the one colour on the bar that carries no self-evident meaning, so
+ * leaving it unexplained is what sent people looking for a bug.
+ */
+function readUnknownReason(segment: C2PATimelineSegmentUpdate): string {
+  if (segment.pending) {
+    return PENDING_SENTENCE;
+  }
+
+  const integrity =
+    segment.manifestRef?.kind === 'integrity-only'
+      ? INTEGRITY_SENTENCES[segment.manifestRef.integrityStatus] ?? null
+      : null;
+
+  if (segment.unplayed) {
+    // Both facts, when both apply: what the engine found, and that nobody ever
+    // watched it. Saying only the second of a fragment whose credentials were
+    // actually missing would be a different, weaker claim than the truth.
+    return integrity ? `${integrity} ${UNPLAYED_SENTENCE}` : UNPLAYED_SENTENCE;
+  }
+
+  return integrity ?? GENERIC_UNKNOWN_SENTENCE;
 }
 
 /**
  * Everything the preview needs about one segment.
  *
- * `validationState` is passed through rather than re-derived: the timeline has
- * already decided what colour the segment is, and a preview that disagreed with
- * the bar it is attached to would be worse than no preview.
+ * `validationState` follows the bar rather than being re-derived: the timeline
+ * has already decided what colour the segment is, and a preview that disagreed
+ * with the bar it is attached to would be worse than no preview. A segment
+ * still awaiting its verdict is grey, so it reads as Unknown - the same word
+ * the bar's grey means everywhere else.
  *
- * That authority is also why a healthy segment reports no failure even when its
- * `manifestRef` carries codes. For HLS one manifest covers the whole stream, so
- * every region is given the same reference - the metadata on it is shared, but
- * the validation errors belong to whichever fragment failed. Reading them for a
- * neighbour told a viewer that a Trusted stretch had a hash mismatch, which is
- * both wrong and precisely the accusation this player must not make carelessly.
+ * The three branches below differ in what they are willing to say:
+ *
+ *  - **Invalid** shows the verdict, the time and one sentence. No metadata:
+ *    the declared title and rights of a fragment that failed its own integrity
+ *    check are exactly the claims that cannot be relied on, and putting them
+ *    beside the failure invites reading them as merely unverified rather than
+ *    as part of what was tampered with. No raw codes either.
+ *  - **Unknown** shows the metadata it has, marked, plus a sentence saying why
+ *    nothing was verified.
+ *  - **Valid and Trusted** report no failure even when the `manifestRef`
+ *    carries codes. For HLS one manifest covers the whole stream, so every
+ *    region is given the same reference - the metadata on it is shared, but
+ *    the validation errors belong to whichever fragment failed. Reading them
+ *    for a neighbour told a viewer that a Trusted stretch had a hash mismatch,
+ *    which is both wrong and precisely the accusation this player must not
+ *    make carelessly.
  */
 export function buildSegmentPreview(
   segment: C2PATimelineSegmentUpdate,
   adapterKind: AdapterKind | null,
 ): SegmentPreview {
-  const codes = isHealthy(segment) ? [] : readFailureCodes(segment.manifestRef);
-  const metadata = readMetadata(segment.manifestRef);
+  const timeRange = formatSegmentRange(segment.startTime, segment.endTime);
+  const state = segment.pending ? 'Unknown' : segment.validationState;
 
-  return {
-    timeRange: formatSegmentRange(segment.startTime, segment.endTime),
-    validationState: segment.pending ? 'Checking' : segment.validationState,
-    metadata,
-    // Only claim the metadata is verified when something verified it. For DASH
-    // the underlying library performs no identity or trust check at all, so its
-    // Dublin Core is shown and marked rather than presented as attested.
-    metadataVerified: metadata !== null && adapterKind !== null && verifiesCawgIdentity(adapterKind),
-    reason: readReason(segment.manifestRef, codes),
-    codes,
-  };
+  if (state === 'Invalid') {
+    const codes = readFailureCodes(segment.manifestRef);
+
+    return {
+      timeRange,
+      validationState: 'Invalid',
+      metadata: null,
+      metadataVerified: false,
+      reason: readReason(segment.manifestRef, codes) ?? GENERIC_FAILURE_SENTENCE,
+    };
+  }
+
+  const metadata = readMetadata(segment.manifestRef);
+  // Only claim the metadata is verified when something verified it. For DASH
+  // the underlying library performs no identity or trust check at all, so its
+  // Dublin Core is shown and marked rather than presented as attested.
+  const metadataVerified =
+    metadata !== null && adapterKind !== null && verifiesCawgIdentity(adapterKind);
+
+  if (state === 'Unknown') {
+    return {
+      timeRange,
+      validationState: 'Unknown',
+      metadata,
+      metadataVerified,
+      reason: readUnknownReason(segment),
+    };
+  }
+
+  return { timeRange, validationState: state, metadata, metadataVerified, reason: null };
 }

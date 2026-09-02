@@ -151,7 +151,7 @@ describe('buildSegmentPreview', () => {
     expect(buildSegmentPreview(segment(), 'hls-fragmented-fmp4').metadataVerified).toBe(false);
   });
 
-  it('explains a failed fragment and keeps the raw code', () => {
+  it('explains a failed fragment in a sentence, and shows nothing else', () => {
     const preview = buildSegmentPreview(
       segment({
         validationState: 'Invalid',
@@ -167,7 +167,11 @@ describe('buildSegmentPreview', () => {
     );
 
     expect(preview.reason).toContain('does not match the hash');
-    expect(preview.codes).toEqual(['assertion.bmffHash.mismatch']);
+    // The declared title of a fragment that failed its own integrity check is
+    // exactly the claim that cannot be relied on, so it is not shown beside
+    // the failure.
+    expect(preview.metadata).toBeNull();
+    expect(preview.metadataVerified).toBe(false);
   });
 
   it('falls back to the integrity status when there is no code to read', () => {
@@ -182,7 +186,9 @@ describe('buildSegmentPreview', () => {
     expect(preview.reason).toContain('repeats one already seen');
   });
 
-  it('shows an unrecognised code rather than swallowing it', () => {
+  it('still states that a fragment failed when its code has no reading', () => {
+    // The raw code is no longer shown, so silence here would leave a red block
+    // with a time range and no statement of what happened.
     const preview = buildSegmentPreview(
       segment({
         validationState: 'Invalid',
@@ -195,8 +201,7 @@ describe('buildSegmentPreview', () => {
       'dash-fragmented-fmp4',
     );
 
-    expect(preview.reason).toBeNull();
-    expect(preview.codes).toEqual(['livevideo.something.new']);
+    expect(preview.reason).toBe('This fragment failed its integrity check.');
   });
 
   it('does not report a neighbour’s failure on a segment that passed', () => {
@@ -216,7 +221,6 @@ describe('buildSegmentPreview', () => {
       'hls-fragmented-fmp4',
     );
     expect(trusted.reason).toBeNull();
-    expect(trusted.codes).toEqual([]);
     // The metadata is genuinely shared, so it still shows.
     expect(trusted.metadata?.title).toBe('Shared across fragments');
 
@@ -225,13 +229,79 @@ describe('buildSegmentPreview', () => {
       segment({ validationState: 'Invalid', manifestRef: shared }),
       'hls-fragmented-fmp4',
     );
-    expect(invalid.codes).toEqual(['assertion.bmffHash.mismatch']);
+    expect(invalid.reason).toContain('does not match the hash');
+  });
+});
+
+describe('an unverified segment', () => {
+  // Grey is the one colour on the bar that carries no self-evident meaning, so
+  // every one of these has to come back with a sentence.
+  it('reads as Unknown, the same word the bar’s grey means elsewhere', () => {
+    expect(buildSegmentPreview(segment({ validationState: 'Unknown' }), 'dash-fragmented-fmp4'))
+      .toMatchObject({ validationState: 'Unknown' });
   });
 
-  it('reports a pending segment as being checked, not as a verdict', () => {
-    expect(buildSegmentPreview(segment({ pending: true }), 'dash-fragmented-fmp4').validationState).toBe(
-      'Checking',
+  it('reads as Unknown while still awaiting a verdict, not as a third state', () => {
+    // It is grey on the bar either way, and two words for one colour is one
+    // more than a viewer can act on.
+    const preview = buildSegmentPreview(segment({ pending: true }), 'dash-fragmented-fmp4');
+
+    expect(preview.validationState).toBe('Unknown');
+    expect(preview.reason).toBe('No verdict has arrived for this fragment yet.');
+  });
+
+  it('says so when it was never played and has gone out of reach', () => {
+    const preview = buildSegmentPreview(
+      segment({ validationState: 'Unknown', unplayed: true }),
+      'dash-fragmented-fmp4',
     );
+
+    expect(preview.reason).toBe(
+      'This fragment was never played, so this player did not verify it, and it is now too far in the past to reach.',
+    );
+  });
+
+  it('keeps what the engine found alongside the never-played fact', () => {
+    // Both are true and they are different claims: credentials that were
+    // missing is a stronger statement than content nobody watched.
+    const preview = buildSegmentPreview(
+      segment({
+        validationState: 'Unknown',
+        unplayed: true,
+        manifestRef: { kind: 'integrity-only', integrityStatus: 'missing' },
+      }),
+      'dash-fragmented-fmp4',
+    );
+
+    expect(preview.reason).toContain('No C2PA data was found');
+    expect(preview.reason).toContain('never played');
+  });
+
+  it('falls back to a general sentence rather than none', () => {
+    expect(
+      buildSegmentPreview(segment({ validationState: 'Unknown' }), 'dash-fragmented-fmp4').reason,
+    ).toBe('No verified content credentials were found for this fragment.');
+  });
+
+  it('still shows the metadata it has, marked unverified', () => {
+    // Credentials present but unchecked is worth showing, and the caveat is
+    // what keeps it honest.
+    const preview = buildSegmentPreview(
+      segment({
+        validationState: 'Unknown',
+        manifestRef: {
+          kind: 'single-manifest',
+          manifest: manifestWithDublinCore({ 'dc:title': 'Unchecked but declared' }),
+          manifests: {},
+          validationState: 'Unknown',
+          validationErrors: [],
+        },
+      }),
+      'dash-fragmented-fmp4',
+    );
+
+    expect(preview.metadata?.title).toBe('Unchecked but declared');
+    expect(preview.metadataVerified).toBe(false);
   });
 });
 

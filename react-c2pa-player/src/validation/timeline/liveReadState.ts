@@ -52,6 +52,16 @@ export interface LiveRegion<TSource extends SegmentVerdict = SegmentVerdict>
    * playable. The timeline renders these dimmed.
    */
   settled: boolean;
+  /**
+   * Whether playback actually read any of this region.
+   *
+   * False on a region that settled only because it aged out of the DVR: the
+   * engine's verdict for it stands, but nobody ever watched the content and
+   * now nobody can, so there is no longer any way to confirm it by playing it.
+   * The hover preview says so for an unverified one, which is otherwise a
+   * grey block with no explanation.
+   */
+  played: boolean;
 }
 
 /** Sorts, merges and returns disjoint intervals. */
@@ -84,17 +94,31 @@ function normalize(intervals: readonly TimeInterval[]): TimeInterval[] {
 const SEVERITY: Record<string, number> = { Invalid: 3, Unknown: 2, Valid: 1, Trusted: 0 };
 
 /**
- * Collapses overlapping provisional regions into disjoint ones, worst verdict
- * winning where they disagree.
+ * Collapses overlapping regions into disjoint ones, worst verdict winning
+ * where they disagree.
  *
  * Needed because two verdicts can cover the same stretch of stream - a live
  * segment re-requested after a retry or a rendition change is validated twice,
  * and both verdicts describe the same time range. Without this the bar stacked
- * two identical dimmed regions on top of each other, measured on the live feed
- * as pairs at 93.6-99.4% and 99.9-100%.
+ * two regions on top of each other, measured on the live feed as pairs at
+ * 93.6-99.4% and 99.9-100%.
  *
- * The settled path needs no equivalent: those regions go through the
- * projector, whose upsert already resolves overlap.
+ * Applied to every region, not only the provisional ones. It used to be
+ * provisional-only, on the grounds that settled regions went through the
+ * projector, whose upsert resolved overlap - true when that was written, and
+ * no longer true since the DASH session began deriving its timeline directly.
+ * The consequence was visible on the live feed: a **failing** verdict and a
+ * passing one occupying the same stretch, with which of them a viewer saw
+ * decided by element order and width. An invalid fragment hidden behind a
+ * valid one is the one direction this player must never fail in.
+ *
+ * Two flags are unioned rather than taken from the winner, because they are
+ * claims about the stretch rather than about the verdict:
+ *
+ *  - `settled`: if any verdict covering it was played or has gone out of
+ *    reach, the stretch is settled. So a failing verdict over content that was
+ *    watched shows solid rather than dimmed.
+ *  - `played`: likewise, read by anyone means read.
  */
 function collapse<TSource extends SegmentVerdict>(
   regions: readonly LiveRegion<TSource>[],
@@ -104,7 +128,7 @@ function collapse<TSource extends SegmentVerdict>(
   }
 
   // Sweep the boundaries, and for each span between two of them keep the worst
-  // verdict covering it. Adjacent spans with the same verdict then merge.
+  // verdict covering it. Adjacent spans that agree then merge.
   const edges = [...new Set(regions.flatMap((r) => [r.startTime, r.endTime]))].sort((a, b) => a - b);
   const spans: LiveRegion<TSource>[] = [];
 
@@ -122,18 +146,30 @@ function collapse<TSource extends SegmentVerdict>(
         ? candidate
         : chosen,
     );
+    const span: LiveRegion<TSource> = {
+      ...worst,
+      startTime,
+      endTime,
+      settled: covering.some((r) => r.settled),
+      played: covering.some((r) => r.played),
+    };
     const previous = spans[spans.length - 1];
 
+    // Merged only when every rendered property agrees, or two spans that look
+    // different on the bar would become one.
     if (
       previous &&
       previous.endTime === startTime &&
-      previous.validationState === worst.validationState
+      previous.validationState === span.validationState &&
+      previous.settled === span.settled &&
+      previous.played === span.played &&
+      previous.source === span.source
     ) {
       previous.endTime = endTime;
       continue;
     }
 
-    spans.push({ ...worst, startTime, endTime });
+    spans.push(span);
   }
 
   return spans;
@@ -173,7 +209,9 @@ export function selectLiveRegions<TSource extends SegmentVerdict>(
   watched: WatchedTimeline,
   settledBefore: number,
 ): LiveRegion<TSource>[] {
-  const regions: LiveRegion<TSource>[] = [];
+  // Settled first, so a tie on severity resolves to the settled region: if one
+  // verdict says this stretch was played and checked, it was.
+  const settledRegions: LiveRegion<TSource>[] = [];
   const provisional: LiveRegion<TSource>[] = [];
 
   verdicts.forEach((verdict) => {
@@ -185,18 +223,28 @@ export function selectLiveRegions<TSource extends SegmentVerdict>(
 
     // Read, plus anything now beyond reach - the two ways a claim settles.
     const agedEnd = Math.min(endTime, settledBefore);
+    const watchedParts = watched.intersect(startTime, endTime);
     const settled = normalize([
-      ...watched.intersect(startTime, endTime),
+      ...watchedParts,
       ...(agedEnd > startTime ? [{ startTime, endTime: agedEnd }] : []),
     ]);
 
     settled.forEach((interval) => {
-      regions.push({
+      settledRegions.push({
         startTime: interval.startTime,
         endTime: interval.endTime,
         validationState: verdict.validationState,
         source: verdict,
         settled: true,
+        // Merged regions are kept merged rather than split along the two
+        // reasons they settled: a region that overlaps the read record at all
+        // counts as played. Splitting would put two blocks of the same colour
+        // side by side on the bar for no visible gain, and would make one of
+        // them a new element on the tick it happened - so it would fade in as
+        // if it were new content.
+        played: watchedParts.some(
+          (part) => part.startTime < interval.endTime && part.endTime > interval.startTime,
+        ),
       });
     });
 
@@ -207,11 +255,12 @@ export function selectLiveRegions<TSource extends SegmentVerdict>(
         validationState: verdict.validationState,
         source: verdict,
         settled: false,
+        played: false,
       });
     });
   });
 
-  return [...regions, ...collapse(provisional)];
+  return collapse([...settledRegions, ...provisional]);
 }
 
 /**

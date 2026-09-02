@@ -233,6 +233,33 @@ describe('DashFragmentedFmp4Session', () => {
       expect(watchedRegion(98)).toBe(true);
     });
 
+    it('marks a segment that aged out unplayed, so the bar can explain it', async () => {
+      // A grey block in the middle of validated history needs a reason, and
+      // this is the one: fetched, never watched, and now behind the DVR.
+      runtime.dvrWindowSeconds = 30;
+      runtime.segments = [segment(40, 44, 'Unknown')];
+      await session.load();
+
+      // Nothing played, and the stream has run well past it.
+      for (let end = 100; end <= 132; end += 4) runtime.segments.push(segment(end - 4, end));
+      runtime.notify();
+
+      const aged = session
+        .getStatusAt(132)
+        .timelineSegments.find((s) => s.startTime === 40);
+
+      expect(aged).toMatchObject({ unplayed: true });
+      expect(aged?.provisional).toBeUndefined();
+    });
+
+    it('does not mark a segment playback actually read', async () => {
+      runtime.segments = [segment(0, 4)];
+      await session.load();
+      play(0, 4);
+
+      expect(session.getStatusAt(4).timelineSegments[0].unplayed).toBeUndefined();
+    });
+
     it('keeps an invalid segment in its own place', async () => {
       runtime.segments = [segment(0, 4), segment(4, 8, 'Invalid'), segment(8, 12)];
       await session.load();

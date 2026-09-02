@@ -39,6 +39,113 @@ const describeRegions = (regions: ReturnType<typeof selectLiveRegions>) =>
     .map((r) => `${r.startTime}-${r.endTime}:${r.settled ? 'settled' : 'provisional'}`)
     .join(', ');
 
+describe('two verdicts for the same stretch', () => {
+  const stated = (startTime: number, endTime: number, validationState: 'Valid' | 'Invalid') => ({
+    startTime,
+    endTime,
+    validationState,
+  });
+
+  it('never hides a failing verdict behind a passing one', () => {
+    // Found on the live feed: a segment re-requested after a retry or a
+    // rendition change is validated twice, and the two verdicts can disagree.
+    // Both regions were emitted, so which one a viewer saw came down to
+    // element order and width - and the bar showed Valid over an Invalid
+    // fragment. The one direction this must never fail in.
+    const watched = new WatchedTimeline();
+
+    const regions = selectLiveRegions(
+      [stated(0, 4, 'Valid'), stated(0, 4, 'Invalid')],
+      watched,
+      resolveSettledBefore(100, 30),
+    );
+
+    expect(regions).toHaveLength(1);
+    expect(regions[0]).toMatchObject({ startTime: 0, endTime: 4, validationState: 'Invalid' });
+  });
+
+  it('settles a failing verdict over content that was watched', () => {
+    // The failure came from one verdict and the read record from another, but
+    // they describe the same stretch: it was shown to a viewer, so it is not
+    // provisional.
+    const watched = new WatchedTimeline();
+    play(watched, 0, 4);
+
+    const regions = selectLiveRegions(
+      [stated(0, 4, 'Valid'), stated(0, 4, 'Invalid')],
+      watched,
+      NOTHING_AGES,
+    );
+
+    expect(regions).toHaveLength(1);
+    expect(regions[0]).toMatchObject({ validationState: 'Invalid', settled: true, played: true });
+  });
+
+  it('splits where only part of the stretch is disputed', () => {
+    const watched = new WatchedTimeline();
+
+    expect(
+      describeRegions(
+        selectLiveRegions([stated(0, 8, 'Valid'), stated(4, 8, 'Invalid')], watched, NOTHING_AGES),
+      ),
+    ).toBe('0-4:provisional, 4-8:provisional');
+
+    const states = selectLiveRegions(
+      [stated(0, 8, 'Valid'), stated(4, 8, 'Invalid')],
+      watched,
+      NOTHING_AGES,
+    )
+      .slice()
+      .sort((a, b) => a.startTime - b.startTime)
+      .map((r) => r.validationState);
+
+    expect(states).toEqual(['Valid', 'Invalid']);
+  });
+});
+
+describe('whether anyone played a settled region', () => {
+  it('is false when it settled only because it went out of reach', () => {
+    // The case a viewer sees as an unexplained block in the middle of
+    // validated history: dash.js fetched it, nobody watched it, and the DVR
+    // has since moved past it. The hover preview says so.
+    const watched = new WatchedTimeline();
+    const regions = selectLiveRegions([verdict(40, 44)], watched, resolveSettledBefore(100, 30));
+
+    expect(regions).toHaveLength(1);
+    expect(regions[0]).toMatchObject({ settled: true, played: false });
+  });
+
+  it('is true when playback read it', () => {
+    const watched = new WatchedTimeline();
+    play(watched, 40, 44);
+
+    const regions = selectLiveRegions([verdict(40, 44)], watched, NOTHING_AGES);
+
+    expect(regions[0]).toMatchObject({ settled: true, played: true });
+  });
+
+  it('counts a partly-read region as played, since it is one region', () => {
+    // Watched and aged-out parts are left merged rather than split along the
+    // reason they settled: two adjacent blocks of the same colour would look
+    // identical on the bar, and the newer of them would fade in as if it were
+    // new content.
+    const watched = new WatchedTimeline();
+    play(watched, 42, 44);
+
+    const regions = selectLiveRegions([verdict(40, 44)], watched, resolveSettledBefore(100, 30));
+
+    expect(regions).toHaveLength(1);
+    expect(regions[0]).toMatchObject({ startTime: 40, endTime: 44, played: true });
+  });
+
+  it('is false on anything still provisional, which nothing has read yet', () => {
+    const watched = new WatchedTimeline();
+    const regions = selectLiveRegions([verdict(0, 4)], watched, NOTHING_AGES);
+
+    expect(regions[0]).toMatchObject({ settled: false, played: false });
+  });
+});
+
 describe('selectLiveRegions', () => {
   it('marks a validated but unplayed segment provisional, not absent', () => {
     const watched = new WatchedTimeline();

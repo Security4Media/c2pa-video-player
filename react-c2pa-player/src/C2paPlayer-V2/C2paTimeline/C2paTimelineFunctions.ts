@@ -18,6 +18,7 @@ import { DEFAULT_LIVE_RETENTION_SECONDS } from '@/validation/policy/liveRetentio
 import type { C2PATimelineSegmentUpdate, ValidationState } from '@/types/c2pa.types';
 import type { C2PATimelineState } from '../C2PAPlayerRoot.types';
 import type { VideoJsPlayerLike } from '../C2paMenu/C2paMenu.types';
+import { advanceLiveEdge, prefersReducedMotion, type LiveEdgeState } from './liveEdgeClock';
 import { setLiveTimelineWindow } from './liveWindowState';
 
 type TimelineVerificationStatus = ValidationState | 'unknown' | 'false';
@@ -27,6 +28,13 @@ interface TimelineSegmentElement extends HTMLDivElement {
         startTime: string;
         endTime: string;
         verificationStatus: TimelineVerificationStatus;
+        /**
+         * Identity across renders, so the bar is reconciled rather than
+         * rebuilt. See segmentKey.
+         */
+        segmentKey?: string;
+        /** 'true' while no verdict has arrived for this stretch yet. */
+        pending?: string;
     };
     /**
      * The full segment this element represents, when it was built from a
@@ -49,6 +57,50 @@ const INSPECTABLE_CLASS = 'seekbar-play-c2pa--inspectable';
  * content was checked *and shown*. See ValidationTimelineSegment.provisional.
  */
 const PROVISIONAL_CLASS = 'seekbar-play-c2pa--provisional';
+/**
+ * On a segment for one frame after it is appended, so its fade-in has a state
+ * to transition *from*. Removed on the next frame; a transition set on an
+ * element in the same frame it enters the document does not run.
+ */
+const ENTERING_CLASS = 'seekbar-play-c2pa--entering';
+
+/**
+ * Decimal places in a segment's identity key.
+ *
+ * Milliseconds. Segment boundaries come from the media's own timing, so they
+ * are stable to far better than this between renders; rounding here only
+ * guards against a float that differs in its last bit.
+ */
+const SEGMENT_KEY_PRECISION = 3;
+
+/**
+ * A segment's identity across renders.
+ *
+ * Start time, because that is what a region keeps while its other properties
+ * change: a settled region grows at the end as playback reads it, and a
+ * provisional one changes verdict when its reader resolves. Keying on the
+ * whole extent would make a growing region a new element every tick, which is
+ * what the bar did before and why nothing could be animated.
+ *
+ * `seen` disambiguates the case two regions report the same start - possible
+ * when overlapping verdicts both settle - so a duplicate gets its own element
+ * instead of the pair fighting over one.
+ */
+function segmentKey(startTime: number, seen: Map<string, number>): string {
+    const base = startTime.toFixed(SEGMENT_KEY_PRECISION);
+    const occurrence = seen.get(base) ?? 0;
+
+    seen.set(base, occurrence + 1);
+
+    return occurrence === 0 ? base : `${base}#${occurrence}`;
+}
+
+/** A monotonic clock for the roll, falling back where performance is absent. */
+function nowMs(): number {
+    return typeof performance !== 'undefined' && typeof performance.now === 'function'
+        ? performance.now()
+        : Date.now();
+}
 
 function isInspectableStatus(status: TimelineVerificationStatus): boolean {
     return status !== 'Valid' && status !== 'Trusted';
@@ -105,6 +157,12 @@ export interface TimelineFunctions {
         isLive?: boolean,
         retentionSeconds?: number,
     ) => void;
+    /**
+     * Stops the animation frame loop and clears the bar. Must be called when
+     * the player goes away: the loop holds the player instance and would
+     * otherwise keep calling `currentTime()` on a disposed one.
+     */
+    disposeTimeline: () => void;
 }
 
 function isInvalidSegmentStatus(status: string) {
@@ -221,20 +279,54 @@ function positionTimelineSegment(segment: TimelineSegmentElement, window: Timeli
     segment.style.width = `${clamp(toPercent(endTime)) - left}%`;
 }
 
-function getSegmentColor(verificationStatus: TimelineVerificationStatus, isManifestInvalid = false) {
+/**
+ * The four verdict colours, read once per render pass.
+ *
+ * `getComputedStyle` forces a style recalculation, and this used to be called
+ * once per segment: at ~78 segments in a five-minute window and four renders a
+ * second that is over 300 recalculations a second, on the same four tokens.
+ * One read per pass instead, passed down.
+ *
+ * Per pass rather than cached for the session, so a token that changes at
+ * runtime is picked up on the next render rather than never.
+ */
+interface VerdictColors {
+    trusted: string;
+    passed: string;
+    failed: string;
+    unknown: string;
+}
+
+function readVerdictColors(): VerdictColors {
+    const style = getComputedStyle(document.documentElement);
+    const token = (name: string) => style.getPropertyValue(name).trim();
+
+    return {
+        trusted: token('--c2pa-trusted'),
+        passed: token('--c2pa-passed'),
+        failed: token('--c2pa-failed'),
+        unknown: token('--c2pa-unknown'),
+    };
+}
+
+function getSegmentColor(
+    verificationStatus: TimelineVerificationStatus,
+    isManifestInvalid = false,
+    colors: VerdictColors = readVerdictColors(),
+) {
     if (isManifestInvalid || verificationStatus === 'Invalid' || verificationStatus === 'false') {
-        return getComputedStyle(document.documentElement).getPropertyValue('--c2pa-failed').trim();
+        return colors.failed;
     }
 
     if (verificationStatus === 'Trusted') {
-        return getComputedStyle(document.documentElement).getPropertyValue('--c2pa-trusted').trim();
+        return colors.trusted;
     }
 
     if (verificationStatus === 'Valid') {
-        return getComputedStyle(document.documentElement).getPropertyValue('--c2pa-passed').trim();
+        return colors.passed;
     }
 
-    return getComputedStyle(document.documentElement).getPropertyValue('--c2pa-unknown').trim();
+    return colors.unknown;
 }
 
 /**
@@ -248,10 +340,181 @@ export function getTimelineFunctions(
     onSegmentClick?: (segment: C2PATimelineSegmentUpdate) => void,
 ): TimelineFunctions {
     let progressSegments: TimelineSegmentElement[] = [];
+    /** The smoothed live edge, while a live source is rolling. */
+    let liveEdge: LiveEdgeState | null = null;
+    let rollFrame: number | null = null;
+    /** What the roll needs to recompute the window without a render pass. */
+    let rollTarget: { videoPlayer: TimelineVideoPlayer; retentionSeconds: number } | null = null;
+    // Read once rather than per render: it is a viewer preference, and
+    // re-querying matchMedia on every frame would be a style read per frame.
+    const reducedMotion = prefersReducedMotion();
 
     const handleOnSeeked = function (time: number) {
         console.log('[C2PA] Player seeked: ', time);
         return false;
+    };
+
+    /** Everything one render pass needs to know about one segment. */
+    interface SegmentRender {
+        startTime: number;
+        endTime: number;
+        verificationStatus: TimelineVerificationStatus;
+        isManifestInvalid: boolean;
+        provisional: boolean;
+        pending: boolean;
+        source?: C2PATimelineSegmentUpdate;
+    }
+
+    /**
+     * A bare element with its click handler, which is attached once and reads
+     * the segment off the element rather than closing over it.
+     *
+     * That indirection is what makes reuse possible: a reused element is given
+     * a fresh source object on every render (the session derives its timeline
+     * from scratch each tick), so a captured variable would pin the handler to
+     * whichever object happened to exist when the element was created.
+     */
+    const createSegmentElement = function (key: string) {
+        const segment = document.createElement('div') as TimelineSegmentElement;
+        segment.className = 'seekbar-play-c2pa';
+        segment.style.width = '0%';
+        segment.dataset.segmentKey = key;
+
+        if (onSegmentClick) {
+            segment.addEventListener('click', (event) => {
+                const source = segment.__c2paSegment;
+
+                // Guarded on the element's current state, not on what it was
+                // when created: a segment's verdict can change under it, and
+                // only the inspectable ones accept pointer events at all.
+                if (!source || !isInspectableStatus(segment.dataset.verificationStatus)) {
+                    return;
+                }
+
+                event.stopPropagation();
+                onSegmentClick(source);
+            });
+        }
+
+        return segment;
+    };
+
+    /** Brings an element up to date with what the render says it should be. */
+    const applySegmentState = function (
+        segment: TimelineSegmentElement,
+        render: SegmentRender,
+        colors: VerdictColors,
+    ) {
+        segment.dataset.startTime = String(render.startTime);
+        segment.dataset.endTime = String(render.endTime);
+        segment.dataset.verificationStatus = render.verificationStatus;
+        segment.style.backgroundColor = getSegmentColor(
+            render.verificationStatus,
+            render.isManifestInvalid,
+            colors,
+        );
+        segment.classList.toggle(PROVISIONAL_CLASS, render.provisional);
+
+        if (render.pending) {
+            segment.dataset.pending = 'true';
+        } else {
+            delete segment.dataset.pending;
+        }
+
+        // Every real per-fragment segment carries its source, so the hover
+        // preview can read its manifest - including the ones with no verdict
+        // yet, which hover as Unknown. Excluded are the synthesized "unknown"
+        // gap filler and the legacy static-fallback status blob, which
+        // represent no single fragment and have no manifest of their own.
+        if (render.source) {
+            segment.__c2paSegment = render.source;
+        } else {
+            delete segment.__c2paSegment;
+        }
+
+        // Clicking, though, stays limited to segments with a problem to
+        // inspect. A Valid/Trusted stretch keeps `pointer-events: none` so a
+        // click there falls through to video.js and seeks, which is what a
+        // viewer expects from a progress bar; and a segment still awaiting its
+        // verdict has nothing to open a panel on.
+        segment.classList.toggle(
+            INSPECTABLE_CLASS,
+            Boolean(onSegmentClick) &&
+                render.source !== undefined &&
+                !render.pending &&
+                isInspectableStatus(render.verificationStatus),
+        );
+    };
+
+    /**
+     * Reconciles the bar against a render, reusing elements by key.
+     *
+     * The bar used to be torn down and rebuilt on every tick - four times a
+     * second, ~78 elements in a five-minute window. Besides the waste, it made
+     * animation impossible: a CSS transition needs an element that persists
+     * across the change it is meant to smooth, and every element was new.
+     */
+    const reconcileSegments = function (
+        renders: readonly SegmentRender[],
+        c2paControlBar: TimelineComponentLike,
+    ) {
+        const existing = new Map<string, TimelineSegmentElement>();
+
+        progressSegments.forEach((segment) => {
+            const key = segment.dataset.segmentKey;
+
+            if (key !== undefined && !existing.has(key)) {
+                existing.set(key, segment);
+            }
+        });
+
+        const colors = readVerdictColors();
+        const seen = new Map<string, number>();
+        const kept = new Set<TimelineSegmentElement>();
+        const entering: TimelineSegmentElement[] = [];
+        const next: TimelineSegmentElement[] = [];
+        const host = c2paControlBar.el();
+
+        renders.forEach((render) => {
+            const key = segmentKey(render.startTime, seen);
+            const reused = existing.get(key);
+            const segment = reused ?? createSegmentElement(key);
+
+            applySegmentState(segment, render, colors);
+
+            if (!reused) {
+                if (!reducedMotion) {
+                    segment.classList.add(ENTERING_CLASS);
+                    entering.push(segment);
+                }
+
+                host.appendChild(segment);
+            }
+
+            kept.add(segment);
+            next.push(segment);
+        });
+
+        progressSegments.forEach((segment) => {
+            if (!kept.has(segment)) {
+                segment.remove();
+            }
+        });
+
+        progressSegments = next;
+
+        // Two frames, not one: the class has to survive a style resolution
+        // while the element is in the document, or the browser sees only the
+        // final value and there is nothing to transition from. Batched for the
+        // whole pass rather than per element, which on a first render of a
+        // full window would otherwise be ~78 separate callbacks.
+        if (entering.length > 0 && typeof requestAnimationFrame === 'function') {
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                    entering.forEach((segment) => segment.classList.remove(ENTERING_CLASS));
+                });
+            });
+        }
     };
 
     const createTimelineSegment = function (
@@ -259,41 +522,23 @@ export function getTimelineFunctions(
         segmentEndTime: number,
         verificationStatus: TimelineVerificationStatus,
         isManifestInvalid = false,
-        sourceSegment?: C2PATimelineSegmentUpdate,
-        provisional = false,
     ) {
-        const segment = document.createElement('div') as TimelineSegmentElement;
-        segment.className = 'seekbar-play-c2pa';
-        segment.style.width = '0%';
-        segment.dataset.startTime = String(segmentStartTime);
-        segment.dataset.endTime = String(segmentEndTime);
-        segment.dataset.verificationStatus = verificationStatus;
-        segment.style.backgroundColor = getSegmentColor(verificationStatus, isManifestInvalid);
+        const segment = createSegmentElement(
+            segmentKey(segmentStartTime, new Map<string, number>()),
+        );
 
-        if (provisional) {
-            segment.classList.add(PROVISIONAL_CLASS);
-        }
-
-        // Every real per-fragment segment carries its source, so the hover
-        // preview can read its manifest. Excluded are the synthesized
-        // "unknown" gap filler and the legacy static-fallback status blob,
-        // which represent no single fragment and have no manifest of their own.
-        if (sourceSegment) {
-            segment.__c2paSegment = sourceSegment;
-        }
-
-        // Clicking, though, stays limited to segments with a problem. A
-        // Valid/Trusted stretch keeps `pointer-events: none` so a click there
-        // falls through to video.js and seeks, which is what a viewer expects
-        // from a progress bar; taking that over for the whole width to open a
-        // panel would cost more than it gives.
-        if (sourceSegment && onSegmentClick && isInspectableStatus(verificationStatus)) {
-            segment.classList.add(INSPECTABLE_CLASS);
-            segment.addEventListener('click', (event) => {
-                event.stopPropagation();
-                onSegmentClick(sourceSegment);
-            });
-        }
+        applySegmentState(
+            segment,
+            {
+                startTime: segmentStartTime,
+                endTime: segmentEndTime,
+                verificationStatus,
+                isManifestInvalid,
+                provisional: false,
+                pending: false,
+            },
+            readVerdictColors(),
+        );
 
         return segment;
     };
@@ -303,6 +548,90 @@ export function getTimelineFunctions(
             segment.remove();
         });
         progressSegments = [];
+    };
+
+    /** The furthest point any rendered segment covers. */
+    const latestKnownEndTime = function () {
+        return progressSegments.reduce(
+            (max, segment) => Math.max(max, parseFloat(segment.dataset.endTime)),
+            0,
+        );
+    };
+
+    const positionAll = function (window: TimelineWindow) {
+        // No z-index laddering: positioned segments cover disjoint stretches of
+        // the bar, so none needs to paint over another.
+        progressSegments.forEach((segment) => {
+            positionTimelineSegment(segment, window);
+        });
+    };
+
+    /**
+     * Places the bar against the smoothed live edge.
+     *
+     * Called both from a render pass and from every animation frame in
+     * between, which is the point: the anchor a render pass has to offer is a
+     * staircase (see liveEdgeClock), so the roll cannot come from the render
+     * rate. Positions are recomputed here instead, from a clock.
+     */
+    const rollLiveWindow = function (frameMs: number) {
+        if (!rollTarget || progressSegments.length === 0) {
+            return;
+        }
+
+        const { videoPlayer, retentionSeconds } = rollTarget;
+        const currentTime = videoPlayer.currentTime?.();
+        const anchor = Math.max(
+            Number.isFinite(currentTime) ? (currentTime as number) : Number.NEGATIVE_INFINITY,
+            latestKnownEndTime(),
+        );
+
+        liveEdge = advanceLiveEdge(liveEdge, anchor, frameMs);
+
+        // Both time arguments are the smoothed edge: on a live source
+        // getTimelineWindow takes the later of the two, so handing it one
+        // value keeps the smoothing here and leaves that function as the
+        // single place the window's shape is decided.
+        const window = getTimelineWindow(
+            videoPlayer.duration(),
+            liveEdge.edge,
+            liveEdge.edge,
+            true,
+            retentionSeconds,
+        );
+
+        publishLiveWindow(window, true);
+        positionAll(window);
+    };
+
+    const stopLiveRoll = function () {
+        if (rollFrame !== null && typeof cancelAnimationFrame === 'function') {
+            cancelAnimationFrame(rollFrame);
+        }
+
+        rollFrame = null;
+        rollTarget = null;
+        liveEdge = null;
+    };
+
+    const startLiveRoll = function (
+        videoPlayer: TimelineVideoPlayer,
+        retentionSeconds: number,
+    ) {
+        rollTarget = { videoPlayer, retentionSeconds };
+
+        // Under a reduced-motion preference the bar still updates, just on the
+        // render tick rather than every frame - steps instead of a glide.
+        if (rollFrame !== null || reducedMotion || typeof requestAnimationFrame !== 'function') {
+            return;
+        }
+
+        const tick = (frameMs: number) => {
+            rollFrame = requestAnimationFrame(tick);
+            rollLiveWindow(frameMs);
+        };
+
+        rollFrame = requestAnimationFrame(tick);
     };
 
     // Repositions already-appended segments; it no longer needs the host
@@ -336,25 +665,16 @@ export function getTimelineFunctions(
             lastSegment.dataset.endTime = String(currentTime);
         }
 
-        const latestKnownEndTime = progressSegments.reduce(
-            (max, segment) => Math.max(max, parseFloat(segment.dataset.endTime)),
-            0,
-        );
         const window = getTimelineWindow(
             videoPlayer.duration(),
             currentTime,
-            latestKnownEndTime,
+            latestKnownEndTime(),
             isLive,
             retentionSeconds,
         );
 
         publishLiveWindow(window, isLive);
-
-        // No z-index laddering: positioned segments cover disjoint stretches of
-        // the bar, so none needs to paint over another.
-        progressSegments.forEach((segment) => {
-            positionTimelineSegment(segment, window);
-        });
+        positionAll(window);
 
         // The played-bar colour is intentionally left to CSS. Painting
         // `.vjs-play-progress` from a single segment flattened the whole
@@ -512,53 +832,47 @@ export function getTimelineFunctions(
         isLive = false,
         retentionSeconds = DEFAULT_LIVE_RETENTION_SECONDS,
     ) {
-        removeProgressSegments();
-
-        const sortedSegments = [...segments]
+        const renders: SegmentRender[] = [...segments]
             .filter((segment) => Number.isFinite(segment.startTime) && Number.isFinite(segment.endTime))
             .filter((segment) => segment.endTime >= segment.startTime)
-            .sort((a, b) => a.startTime - b.startTime);
+            .sort((a, b) => a.startTime - b.startTime)
+            .map((segment) => ({
+                startTime: segment.startTime,
+                endTime: segment.endTime,
+                verificationStatus: segment.pending
+                    ? ('unknown' as TimelineVerificationStatus)
+                    : normalizeVerificationStatus(segment.validationState),
+                isManifestInvalid: false,
+                provisional: segment.provisional === true,
+                pending: segment.pending === true,
+                source: segment,
+            }));
 
-        const latestKnownEndTime = sortedSegments.reduce(
-            (max, segment) => Math.max(max, segment.endTime),
-            0,
-        );
+        reconcileSegments(renders, c2paControlBar);
+
+        // On a live source the window is owned by the roll, which is also what
+        // places the segments - so this pass hands over rather than computing
+        // a window of its own. Calling it once here keeps the render
+        // synchronous, so the bar is correct before the next paint whether or
+        // not an animation frame follows.
+        if (isLive && progressSegments.length > 0) {
+            startLiveRoll(videoPlayer, retentionSeconds);
+            rollLiveWindow(nowMs());
+            return;
+        }
+
+        stopLiveRoll();
+
         const window = getTimelineWindow(
             videoPlayer.duration(),
             videoPlayer.currentTime(),
-            latestKnownEndTime,
+            latestKnownEndTime(),
             isLive,
             retentionSeconds,
         );
 
         publishLiveWindow(window, isLive);
-
-        sortedSegments.forEach((segment) => {
-            const verificationStatus = segment.pending
-                ? 'unknown'
-                : normalizeVerificationStatus(segment.validationState);
-            const timelineSegment = createTimelineSegment(
-                segment.startTime,
-                segment.endTime,
-                verificationStatus,
-                false,
-                // A pending segment has no verdict yet, so there's nothing to
-                // inspect even though it normalizes to the same "unknown"
-                // status as a real unverified/missing one.
-                segment.pending ? undefined : segment,
-                segment.provisional === true,
-            );
-
-            positionTimelineSegment(timelineSegment, window);
-            c2paControlBar.el().appendChild(timelineSegment);
-            progressSegments.push(timelineSegment);
-        });
-
-        // Deliberately no updateC2PATimeline() here. Every segment above is
-        // already placed against `window`, so re-running the pass only
-        // recomputed the same positions - and it did so without `isLive`,
-        // which on a live stream replaced the correct window with one scaled
-        // from zero and collapsed every segment back to a sliver.
+        positionAll(window);
     };
 
     /**
@@ -567,6 +881,11 @@ export function getTimelineFunctions(
      * of any region, so it is not built up as playback reads segments - it
      * applies to the whole timeline from the moment it is known.
      */
+    const disposeTimeline = function () {
+        stopLiveRoll();
+        removeProgressSegments();
+    };
+
     const renderWholeAssetVerdict = function (
         verificationStatus: TimelineVerificationStatus,
         videoPlayer: TimelineVideoPlayer,
@@ -575,6 +894,11 @@ export function getTimelineFunctions(
         retentionSeconds = DEFAULT_LIVE_RETENTION_SECONDS,
     ) {
         removeProgressSegments();
+        // A condemned asset is painted edge to edge and stays that way, so
+        // there is nothing to roll - and a rolling window would drag the red
+        // band left and open grey at the right, which would read as part of
+        // the stream having been fine.
+        stopLiveRoll();
 
         const window = getTimelineWindow(
             videoPlayer.duration(),
@@ -607,5 +931,6 @@ export function getTimelineFunctions(
         updateC2PATimeline,
         replaceC2PATimelineSegments,
         renderWholeAssetVerdict,
+        disposeTimeline,
     };
 }

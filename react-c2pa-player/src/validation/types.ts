@@ -146,6 +146,18 @@ export interface ValidationTimelineSegment {
    * readRegionGate.ts), and nothing ever ages out of reach.
    */
   provisional?: boolean;
+  /**
+   * Settled without playback ever reaching it.
+   *
+   * The engine's verdict stands, but this player never showed the content to
+   * anyone and it has since aged out of the DVR, so it can no longer be
+   * confirmed by watching it. Worth saying out loud for an unverified segment,
+   * which is otherwise a grey block on the bar with no explanation.
+   *
+   * Live only: on VOD an unread verdict is not shown at all (readRegionGate),
+   * and nothing ever ages out of reach.
+   */
+  unplayed?: boolean;
   manifestRef?: ManifestSource;
 }
 

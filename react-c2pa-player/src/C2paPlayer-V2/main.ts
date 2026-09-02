@@ -140,6 +140,7 @@ export const C2PAPlayer = function (
         updateC2PATimeline,
         replaceC2PATimelineSegments,
         renderWholeAssetVerdict,
+        disposeTimeline,
     } = getTimelineFunctions(handleTimelineSegmentClick);
 
     let isManifestInvalid = false;
@@ -304,6 +305,9 @@ export const C2PAPlayer = function (
             disposeC2PAMenu();
             disposeFrictionOverlay(playerRoot);
             timelinePreview.dispose();
+            // Before the player is released: the timeline's roll holds the
+            // player instance and reads `currentTime()` on every frame.
+            disposeTimeline();
 
             try {
                 if (c2paMenu && videoPlayer && videoPlayer.controlBar) {

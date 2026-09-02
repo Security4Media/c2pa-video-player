@@ -177,6 +177,7 @@ export class DashFragmentedFmp4Session implements ValidationSession {
         validationState: region.validationState,
         manifestRef: region.source.segment.result.manifestSource,
         ...(region.settled ? {} : { provisional: true }),
+        ...(region.settled && !region.played ? { unplayed: true } : {}),
       }));
   }
 

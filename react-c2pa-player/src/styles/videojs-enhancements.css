@@ -265,6 +265,21 @@
   pointer-events: none;
 }
 
+/* Colour and opacity transition; `left` and `width` deliberately do not.
+ *
+ * The live roll rewrites geometry on every animation frame, and a transition
+ * on a property that is reassigned each frame never completes - it restarts
+ * from wherever it had reached, so the whole bar trails the playhead by the
+ * transition's own duration and the glide it was meant to smooth gets worse.
+ * The roll *is* the animation for geometry (see liveEdgeClock.ts). These two
+ * are for the things that change discretely: a verdict arriving, and a
+ * provisional segment settling once playback reaches it. */
+.video-js .vjs-progress-control .seekbar-play-c2pa {
+  transition:
+    background-color 240ms ease,
+    opacity 240ms ease;
+}
+
 /* The hover preview.
  *
  * Lives inside .vjs-progress-control (which is `overflow: visible`) and sits
@@ -339,8 +354,7 @@
   background: var(--c2pa-failed);
 }
 
-.video-js .c2pa-timeline-preview__state--unknown,
-.video-js .c2pa-timeline-preview__state--checking {
+.video-js .c2pa-timeline-preview__state--unknown {
   background: var(--c2pa-unknown);
   color: #1c1c1c;
 }
@@ -373,14 +387,6 @@
 
 /* The raw codes. Present but quiet: evidence for the sentence above, not the
    headline. */
-.video-js .c2pa-timeline-preview__codes {
-  margin: 0.35em 0 0;
-  opacity: 0.6;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 0.9em;
-  overflow-wrap: anywhere;
-}
-
 /* The seconds readout video.js shows while hovering the bar.
  *
  * Removed on live, for two reasons. On an epoch-based live timeline it prints
@@ -418,6 +424,28 @@
     transparent 1px,
     transparent 4px
   );
+}
+
+/* A newly appended segment spends one frame here so its fade-in has something
+   to transition from; the timeline removes the class on the next frame.
+   Without it a segment appears at full strength in a single frame, which on a
+   live bar is a small colour block popping into existence every few seconds.
+ *
+ * Placed after the provisional rule on purpose. The two are equally specific,
+ * so source order decides the `opacity` declaration - and a segment that
+ * arrives provisional (the usual case on live, since verdicts land before
+ * playback reaches them) would otherwise start at 0.45 with nothing to fade
+ * from. */
+.video-js .vjs-progress-control .seekbar-play-c2pa--entering {
+  opacity: 0;
+}
+
+/* Asked for less animation: the timeline also skips its frame loop, so the bar
+   steps on the render tick instead of gliding. */
+@media (prefers-reduced-motion: reduce) {
+  .video-js .vjs-progress-control .seekbar-play-c2pa {
+    transition: none;
+  }
 }
 
 /* Only non-Valid/Trusted segments are inspectable - re-enable pointer events

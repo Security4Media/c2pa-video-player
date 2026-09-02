@@ -160,13 +160,12 @@ function renderPreview(preview: SegmentPreview): string {
         }
     }
 
-    // Always shown when present, even alongside a sentence: the wording above
-    // is a reading of these, and the reading is not the evidence.
-    if (preview.codes.length > 0) {
-        parts.push(`<p class="${PREVIEW_CLASS}__codes">${escapeHtml(preview.codes.join(', '))}</p>`);
-    }
-
-    if (!preview.reason && !preview.metadata && preview.codes.length === 0) {
+    // No raw failure codes here. A hover is a glance, and a viewer being told
+    // a moment of a broadcast was tampered with does not need
+    // `assertion.bmffHash.mismatch` to act on it - the sentence above is the
+    // whole message. The codes belong in the debug console, where someone has
+    // chosen to look at engine output; the model no longer carries them.
+    if (!preview.reason && !preview.metadata) {
         parts.push(
             `<p class="${PREVIEW_CLASS}__caveat">No per-segment metadata in this stream.</p>`,
         );
@@ -179,13 +178,24 @@ export function createTimelinePreview(): TimelinePreviewController {
     let progressControl: HTMLElement | null = null;
     let element: HTMLDivElement | null = null;
     let adapterKind: AdapterKind | null = null;
-    let shownSegment: C2PATimelineSegmentUpdate | null = null;
+    /**
+     * What the panel currently says, as markup.
+     *
+     * Compared against rather than the segment object it came from. The
+     * session derives its timeline from scratch on every tick, so the object
+     * under the pointer is a different one four times a second even when the
+     * segment it describes has not changed at all - an identity check
+     * therefore rebuilt the panel on essentially every mousemove. Comparing
+     * the output instead makes the guard mean what it says: rebuild when what
+     * is displayed would differ.
+     */
+    let shownHtml: string | null = null;
 
     const hide = () => {
         if (element) {
             element.classList.remove(`${PREVIEW_CLASS}--visible`);
         }
-        shownSegment = null;
+        shownHtml = null;
     };
 
     const onMouseMove = (event: MouseEvent) => {
@@ -215,9 +225,11 @@ export function createTimelinePreview(): TimelinePreviewController {
 
         // Re-rendering identical content on every mousemove would rebuild the
         // panel dozens of times a second while the pointer crosses one segment.
-        if (source !== shownSegment) {
-            element.innerHTML = renderPreview(buildSegmentPreview(source, adapterKind));
-            shownSegment = source;
+        const html = renderPreview(buildSegmentPreview(source, adapterKind));
+
+        if (html !== shownHtml) {
+            element.innerHTML = html;
+            shownHtml = html;
         }
 
         element.classList.add(`${PREVIEW_CLASS}--visible`);
@@ -256,7 +268,7 @@ export function createTimelinePreview(): TimelinePreviewController {
 
             adapterKind = kind;
             // The next move rebuilds against the new adapter's honesty rules.
-            shownSegment = null;
+            shownHtml = null;
         },
 
         dispose() {
@@ -265,7 +277,7 @@ export function createTimelinePreview(): TimelinePreviewController {
             element?.remove();
             progressControl = null;
             element = null;
-            shownSegment = null;
+            shownHtml = null;
         },
     };
 }
