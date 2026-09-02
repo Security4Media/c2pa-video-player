@@ -84,7 +84,13 @@ describe('backward observation (VOD)', () => {
 });
 
 describe('live mode', () => {
-  it('wipes history on a backward seek, unlike VOD', () => {
+  it('keeps history when a verdict arrives for content behind the playhead', () => {
+    // This used to wipe the whole timeline, on the reasoning that a backward
+    // move on a live stream meant something discontinuous had happened. It does
+    // not: a segment nobody watched settles the moment it falls out of the DVR
+    // window, and that is an observation at an earlier time than anything seen
+    // so far. Wiping on it destroyed ten seconds of watched history and reset
+    // the bar to grey.
     const projector = new FragmentedTimelineProjector();
     projector.setLiveMode(true);
     projector.observe(10, 'Valid');
@@ -93,7 +99,8 @@ describe('live mode', () => {
 
     projector.observe(3, 'Valid');
 
-    expect(summarize(projector)).toBe('0-3:Valid');
+    // The late verdict is merged in; what was already known survives.
+    expect(summarize(projector)).toBe('0-10:Valid, 10-20:Trusted');
   });
 
   it('prunes segments older than the retention window', () => {

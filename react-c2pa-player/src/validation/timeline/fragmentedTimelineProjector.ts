@@ -44,15 +44,17 @@ const MERGE_EPSILON_SECONDS = 0.001;
  * Callers holding only a playhead sample may omit `startTime`.
  *
  * Backward-time observations are handled differently depending on
- * `setLiveMode`:
- * - Live sources keep the original behavior: a backward observation wipes
- *   the whole known timeline (`#resetOnBackwardSeek`). This class doesn't
- *   change anything about the already-shipped live-streaming experience.
- * - VOD sources (or sources whose live/VOD-ness isn't known yet) never wipe:
- *   a backward observation is upserted into the existing timeline instead,
- *   so previously-validated regions keep their color no matter where
- *   playback seeks to. The underlying content at a given VOD timestamp never
- *   changes, so there's never a reason to forget it.
+ * A backward observation is upserted into the existing timeline, live or not.
+ * It used to wipe the whole timeline on live sources, on the reasoning that a
+ * backward move there meant something discontinuous had happened. It does not:
+ * a verdict can legitimately arrive for content behind the playhead - a segment
+ * nobody watched settles the moment it falls out of the DVR window - and wiping
+ * on that destroyed real, watched history. The content at a given time does not
+ * change on a live stream either, so there was never a reason to forget it.
+ *
+ * `setLiveMode` now governs only eviction: live sources expire segments older
+ * than the retention window, VOD sources keep everything, since a VOD asset's
+ * duration is finite and bounded.
  */
 export class FragmentedTimelineProjector {
   #segments: ValidationTimelineSegment[] = [];
@@ -88,10 +90,6 @@ export class FragmentedTimelineProjector {
     }
 
     const isBackward = time < this.#lastObservedTime;
-
-    if (isBackward && this.#isLive) {
-      this.#resetOnBackwardSeek(time);
-    }
 
     const hasExplicitStart = typeof startTime === 'number' && Number.isFinite(startTime);
     const resolvedStartTime = hasExplicitStart
@@ -157,11 +155,6 @@ export class FragmentedTimelineProjector {
 
   snapshot(): ValidationTimelineSegment[] {
     return this.#segments.map((segment) => ({ ...segment }));
-  }
-
-  #resetOnBackwardSeek(time: number): void {
-    this.#segments = [];
-    this.#lastObservedTime = Math.max(0, time);
   }
 
   /**

@@ -20,9 +20,7 @@ import { DEFAULT_LIVE_RETENTION_SECONDS } from './policy/liveRetention';
 import type { DashValidationRuntime } from './runtimes/contracts';
 import type { DashSegmentEntry } from './runtimes/dashBridgeRuntime';
 import {
-  FragmentedTimelineProjector,
   isActuallyPlaying,
-  readRegionKey,
   resolveSettledBefore,
   selectLiveRegions,
   WatchedTimeline,
@@ -40,7 +38,6 @@ export class DashFragmentedFmp4Session implements ValidationSession {
   readonly adapterKind = 'dash-fragmented-fmp4' as const;
 
   readonly #runtime: DashValidationRuntime;
-  readonly #timelineProjector = new FragmentedTimelineProjector();
   readonly #emitter = new Emitter<ValidationStatusSnapshot>();
   #unsubscribeRuntime: (() => void) | null = null;
   #drainedSegmentCount = 0;
@@ -49,12 +46,6 @@ export class DashFragmentedFmp4Session implements ValidationSession {
   // reached it. The plugin validates each segment as it downloads, so this runs
   // ahead of the playhead; #observeReadRegions decides what may be shown.
   readonly #knownSegments: DashSegmentEntry[] = [];
-  #observedRegionKeys = new Set<string>();
-  /**
-   * Validated but not yet played, and still playable. Rebuilt every tick by
-   * #observeRegions rather than accumulated.
-   */
-  #provisional: ValidationTimelineSegment[] = [];
   readonly #watched = new WatchedTimeline();
   readonly #videoElement: HTMLVideoElement;
   readonly #retentionSeconds: number;
@@ -143,19 +134,30 @@ export class DashFragmentedFmp4Session implements ValidationSession {
   }
 
   /**
-   * Splits what has validated into settled and provisional, projecting the
-   * settled part and keeping the rest for the snapshot.
+   * Rebuilds the whole timeline from what is known, every tick.
    *
-   * Settled regions go into the projector, which accumulates them as the
-   * permanent record. Provisional ones are recomputed every tick instead of
-   * accumulated: being provisional is a transient property - it ends the moment
-   * playback arrives or the content ages out of reach - so there is nothing
-   * worth remembering, and deriving it fresh means it can never go stale.
+   * Nothing is accumulated. The runtime retains every verdict inside the
+   * retention window and the watched record is complete, so the full picture is
+   * derivable from first principles each time - and a derived picture cannot
+   * drift from reality, which an accumulated one demonstrably could.
    *
-   * Already-projected regions are skipped, so a settled segment is observed
-   * once while the one being watched refreshes as its clipped end advances.
+   * It could, twice over. Verdicts do not only arrive ahead of the playhead: a
+   * segment behind it that nobody watched settles the moment it falls out of the
+   * DVR, and that is an observation at an *earlier* time than anything seen so
+   * far. The projector read that as a backward seek and wiped the live timeline;
+   * the skip-what-we-have-already-projected set then made the loss permanent,
+   * because the regions it destroyed were still marked as projected. Ten seconds
+   * of watched, settled history disappeared and the bar reset to grey.
+   *
+   * Deriving instead removes the whole class: there is no accumulated state to
+   * disagree with, no ordering to respect, and no bookkeeping to go stale.
+   *
+   * Segments are also left unmerged, one region each, rather than collapsed by
+   * verdict as the projector did. On DASH every segment carries its own CAWG
+   * metadata, and merging kept only the last one's - so the hover preview showed
+   * a whole run's worth of segments under one segment's title.
    */
-  #observeRegions(): void {
+  #buildTimeline(): ValidationTimelineSegment[] {
     const regions = selectLiveRegions(
       this.#knownSegments.map((segment) => ({
         startTime: segment.startTime,
@@ -166,38 +168,16 @@ export class DashFragmentedFmp4Session implements ValidationSession {
       this.#watched,
       this.#settledBefore(),
     );
-    const seen = new Set<string>();
 
-    this.#provisional = [];
-
-    regions.forEach((region) => {
-      if (!region.settled) {
-        this.#provisional.push({
-          startTime: region.startTime,
-          endTime: region.endTime,
-          validationState: region.validationState,
-          provisional: true,
-          manifestRef: region.source.segment.result.manifestSource,
-        });
-        return;
-      }
-
-      const key = readRegionKey(region);
-      seen.add(key);
-
-      if (this.#observedRegionKeys.has(key)) {
-        return;
-      }
-
-      this.#timelineProjector.observe(
-        region.endTime,
-        region.validationState,
-        region.startTime,
-        region.source.segment.result.manifestSource,
-      );
-    });
-
-    this.#observedRegionKeys = seen;
+    return regions
+      .sort((left, right) => left.startTime - right.startTime)
+      .map((region) => ({
+        startTime: region.startTime,
+        endTime: region.endTime,
+        validationState: region.validationState,
+        manifestRef: region.source.segment.result.manifestSource,
+        ...(region.settled ? {} : { provisional: true }),
+      }));
   }
 
   /**
@@ -233,16 +213,11 @@ export class DashFragmentedFmp4Session implements ValidationSession {
   #rebuildSnapshot(time: number, shouldEmit: boolean): void {
     const liveSignal = this.#runtime.isLive();
 
-    if (liveSignal !== null) {
-      this.#timelineProjector.setLiveMode(liveSignal, this.#retentionSeconds);
-    }
-
     if (Number.isFinite(time)) {
       this.#lastPlaybackTime = time;
     }
 
     this.#watched.observePlayhead(this.#lastPlaybackTime, isActuallyPlaying(this.#videoElement));
-    this.#observeRegions();
 
     const lookedUp = this.#runtime.lookup(this.#lastPlaybackTime);
     const result = lookedUp
@@ -254,10 +229,7 @@ export class DashFragmentedFmp4Session implements ValidationSession {
     this.#snapshot = {
       adapterKind: this.adapterKind,
       result,
-      // Settled first, provisional after: the timeline paints in order, and a
-      // provisional region only ever abuts settled ones rather than overlapping
-      // them, so the order is presentational rather than load-bearing.
-      timelineSegments: [...this.#timelineProjector.snapshot(), ...this.#provisional],
+      timelineSegments: this.#buildTimeline(),
       message: this.#runtime.getMessage(),
       // Init-segment C2PA processing failed, so the asset's credentials are
       // broken as a whole rather than one segment being bad.

@@ -198,6 +198,41 @@ describe('DashFragmentedFmp4Session', () => {
       expect(session.getStatusAt(0).timelineSegments.every((s) => s.provisional)).toBe(true);
     });
 
+    it('keeps watched history when a segment behind the join point ages out', async () => {
+      // The reported reset. dash.js fetches a little behind the join point as
+      // well as ahead of it, so some segments are validated that playback never
+      // reaches. When one of those falls out of the DVR it settles on age - an
+      // observation at an *earlier* time than anything seen so far.
+      //
+      // That used to wipe the timeline (the projector read it as a backward
+      // seek) and the loss was permanent, because the destroyed regions were
+      // still marked as projected. Ten seconds of watched history vanished and
+      // the bar reset to grey. Measured before the fix:
+      //
+      //   before  96-100(prov) 100-110(settled) 110-112(prov)
+      //   after   96-100(settled)               110-132(prov)
+      runtime.dvrWindowSeconds = 30;
+      runtime.segments = [segment(96, 100), segment(100, 104), segment(104, 108), segment(108, 112)];
+      await session.load();
+
+      for (let time = 100; time <= 110; time += 0.25) session.getStatusAt(time);
+      const watchedRegion = (time: number) =>
+        session
+          .getStatusAt(110)
+          .timelineSegments.some((s) => time >= s.startTime && time < s.endTime && !s.provisional);
+
+      expect(watchedRegion(105)).toBe(true);
+
+      // Run the stream on until 96-100 is out of reach.
+      for (let end = 116; end <= 132; end += 4) runtime.segments.push(segment(end - 4, end));
+      runtime.notify();
+
+      expect(watchedRegion(105)).toBe(true);
+      expect(watchedRegion(102)).toBe(true);
+      // And the one that aged out has settled rather than vanished.
+      expect(watchedRegion(98)).toBe(true);
+    });
+
     it('keeps an invalid segment in its own place', async () => {
       runtime.segments = [segment(0, 4), segment(4, 8, 'Invalid'), segment(8, 12)];
       await session.load();
