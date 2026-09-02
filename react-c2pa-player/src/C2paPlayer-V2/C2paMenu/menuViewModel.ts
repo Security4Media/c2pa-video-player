@@ -16,7 +16,7 @@
 
 import type { Manifest } from '@contentauth/c2pa-web';
 import type { C2PAStatus } from '@/types/c2pa.types';
-import type { ValidationTimelineSegment } from '@/validation';
+import type { AdapterKind, ValidationTimelineSegment } from '@/validation';
 import type { C2PATimelineState } from '../C2PAPlayerRoot.types';
 import { readStoreEvidence } from '@/validation/evidence';
 import { getActiveManifest } from '@/validation/rules';
@@ -187,7 +187,7 @@ export function buildMenuRenderState(
     selectedSegment?: ValidationTimelineSegment | null,
 ): C2paMenuRenderState {
     if (selectedSegment) {
-        return buildSegmentMenuRenderState(selectedSegment);
+        return buildSegmentMenuRenderState(selectedSegment, c2paStatus?.adapterKind);
     }
 
     const manifestStore = c2paStatus?.manifestStore ?? null;
@@ -265,8 +265,19 @@ export function buildMenuRenderState(
                 alert: buildAlertMessage(timeline, c2paStatus),
             },
             claimGenerator: selectClaimGeneratorSection(activeManifest),
-            organization: selectOrganizationSection(activeManifest, selectorManifestStore ?? undefined),
-            work: selectWorkSection(activeManifest, selectorManifestStore ?? undefined),
+            // The adapter reaches the identity selector because whether the
+            // engine verified the identity at all is not something the
+            // manifest or the store can say. See readIdentityStatus.
+            organization: selectOrganizationSection(
+                activeManifest,
+                selectorManifestStore ?? undefined,
+                c2paStatus?.adapterKind,
+            ),
+            work: selectWorkSection(
+                activeManifest,
+                selectorManifestStore ?? undefined,
+                c2paStatus?.adapterKind,
+            ),
             aiOptOut: selectAiOptOutSection(activeManifest),
             history: selectorManifestStore
                 ? selectHistorySection(activeManifest, selectorManifestStore)
@@ -321,7 +332,10 @@ function buildSegmentAlertMessage(segment: ValidationTimelineSegment): string | 
  * status/anomaly-only view (mode 'segment-integrity') when it doesn't - the
  * DASH VSI/integrity-only case, or any segment with no manifestRef at all.
  */
-function buildSegmentMenuRenderState(segment: ValidationTimelineSegment): C2paMenuRenderState {
+function buildSegmentMenuRenderState(
+    segment: ValidationTimelineSegment,
+    adapterKind: AdapterKind | null | undefined,
+): C2paMenuRenderState {
     const activeManifest = resolveManifestFromSource(segment.manifestRef);
     const validationStatus = segment.validationState;
     const alert = buildSegmentAlertMessage(segment);
@@ -373,8 +387,12 @@ function buildSegmentMenuRenderState(segment: ValidationTimelineSegment): C2paMe
                 alert,
             },
             claimGenerator: selectClaimGeneratorSection(activeManifest),
-            organization: selectOrganizationSection(activeManifest, selectorManifestStore ?? undefined),
-            work: selectWorkSection(activeManifest, selectorManifestStore ?? undefined),
+            organization: selectOrganizationSection(
+                activeManifest,
+                selectorManifestStore ?? undefined,
+                adapterKind,
+            ),
+            work: selectWorkSection(activeManifest, selectorManifestStore ?? undefined, adapterKind),
             aiOptOut: selectAiOptOutSection(activeManifest),
             history: selectorManifestStore
                 ? selectHistorySection(activeManifest, selectorManifestStore)

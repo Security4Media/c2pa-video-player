@@ -42,6 +42,7 @@
  */
 
 import type { AdapterKind } from '@/validation';
+import { UNVERIFIED_IDENTITY_CAVEAT } from '@/validation/rules';
 import type { C2PATimelineSegmentUpdate } from '@/types/c2pa.types';
 import {
     buildSegmentPreview,
@@ -228,8 +229,10 @@ function renderPreview(preview: SegmentPreview): string {
         );
 
         if (!preview.metadataVerified) {
+            // Shared with the menu's organization section, so the bar and the
+            // panel cannot word the same fact differently.
             parts.push(
-                `<p class="${PREVIEW_CLASS}__caveat">Declared in the stream; this player did not verify who signed it.</p>`,
+                `<p class="${PREVIEW_CLASS}__caveat">${escapeHtml(UNVERIFIED_IDENTITY_CAVEAT)}</p>`,
             );
         }
     }

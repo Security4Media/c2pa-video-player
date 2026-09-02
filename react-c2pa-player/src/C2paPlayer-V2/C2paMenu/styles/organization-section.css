@@ -57,6 +57,15 @@
   padding-top: 0.25rem;
 }
 
+/* The unverified note. Muted, because it qualifies the names above rather than
+   competing with them, but on its own line so it cannot be missed. */
+.vjs-menu li.vjs-menu-item .c2pa-org-section__caveat {
+  margin: 0.4rem 0 0;
+  opacity: 0.7;
+  font-size: 0.9em;
+  line-height: 1.4;
+}
+
 .vjs-menu li.vjs-menu-item .c2pa-org-section__row {
   line-height: 1.4;
   width: auto;

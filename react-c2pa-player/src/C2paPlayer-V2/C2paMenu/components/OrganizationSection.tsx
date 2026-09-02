@@ -19,6 +19,7 @@ import type {
   OrganizationIdentityItem,
   OrganizationSectionItem,
 } from '../models';
+import { UNVERIFIED_IDENTITY_CAVEAT } from '@/validation/rules';
 import { WebsiteLink } from './shared';
 
 function getValidationIndicator(validationStatus: CawgOrganizationItem['validationStatus']) {
@@ -33,6 +34,18 @@ function getValidationIndicator(validationStatus: CawgOrganizationItem['validati
     return {
       icon: '☑️',
       message: 'Valid: the organization identity is valid, but the signing credentials are not fully trusted.',
+    };
+  }
+
+  // Nobody checked. Distinct from Invalid, and it used to fall through to it:
+  // any status that was not Trusted or Valid rendered a red cross reading
+  // "could not be verified", which on a DASH stream - where the engine runs no
+  // identity check at all - accused a signer the player had never examined.
+  // Also reached when there is no store to read a verdict from.
+  if (validationStatus === 'Unknown') {
+    return {
+      icon: '❔',
+      message: `Not verified: ${UNVERIFIED_IDENTITY_CAVEAT}`,
     };
   }
 
@@ -149,6 +162,13 @@ export function OrganizationSection({
           ) : null}
         </div>
          {section.cawg ? <IdentityDetails itemValue={section.cawg} /> : null}
+        {/* Spelled out rather than left to the icon's tooltip. The whole point
+            of this section is the names in it, and a viewer reading a title
+            and a publisher has no reason to hover a glyph to find out that
+            nothing vouched for them. */}
+        {section.cawg?.validationStatus === 'Unknown' ? (
+          <p className="c2pa-org-section__caveat">{UNVERIFIED_IDENTITY_CAVEAT}</p>
+        ) : null}
         {section.organization && (
           section.organization.website ||
           section.organization.identifier ||

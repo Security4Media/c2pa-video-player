@@ -57,6 +57,20 @@ export function verifiesCawgIdentity(adapterKind: AdapterKind): boolean {
 }
 
 /**
+ * What to say about an identity nothing checked.
+ *
+ * Copy in a rules module is a small layering compromise, taken deliberately:
+ * two surfaces state this - the timeline's hover preview and the menu's
+ * organization section - and they have to agree, because a viewer who sees one
+ * wording on the bar and a different one in the panel has no way to tell
+ * whether they are being told the same thing. Keeping the sentence next to the
+ * rule that decides when it applies is the one arrangement where it cannot
+ * drift.
+ */
+export const UNVERIFIED_IDENTITY_CAVEAT =
+  'Declared in the stream; this player did not verify who signed it.';
+
+/**
  * @svta/cml-c2pa (behind @qualabs/c2pa-live-dashjs-plugin) only performs
  * cryptographic/structural validation (COSE signature, hash, continuity) —
  * it does not check the signing certificate against a trust anchor list.
