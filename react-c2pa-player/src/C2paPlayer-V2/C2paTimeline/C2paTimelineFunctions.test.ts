@@ -54,45 +54,45 @@ describe('getTimelineWindow', () => {
   describe('live', () => {
     const INF = Number.POSITIVE_INFINITY;
 
-    it('starts at the minimum before any history exists', () => {
-      // A stream just joined has nothing behind it; the floor stops the first
-      // segment from becoming the entire window.
-      const window = getTimelineWindow(INF, 1_000_000, 1_000_004, true, INF);
+    it('is a fixed span, whatever history exists behind it', () => {
+      // The scale must not depend on the data, or it changes under the viewer.
+      const justJoined = getTimelineWindow(INF, 1_000_000, 1_000_004, true);
+      const hoursIn = getTimelineWindow(INF, 1_009_000, 1_009_004, true);
 
-      expect(window.size).toBe(MIN_LIVE_WINDOW_SECONDS);
-      expect(window.start + window.size).toBe(1_000_004);
+      expect(justJoined.size).toBe(LIVE_WINDOW_SECONDS);
+      expect(hoursIn.size).toBe(LIVE_WINDOW_SECONDS);
     });
 
-    it('holds at the minimum until history outgrows it', () => {
+    it('does not rescale across a gap in what is known', () => {
+      // The reported bug. A 28s pause used to stretch the window from 60s to
+      // 104s to span the gap, squashing the history that had been in the
+      // right-hand 6% of the bar into the left-hand 3.7%. It read as a reset.
       const edge = 1_000_000;
-      const window = getTimelineWindow(INF, edge, edge, true, edge - 20);
+      const beforePause = getTimelineWindow(INF, edge, edge, true);
+      const afterRejoin = getTimelineWindow(INF, edge + 100, edge + 100, true);
 
-      expect(window.size).toBe(MIN_LIVE_WINDOW_SECONDS);
+      expect(afterRejoin.size).toBe(beforePause.size);
+      // The history scrolls left by exactly the time that passed, no more.
+      expect(afterRejoin.start - beforePause.start).toBe(100);
     });
 
-    it('grows to match the history behind it', () => {
+    it('honours a configured retention', () => {
       const edge = 1_000_000;
-      const window = getTimelineWindow(INF, edge, edge, true, edge - 300);
 
-      expect(window.size).toBe(300);
-      expect(window.start).toBe(edge - 300);
-    });
-
-    it('stops growing at the cap and rolls from there', () => {
-      const edge = 1_000_000;
-      const window = getTimelineWindow(INF, edge, edge, true, edge - 3600);
-
-      expect(window.size).toBe(LIVE_WINDOW_SECONDS);
-      expect(window.start).toBe(edge - LIVE_WINDOW_SECONDS);
+      expect(getTimelineWindow(INF, edge, edge, true, 120)).toEqual({
+        start: edge - 120,
+        size: 120,
+      });
     });
 
     it('always ends at the live edge, whichever side is further ahead', () => {
-      const INF_START = Number.POSITIVE_INFINITY;
+      expect(getTimelineWindow(Number.NaN, 500, 900, true).start).toBe(900 - LIVE_WINDOW_SECONDS);
+      expect(getTimelineWindow(Number.NaN, 900, 500, true).start).toBe(900 - LIVE_WINDOW_SECONDS);
+    });
 
-      expect(getTimelineWindow(Number.NaN, 500, 900, true, INF_START).start)
-        .toBe(900 - MIN_LIVE_WINDOW_SECONDS);
-      expect(getTimelineWindow(Number.NaN, 900, 500, true, INF_START).start)
-        .toBe(900 - MIN_LIVE_WINDOW_SECONDS);
+    it('keeps the minimum window as the floor for the configurable value', () => {
+      // Still meaningful: resolveLiveRetentionSeconds rejects anything narrower.
+      expect(MIN_LIVE_WINDOW_SECONDS).toBeLessThan(LIVE_WINDOW_SECONDS);
     });
   });
 });
@@ -104,12 +104,14 @@ describe('placing segments in the window', () => {
   const EPOCH_EDGE = 1_788_292_531.15;
   const INF = Number.POSITIVE_INFINITY;
 
-  it('gives the first epoch-timed live segment a legible width', () => {
-    const window = getTimelineWindow(INF, EPOCH_EDGE, EPOCH_EDGE, true, EPOCH_EDGE - 3.84);
+  it('gives the first epoch-timed live segment a real width', () => {
+    const window = getTimelineWindow(INF, EPOCH_EDGE, EPOCH_EDGE, true);
     const { left, width } = place(window, EPOCH_EDGE - 3.84, EPOCH_EDGE);
 
-    // 3.84s of the 60s floor.
-    expect(width).toBeCloseTo(6.4, 1);
+    // 3.84s of the five-minute window: small, but thousands of times the
+    // 5e-8% it used to be, and it sits at the live edge where it belongs.
+    expect(width).toBeCloseTo((3.84 / LIVE_WINDOW_SECONDS) * 100, 4);
+    expect(width).toBeGreaterThan(1);
     expect(left + width).toBeCloseTo(100, 5);
   });
 
@@ -120,27 +122,51 @@ describe('placing segments in the window', () => {
     expect(asBefore.width).toBeLessThan(0.001);
   });
 
-  it('narrows a segment as history accumulates behind it', () => {
-    const atOneMinute = getTimelineWindow(INF, EPOCH_EDGE, EPOCH_EDGE, true, EPOCH_EDGE - 60);
-    const atFull = getTimelineWindow(INF, EPOCH_EDGE, EPOCH_EDGE, true, EPOCH_EDGE - 3600);
+  it('keeps a segment the same width however long the session runs', () => {
+    // A segment's width is a property of its duration, not of when it was
+    // watched. It used to shrink as history accumulated, which meant the bar
+    // never looked the same way twice.
+    const early = getTimelineWindow(INF, EPOCH_EDGE, EPOCH_EDGE, true);
+    const later = getTimelineWindow(INF, EPOCH_EDGE + 3600, EPOCH_EDGE + 3600, true);
 
-    const early = place(atOneMinute, EPOCH_EDGE - 3.84, EPOCH_EDGE).width;
-    const late = place(atFull, EPOCH_EDGE - 3.84, EPOCH_EDGE).width;
-
-    expect(early).toBeGreaterThan(late);
-    expect(late).toBeCloseTo((3.84 / LIVE_WINDOW_SECONDS) * 100, 4);
+    expect(place(early, EPOCH_EDGE - 3.84, EPOCH_EDGE).width).toBeCloseTo(
+      place(later, EPOCH_EDGE + 3596.16, EPOCH_EDGE + 3600).width,
+      6,
+    );
   });
 
-  it('fills the bar with whatever history is known', () => {
-    const window = getTimelineWindow(INF, EPOCH_EDGE, EPOCH_EDGE, true, EPOCH_EDGE - 300);
-    const whole = place(window, EPOCH_EDGE - 300, EPOCH_EDGE);
+  it('fills the bar when the whole window has been validated', () => {
+    const window = getTimelineWindow(INF, EPOCH_EDGE, EPOCH_EDGE, true);
+    const whole = place(window, EPOCH_EDGE - LIVE_WINDOW_SECONDS, EPOCH_EDGE);
 
     expect(whole.left).toBeCloseTo(0, 5);
     expect(whole.width).toBeCloseTo(100, 5);
   });
 
+  it('moves history left by the elapsed time, not by rescaling it', () => {
+    // The reported bug, at the level the viewer sees it. Measured before the
+    // fix: three regions sitting at 93.6-100% of a 60s window reappeared at
+    // 0.0-3.7% of a 104s window after a 28s pause and rejoin - same content,
+    // same times, squashed into a corner. It reads as a reset.
+    const historyStart = EPOCH_EDGE - 3;
+    const before = getTimelineWindow(INF, EPOCH_EDGE, EPOCH_EDGE, true);
+    const placedBefore = place(before, historyStart, EPOCH_EDGE);
+
+    // Paused 28s, then rejoined the live edge - the playhead jumps 100s.
+    const jumped = EPOCH_EDGE + 100;
+    const after = getTimelineWindow(INF, jumped, jumped, true);
+    const placedAfter = place(after, historyStart, EPOCH_EDGE);
+
+    // Same width: the segment did not change duration.
+    expect(placedAfter.width).toBeCloseTo(placedBefore.width, 6);
+    // Moved left by exactly the time that passed, as a share of the window.
+    expect(placedBefore.left - placedAfter.left).toBeCloseTo((100 / LIVE_WINDOW_SECONDS) * 100, 4);
+    // And still on the bar, rather than crushed against its left edge.
+    expect(placedAfter.left).toBeGreaterThan(50);
+  });
+
   it('drops a segment that has fallen out of the back of the window', () => {
-    const window = getTimelineWindow(INF, EPOCH_EDGE, EPOCH_EDGE, true, EPOCH_EDGE - 3600);
+    const window = getTimelineWindow(INF, EPOCH_EDGE, EPOCH_EDGE, true);
     const stale = place(window, window.start - 120, window.start - 116);
 
     expect(stale.width).toBe(0);

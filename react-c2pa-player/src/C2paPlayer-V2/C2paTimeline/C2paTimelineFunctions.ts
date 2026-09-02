@@ -160,25 +160,28 @@ export function getTimelineWindow(
     currentTime: number,
     latestKnownEndTime: number,
     isLive = false,
-    earliestKnownStartTime = Number.POSITIVE_INFINITY,
     retentionSeconds = LIVE_WINDOW_SECONDS,
 ): TimelineWindow {
     if (isLive) {
-        // Anchored to the live edge, so the newest segment sits at the right.
+        // A fixed span, anchored to the live edge, so the newest content sits at
+        // the right and everything else scrolls left at a constant rate.
+        //
+        // This used to grow with the history behind it - `edge` minus the oldest
+        // segment known - which made the scale change under the viewer. Pausing
+        // exposed it plainly: pause for 28 seconds and the window stretched from
+        // 60s to 104s to span the gap, so the history that had been sitting in
+        // the right-hand 6% of the bar was squashed into the left-hand 3.7% with
+        // grey after it. Nothing had been lost, but it read exactly like a
+        // reset, and reported as one.
+        //
+        // A fixed window costs an emptier bar for the first few minutes of a
+        // session. That was the argument for growing, and it carried more weight
+        // when the window was fifteen minutes than it does at five - and an
+        // emptier bar is the honest picture of having watched for one minute,
+        // where a window shrunk to fit flatters however little has been checked.
         const edge = Math.max(currentTime, latestKnownEndTime);
-        // Grows with the history behind it, then rolls once it reaches the cap.
-        // A fixed window would spend its first quarter-hour almost entirely
-        // grey, since a live stream can only be validated as fast as it plays
-        // and its 30s DVR leaves nothing to seek back and fill with.
-        const known = Number.isFinite(earliestKnownStartTime)
-            ? edge - earliestKnownStartTime
-            : 0;
-        const size = Math.min(
-            retentionSeconds,
-            Math.max(MIN_LIVE_WINDOW_SECONDS, known),
-        );
 
-        return { start: edge - size, size };
+        return { start: edge - retentionSeconds, size: retentionSeconds };
     }
 
     if (Number.isFinite(rawDuration) && rawDuration > 0) {
@@ -370,16 +373,11 @@ export function getTimelineFunctions(
             (max, segment) => Math.max(max, parseFloat(segment.dataset.endTime)),
             0,
         );
-        const earliestKnownStartTime = progressSegments.reduce(
-            (min, segment) => Math.min(min, parseFloat(segment.dataset.startTime)),
-            Number.POSITIVE_INFINITY,
-        );
         const window = getTimelineWindow(
             videoPlayer.duration(),
             currentTime,
             latestKnownEndTime,
             isLive,
-            earliestKnownStartTime,
             retentionSeconds,
         );
 
@@ -563,7 +561,6 @@ export function getTimelineFunctions(
             videoPlayer.currentTime(),
             latestKnownEndTime,
             isLive,
-            sortedSegments[0]?.startTime ?? Number.POSITIVE_INFINITY,
             retentionSeconds,
         );
 
@@ -617,7 +614,6 @@ export function getTimelineFunctions(
             videoPlayer.currentTime(),
             0,
             isLive,
-            Number.POSITIVE_INFINITY,
             retentionSeconds,
         );
         publishLiveWindow(window, isLive, videoPlayer, c2paControlBar.el());

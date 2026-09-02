@@ -262,6 +262,18 @@ export const C2PAPlayer = function (
                     return;
                 }
 
+                // Only the playhead-appending fallback rewrites the bar on a
+                // seek. An adapter that reports its own fragments rebuilds the
+                // whole timeline from its snapshot on the next tick, so letting
+                // handleOnSeeking loose on it just meant the bar was filtered
+                // and had a synthetic "unknown" span appended, both to be
+                // thrown away milliseconds later - visible as a flicker on the
+                // jump back to the live edge, and pure waste besides.
+                if (!useStaticTimelineFallback) {
+                    seeking = true;
+                    return;
+                }
+
                 const [nextSeeking, nextPlaybackTime] = handleOnSeeking(
                     videoPlayer.currentTime(),
                     playbackStarted,
