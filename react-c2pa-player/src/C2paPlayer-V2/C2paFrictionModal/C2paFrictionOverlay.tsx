@@ -14,32 +14,71 @@
  * limitations under the License.
  */
 
+import { useEffect, useId, useRef } from 'react';
+
 interface C2paFrictionOverlayProps {
     isVisible: boolean;
     onWatchAnyway: () => void;
 }
 
 /**
- * React presentation component for the invalid-manifest friction overlay.
+ * The consent gate shown when an asset's own credentials failed to verify.
  *
- * @param isVisible - Whether the overlay should be visible
- * @param onWatchAnyway - Callback fired when the user accepts playback
- * @returns Overlay markup mounted inside the player container
+ * This is the one surface in the player that stops playback and will not let it
+ * resume until the viewer acts, which is what shapes the accessibility here:
+ *
+ *  - `role="alertdialog"`, because that is what it is. Not `aria-modal`,
+ *    though: the control bar stays reachable behind it, and claiming modality
+ *    without trapping focus would describe behaviour it does not have.
+ *  - Focus moves to the accept button when it appears. Without that, the video
+ *    simply stopped and nothing said why or what to do - the overlay is
+ *    appended after the whole control bar in the DOM, so a keyboard user would
+ *    have had to tab past every control to find it.
+ *  - Focus goes back where it came from on dismissal, so accepting does not
+ *    strand the viewer at the end of the control bar.
+ *
+ * Hidden with `display: none` rather than unmounted, which correctly keeps it
+ * out of both the accessibility tree and the tab order while it is not showing.
  */
 export function C2paFrictionOverlay({
     isVisible,
     onWatchAnyway,
 }: C2paFrictionOverlayProps) {
+    const messageId = useId();
+    const buttonRef = useRef<HTMLButtonElement | null>(null);
+
+    useEffect(() => {
+        if (!isVisible) {
+            return;
+        }
+
+        const returnTo = document.activeElement as HTMLElement | null;
+
+        buttonRef.current?.focus();
+
+        return () => {
+            // Only if it is still in the document: on teardown the element that
+            // had focus has often gone, and focusing a detached node drops
+            // focus to the body rather than leaving it alone.
+            if (returnTo?.isConnected) {
+                returnTo.focus();
+            }
+        };
+    }, [isVisible]);
+
     return (
         <div
             className="friction-overlay"
-            style={{ display: isVisible ? 'block' : 'none' }}
+            role="alertdialog"
+            aria-labelledby={messageId}
+            style={{ display: isVisible ? 'flex' : 'none' }}
         >
-            <p>
+            <p id={messageId}>
                 The information in this video&apos;s Content Credentials is no longer trustworthy and the video&apos;s
                 history cannot be confirmed.
             </p>
             <button
+                ref={buttonRef}
                 type="button"
                 className="friction-button"
                 onClick={onWatchAnyway}

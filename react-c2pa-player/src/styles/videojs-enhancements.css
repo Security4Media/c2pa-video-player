@@ -18,9 +18,18 @@
 
 /* Enhanced Video.js Control Bar Styling */
 
+/* The control bar's height, published so the overlays above it can clear it
+   instead of each guessing. They guessed 4.5rem (72px), 5.25em (60.5px) and
+   40px against a bar that is 54px, and the 40px one overlapped it by 14px.
+   Stated in px because that is what the em chain below resolves to: 4.5em at
+   `font-size: 1.2em` on video.js's 10px base. */
+.video-js {
+  --c2pa-control-bar-height: 54px;
+}
+
 /* Make control bar bigger and more prominent */
 .video-js .vjs-control-bar {
-  height: 4.5em;
+  height: var(--c2pa-control-bar-height);
   font-size: 1.2em;
   background: linear-gradient(180deg, rgba(10, 46, 106, 0.92) 0%, rgba(14, 65, 148, 0.88) 100%);
   backdrop-filter: blur(8px);
@@ -162,8 +171,12 @@
 
 /* Responsive adjustments */
 @media (max-width: 768px) {
+  .video-js {
+    --c2pa-control-bar-height: 35px;
+  }
+
   .video-js .vjs-control-bar {
-    height: 3.5em;
+    height: var(--c2pa-control-bar-height);
     font-size: 1em;
   }
 
