@@ -90,7 +90,6 @@ export interface TimelineFunctions {
         extendTrailingSegmentToPlayhead?: boolean,
         isLive?: boolean,
         retentionSeconds?: number,
-        dvrWindowSeconds?: number | null,
     ) => void;
     replaceC2PATimelineSegments: (
         segments: C2PATimelineSegmentUpdate[],
@@ -98,7 +97,6 @@ export interface TimelineFunctions {
         c2paControlBar: TimelineComponentLike,
         isLive?: boolean,
         retentionSeconds?: number,
-        dvrWindowSeconds?: number | null,
     ) => void;
     renderWholeAssetVerdict: (
         verificationStatus: TimelineVerificationStatus,
@@ -106,7 +104,6 @@ export interface TimelineFunctions {
         c2paControlBar: TimelineComponentLike,
         isLive?: boolean,
         retentionSeconds?: number,
-        dvrWindowSeconds?: number | null,
     ) => void;
 }
 
@@ -159,43 +156,25 @@ export function getTimelineWindow(
     latestKnownEndTime: number,
     isLive = false,
     retentionSeconds = LIVE_WINDOW_SECONDS,
-    dvrDepthSeconds: number | null = null,
 ): TimelineWindow {
     if (isLive) {
-        // The bar spans what can actually be reached: the DVR window the origin
-        // advertises, capped by how much we choose to remember. A fixed span
-        // either way, anchored to the live edge, so content scrolls left at a
-        // constant rate and the scale never changes under the viewer.
+        // A fixed span of the configured retention, anchored to the live edge, so
+        // history rolls left at a constant rate and the scale never changes.
         //
-        // Two earlier versions of this were wrong in opposite directions.
+        // Not sized to the DVR any more. That was worth doing while the bar was
+        // also the seek control - it put the reachable range and the shown range
+        // on one scale - but the bar is a monitor now, not a scrubber, and there
+        // is no reason for a record of what was validated to be limited to what
+        // the origin still happens to hold. Five minutes of history is the point
+        // of it.
         //
-        // Growing it with the history behind it made the scale depend on the
-        // data: pause 28 seconds and the window stretched from 60s to 104s to
-        // span the gap, squashing history from the right-hand 6% of the bar
-        // into the left-hand 3.7%. Nothing was lost but it read as a reset.
-        //
-        // Fixing it at the retention then made the bar fill at 1x real time -
-        // roughly 90% grey for the first four and a half minutes of a
-        // five-minute window, which reads as nothing being validated.
-        //
-        // Sizing it to the DVR settles both. The bar fills in the 30 seconds
-        // these streams retain rather than in five minutes; the cursor, the
-        // segments and the seekable range end up on one scale, so a click lands
-        // where it points anywhere on the bar rather than only in its
-        // right-hand tenth; and a 3.84s segment is a legible 12.8% of the width
-        // instead of 1.3%.
-        //
-        // The cap still matters for a stream retaining hours: the bar is a
-        // record of recent provenance, not an archive, and the retained history
-        // of failures belongs in the debug console rather than in a bar too
-        // dense to read.
+        // Nor does it grow with the history behind it, which is the other thing
+        // this has been: growing made the scale depend on the data, so a 28s
+        // pause stretched the window from 60s to 104s and squashed real history
+        // from the right-hand 6% of the bar into the left-hand 3.7%.
         const edge = Math.max(currentTime, latestKnownEndTime);
-        const size =
-            dvrDepthSeconds !== null && dvrDepthSeconds > 0
-                ? Math.min(retentionSeconds, dvrDepthSeconds)
-                : retentionSeconds;
 
-        return { start: edge - size, size };
+        return { start: edge - retentionSeconds, size: retentionSeconds };
     }
 
     if (Number.isFinite(rawDuration) && rawDuration > 0) {
@@ -344,7 +323,6 @@ export function getTimelineFunctions(
         extendTrailingSegmentToPlayhead = false,
         isLive = false,
         retentionSeconds = DEFAULT_LIVE_RETENTION_SECONDS,
-        dvrWindowSeconds: number | null = null,
     ) {
         // No synthetic "unknown" placeholder when there is nothing to show: an
         // empty list is the correct initial state now that the track's own grey
@@ -368,7 +346,6 @@ export function getTimelineFunctions(
             latestKnownEndTime,
             isLive,
             retentionSeconds,
-            dvrWindowSeconds,
         );
 
         publishLiveWindow(window, isLive);
@@ -534,7 +511,6 @@ export function getTimelineFunctions(
         c2paControlBar: TimelineComponentLike,
         isLive = false,
         retentionSeconds = DEFAULT_LIVE_RETENTION_SECONDS,
-        dvrWindowSeconds: number | null = null,
     ) {
         removeProgressSegments();
 
@@ -553,7 +529,6 @@ export function getTimelineFunctions(
             latestKnownEndTime,
             isLive,
             retentionSeconds,
-            dvrWindowSeconds,
         );
 
         publishLiveWindow(window, isLive);
@@ -598,7 +573,6 @@ export function getTimelineFunctions(
         c2paControlBar: TimelineComponentLike,
         isLive = false,
         retentionSeconds = DEFAULT_LIVE_RETENTION_SECONDS,
-        dvrWindowSeconds: number | null = null,
     ) {
         removeProgressSegments();
 
@@ -608,7 +582,6 @@ export function getTimelineFunctions(
             0,
             isLive,
             retentionSeconds,
-            dvrWindowSeconds,
         );
         publishLiveWindow(window, isLive);
 

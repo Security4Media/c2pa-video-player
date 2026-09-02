@@ -15,30 +15,25 @@
  */
 
 /**
- * Puts the live playhead on the same scale as the validation segments.
+ * Makes the live progress bar a monitor rather than a scrubber.
  *
- * Video.js measures a live seek bar against its own DVR window:
+ * On a live source the bar is a rolling record of what has been validated. It
+ * is deliberately not a seek control: the two wanted different spans - five
+ * minutes of provenance against the thirty seconds the origin still holds -
+ * and every attempt to serve both put the cursor and the segments on different
+ * scales, or shaded off nine tenths of the bar as unreachable. So seeking is
+ * off here, and getting back to the edge is the LIVE button's job.
  *
- *     percent = (currentTime - liveTracker.seekableStart()) / liveTracker.liveWindow()
+ * Three overrides, all of which fall through to video.js when there is no live
+ * window, so VOD and any live source without a C2PA timeline keep working
+ * exactly as before:
  *
- * which was a different span from the validation bar's, so the two were drawn
- * to different scales on the same strip of pixels: measured on the live feed,
- * the cursor sat at 0% while the segments it was supposed to be moving through
- * sat at 93-100%. Pausing made it worse, the cursor drifting 100% -> 62% -> 49%
- * while the segments did not move at all.
+ *   - `getPercent` pins the handle to the right, where the live edge is;
+ *   - `handleMouseDown` and `handleKeyDown` decline to seek.
  *
- * The bar is now sized to the DVR window too, so the two agree by construction
- * and this class mostly re-derives the same answer. It stays because the bar's
- * span is capped by the configured retention, so on a stream retaining more
- * than that the two part company again - and because the arithmetic then lives
- * in one place either way.
- *
- * Only two methods need replacing, because video.js derives everything else
- * from them: `getPercent` decides where the playhead is drawn - pinned to the
- * right on live, see below - and `calculateDistance` is the sole input into
- * where a click seeks to. Both defer to video.js whenever there is no live
- * window, so VOD and any live source without a C2PA timeline behave exactly as
- * before.
+ * Hover is untouched. The preview reads `mousemove` from a listener on the
+ * progress control element rather than through video.js, so suppressing the
+ * seek gestures here does not take the preview with them.
  */
 
 import videojs from 'video.js';
@@ -46,22 +41,14 @@ import { getLiveTimelineWindow } from '../C2paTimeline/liveWindowState';
 
 /** The parts of video.js's SeekBar and LiveTracker this file touches. */
 interface SeekBarInternals {
-  player_: {
-    currentTime(): number;
-    liveTracker?: {
-      isLive(): boolean;
-      liveWindow(): number;
-      seekableStart(): number;
-    };
-  };
+  player_: { currentTime(): number };
 }
-
-const clampFraction = (value: number) => Math.min(1, Math.max(0, value));
 
 const SeekBar = videojs.getComponent('SeekBar') as unknown as {
   new (...args: unknown[]): SeekBarInternals & {
     getPercent(): number;
-    calculateDistance(event: Event): number;
+    handleMouseDown(event: Event): void;
+    handleKeyDown(event: Event): void;
   };
 };
 
@@ -91,34 +78,35 @@ class C2PASeekBar extends SeekBar {
   }
 
   /**
-   * Where a click seeks to, expressed as video.js wants it.
+   * Swallows the gesture that would start a seek or a scrub.
    *
-   * Video.js turns this into a time with
-   * `seekableStart + distance * liveWindow`, so rather than reimplement its
-   * mouse handling, the fraction it is given is the one that lands at the time
-   * *our* scale points to, clamped into what is actually seekable.
-   *
-   * Video.js also treats a distance of 0.99 or more as "go to the live edge",
-   * which is the right reading of a click at the right-hand end of our bar too.
+   * Declining here rather than with `pointer-events: none` on the element:
+   * the hover preview needs the pointer events, and video.js's own
+   * ProgressControl delegates its mousedown to this method, so one refusal
+   * covers clicking, dragging and touch.
    */
-  calculateDistance(event: Event): number {
-    const raw = super.calculateDistance(event);
+  handleMouseDown(event: Event): void {
+    if (this.#seekingDisabled()) {
+      event.stopPropagation();
+      return;
+    }
+
+    super.handleMouseDown(event);
+  }
+
+  /** The same for the arrow keys, which seek a focused slider. */
+  handleKeyDown(event: Event): void {
+    if (this.#seekingDisabled()) {
+      return;
+    }
+
+    super.handleKeyDown(event);
+  }
+
+  #seekingDisabled(): boolean {
     const window = getLiveTimelineWindow();
-    const tracker = this.player_.liveTracker;
 
-    if (!window || !(window.size > 0) || !tracker?.isLive()) {
-      return raw;
-    }
-
-    const liveWindow = tracker.liveWindow();
-
-    if (!(liveWindow > 0)) {
-      return raw;
-    }
-
-    const wanted = window.start + clampFraction(raw) * window.size;
-
-    return clampFraction((wanted - tracker.seekableStart()) / liveWindow);
+    return window !== null && window.size > 0;
   }
 }
 

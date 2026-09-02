@@ -318,7 +318,6 @@ export const C2PAPlayer = function (
                         c2paControlBar,
                         isLive,
                         retentionSeconds,
-                        dvrWindowSeconds,
                     );
                 } else if (ownsFullTimeline) {
                     replaceC2PATimelineSegments(
@@ -327,7 +326,6 @@ export const C2PAPlayer = function (
                         c2paControlBar,
                         isLive,
                         retentionSeconds,
-                        dvrWindowSeconds,
                     );
                 } else {
                     handleC2PAValidation(
@@ -344,7 +342,6 @@ export const C2PAPlayer = function (
                         true,
                         isLive,
                         retentionSeconds,
-                        dvrWindowSeconds,
                     );
                 }
 
