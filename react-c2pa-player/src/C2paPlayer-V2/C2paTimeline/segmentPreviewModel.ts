@@ -161,6 +161,31 @@ const UNPLAYED_SENTENCE =
 /** Nothing has come back for this stretch yet. */
 const PENDING_SENTENCE = 'No verdict has arrived for this fragment yet.';
 
+/**
+ * An uncovered stretch of the bar - grey track rather than a grey segment.
+ *
+ * True whatever the cause, which is the point: no verdict for this moment ever
+ * reached the player, and why is not something we can tell from here. It might
+ * never have been validated, its verdict might have been pruned behind the
+ * retention window, or the player might not have been watching yet.
+ */
+const NOTHING_VERIFIED_SENTENCE = 'No content credentials were verified for this moment.';
+
+/** The same stretch, but at the live edge, where a verdict is still coming. */
+const NOT_YET_SENTENCE = 'Nothing has been validated for this moment yet: it is at the live edge.';
+
+/**
+ * How wide a gap at the live edge may be before it stops being "yet".
+ *
+ * The right-hand end of the bar is normally uncovered by a second or two - the
+ * window's edge advances on a clock and coasts slightly past the newest verdict
+ * so the bar can roll (see liveEdgeClock.ts) - and telling someone that content
+ * one second old was never verified would be wrong. A wider gap than a couple
+ * of segments is a different thing: validation has actually stopped, and the
+ * general sentence is the honest one.
+ */
+const LEADING_EDGE_SECONDS = 10;
+
 export function describeFailureCode(code: string): string | null {
   return FAILURE_SENTENCES[code] ?? null;
 }
@@ -228,6 +253,38 @@ function readMetadata(manifestRef: ManifestSource | undefined): SegmentPreviewMe
 
   // Nothing worth a panel if every field a preview would show is absent.
   return title || publisher || rights ? { title, publisher, rights } : null;
+}
+
+/**
+ * What the preview says about a stretch of bar no verdict covers.
+ *
+ * Grey is the track's own colour, so an uncovered stretch has no element to
+ * hover and used to report nothing at all - which on a live bar is most of the
+ * width, since a five-minute window fills only as verdicts arrive. Silence
+ * there is the worst of the three options: a viewer cannot tell whether the
+ * player has an opinion about that moment or simply failed to show it.
+ *
+ * Synthesized rather than rendered as filler segments. Filler would be
+ * click-inspectable, would need a manifest it does not have, and would undo
+ * the thing that makes the bar readable - that grey is the absence of a
+ * verdict rather than a verdict of its own.
+ */
+export function buildUnverifiedPreview(
+  startTime: number,
+  endTime: number,
+  atLeadingEdge: boolean,
+): SegmentPreview {
+  const seconds = endTime - startTime;
+  const stillArriving =
+    atLeadingEdge && Number.isFinite(seconds) && seconds <= LEADING_EDGE_SECONDS;
+
+  return {
+    timeRange: formatSegmentRange(startTime, endTime),
+    validationState: 'Unknown',
+    metadata: null,
+    metadataVerified: false,
+    reason: stillArriving ? NOT_YET_SENTENCE : NOTHING_VERIFIED_SENTENCE,
+  };
 }
 
 /**

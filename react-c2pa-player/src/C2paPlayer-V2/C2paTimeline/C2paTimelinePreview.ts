@@ -33,11 +33,22 @@
  *    between the pointer and the bar it describes and flicker. Hence
  *    `pointer-events: none` on it, and the "pin" gesture being the existing
  *    click-to-open-the-panel rather than anything belonging to this element.
+ *
+ * Grey is handled here too, and it has no element. Grey is the track's own
+ * colour showing through where no verdict covers the bar, which on a live
+ * stream is most of the width - a five-minute window fills only as verdicts
+ * arrive. So a pointer that matches no segment falls through to the geometry
+ * of the *gap* it is in, and the panel says so.
  */
 
 import type { AdapterKind } from '@/validation';
 import type { C2PATimelineSegmentUpdate } from '@/types/c2pa.types';
-import { buildSegmentPreview, type SegmentPreview } from './segmentPreviewModel';
+import {
+    buildSegmentPreview,
+    buildUnverifiedPreview,
+    type SegmentPreview,
+} from './segmentPreviewModel';
+import { getLiveTimelineWindow } from './liveWindowState';
 
 /** A timeline segment element as the timeline builds it. */
 interface SegmentElementLike extends HTMLElement {
@@ -105,6 +116,69 @@ export function findSegmentAtFraction(
     }
 
     return best;
+}
+
+/** An uncovered stretch of the bar, in the same percentages the segments use. */
+export interface TimelineGap {
+    leftPercent: number;
+    rightPercent: number;
+    /**
+     * The gap runs to the right-hand end of the bar and there is covered
+     * ground behind it, so this is the leading edge: content whose verdict may
+     * simply not have arrived. Distinct from a gap in the middle or at the far
+     * left, where a verdict is not coming.
+     */
+    atLeadingEdge: boolean;
+}
+
+/**
+ * The uncovered stretch of the bar containing `fraction`, if any.
+ *
+ * Derived from the same rendered `left`/`width` percentages as
+ * findSegmentAtFraction, and for the same reason: the gaps are exactly what is
+ * left over once the segments are placed, so reading them off the segments
+ * cannot disagree with what is on screen. Computing them from verdict times
+ * and the current window would be a second, independent answer to the same
+ * question, and the two would drift apart on every roll.
+ *
+ * Returns null when the pointer is over a segment, which is the caller's cue
+ * that this is not a gap at all.
+ */
+export function findGapAtFraction(
+    segments: readonly SegmentElementLike[],
+    fraction: number,
+): TimelineGap | null {
+    if (!(fraction >= 0) || fraction > 1) {
+        return null;
+    }
+
+    const target = fraction * 100;
+    const covered = segments
+        .map((segment) => ({
+            from: parseFloat(segment.style.left),
+            to: parseFloat(segment.style.left) + parseFloat(segment.style.width),
+        }))
+        .filter((span) => Number.isFinite(span.from) && Number.isFinite(span.to) && span.to > span.from)
+        .sort((left, right) => left.from - right.from);
+
+    let cursor = 0;
+
+    for (const span of covered) {
+        if (span.from > cursor && target >= cursor && target <= span.from) {
+            return { leftPercent: cursor, rightPercent: span.from, atLeadingEdge: false };
+        }
+
+        cursor = Math.max(cursor, span.to);
+    }
+
+    if (cursor < 100 && target >= cursor) {
+        // `cursor > 0` distinguishes the live edge from a bar with nothing on
+        // it at all: before the first verdict the whole width is one gap, and
+        // calling five minutes of history "still arriving" would be wrong.
+        return { leftPercent: cursor, rightPercent: 100, atLeadingEdge: cursor > 0 };
+    }
+
+    return null;
 }
 
 /**
@@ -217,16 +291,17 @@ export function createTimelinePreview(): TimelinePreviewController {
         );
         const match = findSegmentAtFraction(segments, fraction);
         const source = match?.__c2paSegment ?? null;
+        const html = source
+            ? renderPreview(buildSegmentPreview(source, adapterKind))
+            : renderGap(segments, fraction);
 
-        if (!source) {
+        if (!html) {
             hide();
             return;
         }
 
         // Re-rendering identical content on every mousemove would rebuild the
         // panel dozens of times a second while the pointer crosses one segment.
-        const html = renderPreview(buildSegmentPreview(source, adapterKind));
-
         if (html !== shownHtml) {
             element.innerHTML = html;
             shownHtml = html;
@@ -241,6 +316,40 @@ export function createTimelinePreview(): TimelinePreviewController {
         const centred = event.clientX - bounds.left - width / 2;
         const maxLeft = bounds.width - width;
         element.style.left = `${Math.max(0, Math.min(maxLeft > 0 ? maxLeft : 0, centred))}px`;
+    };
+
+    /**
+     * What an uncovered stretch says, or null when there is nothing to say.
+     *
+     * Live only. The window it needs is published for live sources alone, and
+     * that is also the only place the statement would be right: on VOD an
+     * uncovered stretch means playback has not read it *yet*, not that no
+     * verdict exists - the verdict usually does, withheld until the content is
+     * actually shown (see readRegionGate.ts). Reporting "nothing was verified"
+     * there would be a different and false claim.
+     */
+    const renderGap = (segments: readonly SegmentElementLike[], fraction: number) => {
+        const window = getLiveTimelineWindow();
+
+        if (!window || !(window.size > 0)) {
+            return null;
+        }
+
+        const gap = findGapAtFraction(segments, fraction);
+
+        if (!gap) {
+            return null;
+        }
+
+        const toTime = (percent: number) => window.start + (percent / 100) * window.size;
+
+        return renderPreview(
+            buildUnverifiedPreview(
+                toTime(gap.leftPercent),
+                toTime(gap.rightPercent),
+                gap.atLeadingEdge,
+            ),
+        );
     };
 
     const onMouseLeave = () => hide();

@@ -17,9 +17,10 @@
 import { describe, expect, it } from 'vitest';
 import type { Manifest } from '@contentauth/c2pa-web';
 import type { C2PATimelineSegmentUpdate } from '@/types/c2pa.types';
-import { findSegmentAtFraction } from './C2paTimelinePreview';
+import { findGapAtFraction, findSegmentAtFraction } from './C2paTimelinePreview';
 import {
   buildSegmentPreview,
+  buildUnverifiedPreview,
   describeFailureCode,
   formatSegmentRange,
 } from './segmentPreviewModel';
@@ -302,6 +303,106 @@ describe('an unverified segment', () => {
 
     expect(preview.metadata?.title).toBe('Unchecked but declared');
     expect(preview.metadataVerified).toBe(false);
+  });
+});
+
+describe('an uncovered stretch of the bar', () => {
+  // Grey is the track's own colour, so there is no element to hover. This used
+  // to report nothing at all, which on a live bar is most of the width.
+  const EPOCH = 1_788_374_000;
+
+  it('says nothing was verified there', () => {
+    const preview = buildUnverifiedPreview(EPOCH, EPOCH + 60, false);
+
+    expect(preview.validationState).toBe('Unknown');
+    expect(preview.reason).toBe('No content credentials were verified for this moment.');
+    expect(preview.metadata).toBeNull();
+  });
+
+  it('says which moment it means', () => {
+    // The whole point of showing it: a viewer needs to know what part of the
+    // broadcast has no provenance, not merely that some part does not.
+    expect(buildUnverifiedPreview(EPOCH, EPOCH + 60, false).timeRange).toContain('–');
+    expect(buildUnverifiedPreview(12, 20, false).timeRange).toBe('00:12 – 00:20');
+  });
+
+  it('says "not yet" for the sliver at the live edge', () => {
+    // The right-hand end of the bar is normally uncovered by a second or two,
+    // because the window's edge advances on a clock and coasts slightly past
+    // the newest verdict so the bar can roll. Telling someone content one
+    // second old was never verified would be wrong.
+    expect(buildUnverifiedPreview(EPOCH, EPOCH + 2, true).reason).toContain('yet');
+  });
+
+  it('does not say "not yet" of a wide gap at the edge', () => {
+    // Validation has actually stopped, which is a different statement.
+    expect(buildUnverifiedPreview(EPOCH, EPOCH + 120, true).reason).toBe(
+      'No content credentials were verified for this moment.',
+    );
+  });
+});
+
+describe('findGapAtFraction', () => {
+  const build = (left: number, width: number) =>
+    ({ style: { left: `${left}%`, width: `${width}%` } }) as unknown as HTMLElement;
+
+  it('finds a gap between two segments', () => {
+    const segments = [build(0, 20), build(60, 40)];
+
+    expect(findGapAtFraction(segments, 0.4)).toEqual({
+      leftPercent: 20,
+      rightPercent: 60,
+      atLeadingEdge: false,
+    });
+  });
+
+  it('finds the gap before the first segment', () => {
+    expect(findGapAtFraction([build(30, 70)], 0.1)).toEqual({
+      leftPercent: 0,
+      rightPercent: 30,
+      atLeadingEdge: false,
+    });
+  });
+
+  it('marks the trailing gap as the live edge', () => {
+    expect(findGapAtFraction([build(0, 95)], 0.98)).toEqual({
+      leftPercent: 95,
+      rightPercent: 100,
+      atLeadingEdge: true,
+    });
+  });
+
+  it('does not call an empty bar the live edge', () => {
+    // Before the first verdict the whole width is one gap. Calling five
+    // minutes of history "still arriving" would be wrong.
+    expect(findGapAtFraction([], 0.5)).toEqual({
+      leftPercent: 0,
+      rightPercent: 100,
+      atLeadingEdge: false,
+    });
+  });
+
+  it('returns nothing when a segment covers the pointer', () => {
+    // The caller's cue that this is a segment hover, not a gap hover.
+    expect(findGapAtFraction([build(0, 100)], 0.5)).toBeNull();
+    expect(findGapAtFraction([build(0, 40), build(40, 60)], 0.5)).toBeNull();
+  });
+
+  it('ignores zero-width segments, which cover nothing', () => {
+    expect(findGapAtFraction([build(50, 0)], 0.5)).toMatchObject({ leftPercent: 0 });
+  });
+
+  it('handles overlapping segments without reporting a gap inside them', () => {
+    expect(findGapAtFraction([build(0, 60), build(30, 40)], 0.5)).toBeNull();
+    expect(findGapAtFraction([build(0, 60), build(30, 40)], 0.8)).toMatchObject({
+      leftPercent: 70,
+      atLeadingEdge: true,
+    });
+  });
+
+  it('rejects a pointer outside the bar', () => {
+    expect(findGapAtFraction([], -0.1)).toBeNull();
+    expect(findGapAtFraction([], 1.2)).toBeNull();
   });
 });
 
