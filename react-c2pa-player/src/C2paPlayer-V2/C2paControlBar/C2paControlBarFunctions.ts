@@ -35,27 +35,33 @@ interface ControlBarPlayer extends VideoJsPlayerLike {
 }
 
 /**
- * Register the custom Video.js load-progress component used as the host
- * for C2PA validation timeline segments.
+ * Host for the C2PA validation timeline segments.
+ *
+ * Extends video.js's own load-progress bar to inherit its geometry inside the
+ * seek bar, with `update` overridden to a no-op: the buffered ranges it would
+ * otherwise draw are not what this bar reports.
+ */
+const LoadProgressBar = videojs.getComponent('LoadProgressBar');
+
+class C2PALoadProgressBar extends LoadProgressBar {
+    update(_event: unknown) { }
+}
+
+// Registered at module scope, because the registry is global while a player is
+// not. Doing this inside the initializer defined a fresh class on every player
+// and re-registered it under the same name, so two players would have held
+// instances of two different classes that video.js believed were one.
+videojs.registerComponent('C2PALoadProgressBar', C2PALoadProgressBar);
+
+/**
+ * Attach the timeline host to a player's seek bar.
  *
  * @param videoPlayer - Video.js player instance
  */
 export const initializeC2PAControlBar = function (videoPlayer: ControlBarPlayer): void {
-    const LoadProgressBar = videojs.getComponent('LoadProgressBar');
-
-    class C2PALoadProgressBar extends LoadProgressBar {
-        update(_event: unknown) { }
-    }
-
-    videojs.registerComponent('C2PALoadProgressBar', C2PALoadProgressBar);
-    console.log('[C2PAControlBar] Registered C2PALoadProgressBar component');
-
     videoPlayer.controlBar.progressControl.seekBar.addChild('C2PALoadProgressBar');
-    console.log('[C2PAControlBar] Added C2PALoadProgressBar to seekBar');
 
     const c2paTimeline = videoPlayer.controlBar.progressControl.seekBar.getChild('C2PALoadProgressBar');
-
-    console.log('[C2PAControlBar] Retrieved c2paTimeline:', c2paTimeline);
 
     if (!c2paTimeline) {
         console.warn('[C2PAControlBar] Failed to retrieve C2PA timeline component');
