@@ -224,9 +224,17 @@
   background: none;
 }
 
+/* The control bar needs a stacking context so the menu overlay below it can be
+   ordered against it. It already has one: video.js positions the bar
+   absolutely against the bottom of the player, which is also what makes it
+   overlay the video rather than sit under it.
+ *
+   This rule used to add `position: relative` as well, which was both redundant
+   and wrong - and harmless only because video.js's `position: absolute` is
+   equally specific and used to load afterwards. Fixing the stylesheet order
+   let it through, and the bar dropped out of the video and stacked below it. */
 .video-js .vjs-control-bar {
-  z-index: 100 !important;
-  position: relative;
+  z-index: 100;
 }
 
 @media (max-width: 768px) {

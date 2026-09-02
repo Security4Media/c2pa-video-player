@@ -138,9 +138,19 @@
   display: none !important;
 }
 
-/* Make video player container larger */
+/* No `font-size` here on purpose.
+ *
+ * This rule used to declare `font-size: 16px`, and it never once applied:
+ * video.js's own `.video-js { font-size: 10px }` (video-js.css:468) is equally
+ * specific and, before the stylesheet order was fixed, loaded afterwards. So
+ * the whole control bar has always been sized from a 10px base, and every em
+ * value in this file was tuned against that. Restating the 16px now that the
+ * order is right would scale the entire player by 1.6x - a design change, not
+ * a refactor - so the declaration is dropped and video.js's base is used, which
+ * is what has been on screen all along. Setting a deliberate base size is a
+ * reasonable thing to want; it just needs to be decided rather than inherited
+ * from a rule nobody knew was dead. */
 .video-js {
-  font-size: 16px;
   min-height: 500px;
 }
 

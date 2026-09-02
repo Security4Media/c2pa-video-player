@@ -14,12 +14,8 @@
  * limitations under the License.
  */
 
+import videojs from 'video.js';
 import type { VideoJsPlayerLike } from '../C2paMenu/C2paMenu.types';
-
-declare const videojs: {
-    getComponent(name: string): new (...args: unknown[]) => { update(event: unknown): void };
-    registerComponent(name: string, component: unknown): void;
-};
 
 interface TimelineComponentLike {
     el(): HTMLElement;
@@ -45,9 +41,6 @@ interface ControlBarPlayer extends VideoJsPlayerLike {
  * @param videoPlayer - Video.js player instance
  */
 export const initializeC2PAControlBar = function (videoPlayer: ControlBarPlayer): void {
-    console.log('[C2PAControlBar] Initializing C2PA control bar');
-    console.log('[C2PAControlBar] videojs available:', typeof videojs !== 'undefined');
-
     const LoadProgressBar = videojs.getComponent('LoadProgressBar');
 
     class C2PALoadProgressBar extends LoadProgressBar {

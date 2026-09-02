@@ -14,16 +14,12 @@
  * limitations under the License.
  */
 
+import videojs from 'video.js';
 import { handleMenuClosed, handleMenuOpened, setMenuReference } from './C2paMenuBridge';
 import type {
     VideoJsMenuButtonComponentLike,
     VideoJsPlayerLike,
 } from './C2paMenu.types';
-
-declare const videojs: {
-    getComponent(name: string): new (...args: unknown[]) => VideoJsMenuButtonComponentLike;
-    registerComponent(name: string, component: unknown): void;
-};
 
 interface MenuItemConstructor {
     new (player: unknown, options: { label: string; id: string }): {
@@ -67,10 +63,13 @@ function createHiddenPlaceholderItem(
  * @param videoPlayer - Video.js player instance
  */
 export const initializeC2PAMenu = function (videoPlayer: VideoJsPlayerLike) {
-    console.log('[C2PAMenu] Initializing C2PA menu, videoPlayer:', videoPlayer);
-    console.log('[C2PAMenu] videojs available:', typeof videojs !== 'undefined', (window as Window & { videojs?: unknown }).videojs);
-
-    const MenuButton = videojs.getComponent('MenuButton') as MenuButtonComponentClass;
+    // Video.js types every component as `Component`, whose `el()` is declared
+    // to return `Element`. The two local interfaces below say `HTMLElement`
+    // and name only the members this file uses, which is the more accurate
+    // description of what a MenuButton is - so the cast goes through
+    // `unknown` rather than widening those interfaces back to `Element` and
+    // pushing the same narrowing out to every call site.
+    const MenuButton = videojs.getComponent('MenuButton') as unknown as MenuButtonComponentClass;
     const MenuItem = videojs.getComponent('MenuItem') as unknown as MenuItemConstructor;
 
     class C2PAMenuButton extends MenuButton {
@@ -113,7 +112,12 @@ export const initializeC2PAMenu = function (videoPlayer: VideoJsPlayerLike) {
         }
     }
 
-    videojs.registerComponent('C2PAMenuButton', C2PAMenuButton);
+    // Cast back for the same reason: the class descends from a component
+    // narrowed above, so it no longer carries `Component`'s static side.
+    videojs.registerComponent(
+        'C2PAMenuButton',
+        C2PAMenuButton as unknown as Parameters<typeof videojs.registerComponent>[1],
+    );
 
     videoPlayer.controlBar.addChild(
         'C2PAMenuButton',
