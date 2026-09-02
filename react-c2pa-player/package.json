@@ -15,7 +15,8 @@
         "test": "vitest run",
         "test:watch": "vitest",
         "test:browser": "node tests/browser/trustMatrix.mjs",
-        "test:keyboard": "node tests/browser/keyboardAccess.mjs"
+        "test:keyboard": "node tests/browser/keyboardAccess.mjs",
+        "test:source-switch": "node tests/browser/sourceSwitch.mjs"
     },
     "dependencies": {
         "@contentauth/c2pa-web": "^0.7.1",

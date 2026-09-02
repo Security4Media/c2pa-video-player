@@ -884,6 +884,21 @@ export function getTimelineFunctions(
     const disposeTimeline = function () {
         stopLiveRoll();
         removeProgressSegments();
+        // The published window is module state, shared with C2paSeekBar, and it
+        // outlived the player that wrote it. Both of that component's overrides
+        // key on it being non-null - `getPercent()` returns 1 and mouse-down is
+        // swallowed - so a live source left the *next* source's bar reporting
+        // fully played and refusing to seek until its first render pass
+        // published null.
+        //
+        // Measured, that gap is 230ms on a local file and about 1.5s on a
+        // remote stream, and in both the seek bar has zero width for the whole
+        // of it because the control bar is not laid out yet. So nothing visibly
+        // broke, and this is a leak rather than a reported bug. It is still
+        // wrong: the safety comes entirely from a race that nothing enforces,
+        // and a slower first snapshot or an eagerly laid-out bar would expose
+        // it. A disposed timeline should not leave global state behind.
+        setLiveTimelineWindow(null);
     };
 
     const renderWholeAssetVerdict = function (
