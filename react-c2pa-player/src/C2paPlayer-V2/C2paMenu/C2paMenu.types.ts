@@ -33,9 +33,13 @@ export interface VideoJsPlayerLike extends VideoJsComponentLike {
 }
 
 export interface VideoJsMenuButtonComponentLike extends VideoJsMenuComponentLike {
+    /**
+     * Video.js's own record of whether the popup is open. Read rather than
+     * mirrored: it is the single source of truth for press state, and keeping a
+     * second copy is what let the two disagree.
+     */
     buttonPressed_?: boolean;
     player_?: unknown;
-    closeC2paMenu?: boolean;
     pressButton?(): void;
     unpressButton?(): void;
     buildCSSClass?(): string;
@@ -46,5 +50,11 @@ export interface C2paMenuBridgeState {
     isMenuOpen: boolean;
     isInvalid: boolean;
     resetVersion: number;
-    menuReference: VideoJsMenuComponentLike | null;
+    /**
+     * The button component, so anything outside video.js can close the menu
+     * through video.js rather than around it. Typed as the button rather than
+     * the bare component because `unpressButton` is the whole point of holding
+     * it.
+     */
+    menuReference: VideoJsMenuButtonComponentLike | null;
 }

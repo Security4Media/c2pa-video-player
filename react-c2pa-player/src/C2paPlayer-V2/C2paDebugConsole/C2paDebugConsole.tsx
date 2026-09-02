@@ -107,8 +107,17 @@ export function C2paDebugConsole({ onClose }: { onClose: () => void }) {
         return chosen.slice().reverse();
     }, [entries, failuresOnly]);
 
+    // `role="region"`, not `dialog`: nothing here is modal. The control bar
+    // stays above and clickable, and focus is moved in but not trapped, so
+    // claiming `dialog` without `aria-modal` would promise behaviour the panel
+    // does not have. `tabIndex={-1}` so the overlay can move focus here.
     return (
-        <div className="c2pa-debug-console" role="dialog" aria-label="Validation log">
+        <div
+            className="c2pa-debug-console"
+            role="region"
+            aria-label="Validation log"
+            tabIndex={-1}
+        >
             <div className="c2pa-debug-console__head">
                 <span className="c2pa-debug-console__title">Validation log</span>
                 <span className="c2pa-debug-console__count">

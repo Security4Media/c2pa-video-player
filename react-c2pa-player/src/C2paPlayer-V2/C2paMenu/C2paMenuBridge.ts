@@ -18,7 +18,7 @@ import type { C2PAStatus } from '@/types/c2pa.types';
 import type { C2PAPlayerRootController } from '../C2PAPlayerRoot.types';
 import type {
     C2paMenuBridgeState,
-    VideoJsMenuComponentLike,
+    VideoJsMenuButtonComponentLike,
     VideoJsPlayerLike,
 } from './C2paMenu.types';
 
@@ -102,7 +102,7 @@ function getStatusValidationState(c2paStatus: C2PAStatus | null) {
  *
  * @param c2paMenu - Video.js C2PA menu component instance
  */
-export function setMenuReference(c2paMenu: VideoJsMenuComponentLike | null) {
+export function setMenuReference(c2paMenu: VideoJsMenuButtonComponentLike | null) {
     if (!c2paMenu) {
         return;
     }
@@ -139,6 +139,26 @@ export function handleMenuOpened() {
     playerRootController?.setState({
         isMenuOpen: true,
     });
+}
+
+/**
+ * Closes the menu from outside video.js, but through video.js.
+ *
+ * Routed through `unpressButton` rather than writing `isMenuOpen: false`
+ * directly, because video.js owns `buttonPressed_` and the button's
+ * `aria-expanded`. Setting only the React half is exactly how the button would
+ * come to report an open panel that is no longer on screen. The shell's
+ * override notifies React on the way back, so this is the whole close.
+ *
+ * Idempotent: the override's `wasPressed` guard means calling it on an already
+ * closed menu does nothing, which is what lets both video.js's own Escape
+ * handling and the overlay's fire without fighting.
+ *
+ * This is also what `menuState.menuReference` is for. It was previously stored
+ * and read only to guard a redundant call to the function that stored it.
+ */
+export function closeC2PAMenu() {
+    menuState.menuReference?.unpressButton?.();
 }
 
 /**
@@ -181,7 +201,7 @@ export function handleMenuClosed() {
  * @param videoPlayer - Video.js player instance
  */
 export function updateC2PAMenu(
-    c2paMenu: VideoJsMenuComponentLike | null,
+    c2paMenu: VideoJsMenuButtonComponentLike | null,
     videoPlayer: VideoJsPlayerLike,
     hasInvalidSegments = false,
 ) {

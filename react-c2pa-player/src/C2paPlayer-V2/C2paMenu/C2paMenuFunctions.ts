@@ -21,6 +21,7 @@
  */
 export { initializeC2PAMenu } from './C2paMenuShell';
 export {
+    closeC2PAMenu,
     closeDebugConsole,
     disposeC2PAMenu,
     handleMenuOpened,

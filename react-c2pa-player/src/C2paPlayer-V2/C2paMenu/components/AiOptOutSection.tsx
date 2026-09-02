@@ -14,7 +14,9 @@
  * limitations under the License.
  */
 
+import { useId } from 'react';
 import type { AiOptOutSectionItem } from '../models';
+import { SectionToggle } from './shared';
 
 function formatLabelList(labels: string[]) {
   if (labels.length === 0) {
@@ -43,6 +45,7 @@ export function AiOptOutSection({
   isExpanded: boolean;
   onToggle: () => void;
 }) {
+  const panelId = useId();
   const allowed = section.assertion.entries
     .filter(entry => entry.use === 'allowed')
     .map(entry => entry.label);
@@ -70,11 +73,16 @@ export function AiOptOutSection({
   return (
     <li className="vjs-menu-item">
       <div className="c2pa-menu-section c2pa-ai-optout-section">
-        <div className="c2pa-menu-section__header c2pa-menu-section__header--collapsible" onClick={onToggle}>
-          <span className="itemName c2pa-menu-section__title">{title}</span>
-          <span className={`c2pa-menu-section__toggle ${isExpanded ? 'expanded' : ''}`}>›</span>
-        </div>
-        <div className={`c2pa-menu-section__content ${isExpanded ? 'expanded' : ''}`}>
+        <SectionToggle
+          title={title}
+          isExpanded={isExpanded}
+          controls={panelId}
+          onToggle={onToggle}
+        />
+        <div
+          id={panelId}
+          className={`c2pa-menu-section__content ${isExpanded ? 'expanded' : ''}`}
+        >
           <div className="c2pa-menu-section__content-inner c2pa-ai-optout-section__assertion">
             {policyParts.map((part, index) => (
               <div key={`${section.assertion.label}-${index}`} className="c2pa-menu-section__row">

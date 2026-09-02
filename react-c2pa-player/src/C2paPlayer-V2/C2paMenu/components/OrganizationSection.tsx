@@ -175,7 +175,10 @@ export function OrganizationSection({
           section.organization.leiCode ||
           section.organization.iso6523Code
         ) ? (
-          <details className="c2pa-org-section__collapsible" tabIndex={0}>
+          // No `tabIndex` here: <summary> is already focusable and operable, so
+          // one on the <details> only added a preceding tab stop where Enter
+          // does nothing.
+          <details className="c2pa-org-section__collapsible">
             <summary className="c2pa-org-section__collapsible-summary">Organization Details</summary>
             <OrganizationDetails organization={section.organization} />
           </details>

@@ -90,14 +90,35 @@
   white-space: nowrap;
 }
 
+/* Sized to WCAG 2.2 SC 2.5.8's 24 by 24 CSS pixel minimum. At `padding: 0
+   0.35rem` on a 1.2em glyph this was about 12 by 18, which is a small target
+   for the only control that closes the panel. */
 .video-js .c2pa-debug-console__close {
-  padding: 0 0.35rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  min-height: 24px;
+  padding: 0;
   border: 0;
+  border-radius: 0.2rem;
   background: none;
   color: inherit;
   font-size: 1.2em;
   line-height: 1;
   cursor: pointer;
+}
+
+/* The panel takes focus when it opens, so it must not draw a ring as though it
+   were tabbed to; its controls must. */
+.video-js .c2pa-debug-console:focus {
+  outline: none;
+}
+
+.video-js .c2pa-debug-console__close:focus-visible,
+.video-js .c2pa-debug-console__filter input:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
 }
 
 .video-js .c2pa-debug-console__empty {

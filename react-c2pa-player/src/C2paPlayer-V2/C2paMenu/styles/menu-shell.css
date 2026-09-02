@@ -90,6 +90,15 @@
   box-shadow: none;
 }
 
+/* Focused programmatically when the panel opens, so a screen reader announces
+   it and the next Tab starts inside it rather than back at the control bar.
+   No `:focus-visible` ring: that belongs on the controls a user tabs to, not on
+   a container that took focus on their behalf. The panel stays
+   `tabindex="-1"`, so it never enters the tab order. */
+.video-js .c2pa-player-menu-overlay .vjs-menu .c2pa-menu-panel:focus {
+  outline: none;
+}
+
 .video-js .c2pa-player-menu-overlay .vjs-menu .c2pa-menu-panel {
   position: relative;
   margin-left: var(--c2pa-menu-panel-offset-x, 0);

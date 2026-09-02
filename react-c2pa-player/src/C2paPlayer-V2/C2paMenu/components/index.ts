@@ -27,6 +27,7 @@ export {
   MenuField,
   MenuHeader,
   NoManifestState,
+  SectionToggle,
   ValidationBadge,
   WebsiteLink,
 } from './shared';

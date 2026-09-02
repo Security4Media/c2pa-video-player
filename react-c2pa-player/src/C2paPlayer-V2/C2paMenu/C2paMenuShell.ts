@@ -74,15 +74,12 @@ const MenuItem = videojs.getComponent('MenuItem') as unknown as MenuItemConstruc
  * other menu buttons.
  */
 class C2PAMenuButton extends MenuButton {
-    closeC2paMenu = false;
-
     createItems() {
         return [createHiddenPlaceholderItem(MenuItem, this.player_)];
     }
 
     handleClick() {
         if (this.buttonPressed_) {
-            this.closeC2paMenu = true;
             this.unpressButton?.();
         } else {
             handleMenuOpened();
@@ -98,11 +95,38 @@ class C2PAMenuButton extends MenuButton {
         return;
     }
 
+    /**
+     * Closes the React panel whenever video.js closes the popup, from wherever
+     * that came.
+     *
+     * This override used to return early unless a flag set by `handleClick`
+     * was present, which made clicking the button the *only* way to close the
+     * menu. Read against video.js 8.23.7, `unpressButton` is what sets
+     * `buttonPressed_ = false`, hides the menu and writes
+     * `aria-expanded="false"`, and it is called from `handleKeyDown` (Escape
+     * and Tab), `handleSubmenuKeyDown`, `Menu.handleBlur` (click outside),
+     * `Menu.handleTapClick` and `disable()`. Every one of those was discarded,
+     * so a keyboard user could open the panel and never dismiss it, and it sat
+     * over the video reporting `aria-expanded="true"` for the rest of the
+     * session.
+     *
+     * The guard the flag was reaching for is simply "was it open": that is what
+     * stops a redundant close from bumping the menu's reset token and
+     * collapsing a segment detail view the viewer is reading.
+     *
+     * `super` runs first so video.js has settled its own press state before
+     * React is told. Note `super.unpressButton()` is itself gated on
+     * `enabled_`, so a disabled button keeps `buttonPressed_` true while the
+     * panel closes; that is the right way round, since a panel belonging to a
+     * button nobody can press should not stay on screen.
+     */
     unpressButton() {
-        if (this.closeC2paMenu) {
-            this.closeC2paMenu = false;
+        const wasPressed = this.buttonPressed_;
+
+        super.unpressButton?.();
+
+        if (wasPressed) {
             handleMenuClosed();
-            super.unpressButton?.();
         }
     }
 

@@ -66,21 +66,36 @@
   margin-left: 0.5rem;
 }
 
+/* A `<button>` when the ingredient actually toggles, a `<div>` when it is a
+   forced-expanded top-level one (see HistorySection), so this rule has to
+   neutralise the browser's button styling and read the same either way. */
 .vjs-menu li.vjs-menu-item .c2pa-history-section__ingredient-header {
   display: flex;
   align-items: center;
   justify-content: flex-start;
   gap: 0.75rem;
   cursor: pointer;
+  appearance: none;
+  width: 100%;
   padding: 0.5rem;
   margin: -0.5rem;
   margin-left: -0.75rem;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
   border-radius: 0.4rem;
   transition: background-color 0.2s ease;
 }
 
 .vjs-menu li.vjs-menu-item .c2pa-history-section__ingredient-header:hover {
   background-color: rgba(255, 255, 255, 0.1);
+}
+
+.vjs-menu li.vjs-menu-item .c2pa-history-section__ingredient-header:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 1px;
 }
 
 .vjs-menu li.vjs-menu-item .c2pa-history-section__ingredient-header .itemName {
@@ -109,18 +124,24 @@
   transform: rotate(90deg);
 }
 
+/* Same reasoning as `.c2pa-menu-section__content`: collapsed means gone from
+   the accessibility tree too, not merely transparent. */
 .vjs-menu li.vjs-menu-item .c2pa-history-section__ingredient-panel {
   display: grid;
   grid-template-rows: 0fr;
   opacity: 0;
+  visibility: hidden;
   transition:
     grid-template-rows 0.24s ease,
-    opacity 0.2s ease;
+    opacity 0.2s ease,
+    visibility 0s linear 0.24s;
 }
 
 .vjs-menu li.vjs-menu-item .c2pa-history-section__ingredient-panel.expanded {
   grid-template-rows: 1fr;
   opacity: 1;
+  visibility: visible;
+  transition-delay: 0s;
 }
 
 .vjs-menu li.vjs-menu-item .c2pa-history-section__ingredient-panel-inner {
