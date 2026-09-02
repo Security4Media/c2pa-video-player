@@ -54,6 +54,7 @@ export class DashFragmentedFmp4Adapter implements MediaValidationAdapter {
       new DashBridgeRuntime(context),
       context.videoElement,
       context.policy.liveRetentionSeconds,
+      context.policy.enforceValidatedPlayback,
     );
   }
 }

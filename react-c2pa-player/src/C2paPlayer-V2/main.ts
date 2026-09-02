@@ -40,6 +40,10 @@ import {
 import { getTimelineFunctions } from './C2paTimeline/C2paTimelineFunctions';
 import { createTimelinePreview } from './C2paTimeline/C2paTimelinePreview';
 import { decideLiveResume } from './C2paTimeline/liveResume';
+import {
+    decideValidatedPlayback,
+    newestVerdictEnd,
+} from './C2paTimeline/validatedPlaybackGate';
 
 interface TimelineComponentLike {
     el(): HTMLElement;
@@ -103,6 +107,9 @@ export const C2PAPlayer = function (
     // `timeShiftBufferDepth`, as the manifest declares it. Sizes the bar and
     // decides whether a paused position still exists at the origin.
     let dvrWindowSeconds: number | null = null;
+    // True while playback is being held because the playhead reached content
+    // with no verdict yet, so it can be released when one arrives.
+    let heldForValidation = false;
     // When the stream was paused, so resuming can tell whether the position it
     // was left at still exists at the origin.
     let pausedAtEpochMs: number | null = null;
@@ -154,6 +161,54 @@ export const C2PAPlayer = function (
      * seekable. Resuming from it does not fail visibly - it hangs. Measured:
      * resuming after 25s paused on a 30s window never recovered.
      */
+    /**
+     * Holds the picture rather than show a segment no verdict covers.
+     *
+     * The DASH plugin validates after handing bytes to the player, so without
+     * this the picture runs ahead of the checking. Pausing is the only lever
+     * available - the bytes are already in the buffer by then.
+     *
+     * The hold is announced rather than silent: a player that simply stops
+     * looks broken, and if validation has stopped for good this will not
+     * release on its own. `?gate=off` is the way out.
+     */
+    const enforceValidatedPlayback = function (
+        snapshot: ValidationStatusSnapshot | null,
+        currentTime: number,
+        isLive: boolean,
+    ) {
+        const decision = decideValidatedPlayback({
+            isLive,
+            enforce: snapshot?.enforceValidatedPlayback !== false,
+            currentTime,
+            newestVerdictEnd: newestVerdictEnd(snapshot?.timelineSegments),
+        });
+
+        if (decision.hold) {
+            if (!heldForValidation) {
+                heldForValidation = true;
+                console.warn(
+                    '[C2PA] Holding playback: the playhead has reached content with no verdict yet. ' +
+                        'Add ?gate=off to play unvalidated content.',
+                );
+            }
+
+            if (!videoElement.paused) {
+                videoElement.pause();
+            }
+
+            return;
+        }
+
+        if (heldForValidation) {
+            heldForValidation = false;
+            void videoElement.play().catch(() => {
+                // The viewer may have paused deliberately while we were
+                // holding; not resuming is the right outcome then.
+            });
+        }
+    };
+
     const rejoinLiveIfPositionIsGone = function () {
         const pausedFor = pausedAtEpochMs === null ? 0 : (Date.now() - pausedAtEpochMs) / 1000;
         pausedAtEpochMs = null;
@@ -364,6 +419,8 @@ export const C2PAPlayer = function (
                     isManifestInvalid,
                 );
             }
+
+            enforceValidatedPlayback(snapshot, currentTime, isLive);
 
             lastPlaybackTime = currentTime;
         },

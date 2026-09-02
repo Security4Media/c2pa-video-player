@@ -445,6 +445,11 @@ export class DashBridgeRuntime {
     player: DashMediaPlayerLike,
     createPipeline: typeof import('@qualabs/c2pa-live-dashjs-plugin').createC2paPipeline,
   ): void {
+    // TEMP EXPERIMENT: is the metadata pipeline starving the buffer?
+    if (!new URLSearchParams(window.location.search).has('metadata')) {
+      return;
+    }
+
     const addInterceptor = (player as unknown as DashjsPlayer).addResponseInterceptor;
 
     if (typeof addInterceptor !== 'function') {

@@ -78,3 +78,21 @@ export function resolveLiveRetentionSeconds(
 
   return requested;
 }
+
+/**
+ * Reads `?gate=off`, for demonstrating what the player looks like without the
+ * validated-playback gate - and as an escape hatch if a validator that has
+ * stopped is holding the picture.
+ *
+ * Only `off` turns it off; anything else, including a typo, leaves it on. A
+ * switch that fails open on a mistake is the wrong way round for this one.
+ */
+export function resolveEnforceValidatedPlayback(
+  search: string | undefined = typeof window === 'undefined' ? undefined : window.location.search,
+): boolean {
+  if (!search) {
+    return true;
+  }
+
+  return new URLSearchParams(search).get('gate') !== 'off';
+}

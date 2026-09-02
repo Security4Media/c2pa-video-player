@@ -58,6 +58,7 @@ export class DashFragmentedFmp4Session implements ValidationSession {
   readonly #watched = new WatchedTimeline();
   readonly #videoElement: HTMLVideoElement;
   readonly #retentionSeconds: number;
+  readonly #enforceValidatedPlayback: boolean;
   #snapshot: ValidationStatusSnapshot = {
     adapterKind: this.adapterKind,
     result: null,
@@ -69,10 +70,12 @@ export class DashFragmentedFmp4Session implements ValidationSession {
     runtime: DashValidationRuntime,
     videoElement: HTMLVideoElement,
     retentionSeconds: number = DEFAULT_LIVE_RETENTION_SECONDS,
+    enforceValidatedPlayback = true,
   ) {
     this.#runtime = runtime;
     this.#videoElement = videoElement;
     this.#retentionSeconds = retentionSeconds;
+    this.#enforceValidatedPlayback = enforceValidatedPlayback;
   }
 
   async load(): Promise<void> {
@@ -266,6 +269,7 @@ export class DashFragmentedFmp4Session implements ValidationSession {
       // What the origin actually lets anyone seek back to, so the bar can span
       // exactly that rather than a figure of our own choosing.
       dvrWindowSeconds: this.#runtime.getDvrWindowSeconds() ?? undefined,
+      enforceValidatedPlayback: this.#enforceValidatedPlayback,
     };
 
     if (shouldEmit) {

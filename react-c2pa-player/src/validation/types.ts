@@ -76,6 +76,15 @@ export interface ValidationPolicy {
    * cache together, so they cannot disagree about what "recent" means.
    */
   liveRetentionSeconds: number;
+  /**
+   * Whether playback may show a live segment before its verdict exists.
+   *
+   * On by default: the DASH plugin validates after handing bytes to the
+   * player, so without this the picture can run ahead of the checking. Turning
+   * it off restores that, which is worth having as a switch because the gate
+   * stops the picture when validation stops.
+   */
+  enforceValidatedPlayback: boolean;
 }
 
 /**
@@ -177,6 +186,11 @@ export interface ValidationStatusSnapshot {
    * covers exactly what can be reached. `undefined` until the manifest says.
    */
   dvrWindowSeconds?: number;
+  /**
+   * Whether playback must not overtake validation. Carried here so the player
+   * layer reads one snapshot rather than reaching into the policy.
+   */
+  enforceValidatedPlayback?: boolean;
 }
 
 export type ValidationSessionListener = (snapshot: ValidationStatusSnapshot) => void;
