@@ -59,22 +59,22 @@ function OrganizationDetails({ organization }: { organization: OrganizationIdent
   return (
     <div className="c2pa-org-section__details">
       {organization.website ? (
-        <div className="c2pa-org-section__row">
+        <div className="c2pa-menu-section__row">
           <span className="itemName">Website:</span> <WebsiteLink href={organization.website} />
         </div>
       ) : null}
       {organization.identifier ? (
-        <div className="c2pa-org-section__row">
+        <div className="c2pa-menu-section__row">
           <span className="itemName">Identifier:</span> {organization.identifier}
         </div>
       ) : null}
       {organization.leiCode ? (
-        <div className="c2pa-org-section__row">
+        <div className="c2pa-menu-section__row">
           <span className="itemName">LEI:</span> {organization.leiCode}
         </div>
       ) : null}
       {organization.iso6523Code ? (
-        <div className="c2pa-org-section__row">
+        <div className="c2pa-menu-section__row">
           <span className="itemName">ISO 6523:</span> {organization.iso6523Code}
         </div>
       ) : null}
@@ -90,42 +90,42 @@ function IdentityDetails({ itemValue }: { itemValue: CawgOrganizationItem }) {
   return (
     <div className="c2pa-org-section__identity">
       {signedByText ? (
-        <div className="c2pa-org-section__row">
+        <div className="c2pa-menu-section__row">
           {signedByText}
         </div>
       ) : null}
       {itemValue.creativeWork?.datePublished ? (
-        <div className="c2pa-org-section__row">
+        <div className="c2pa-menu-section__row">
           <span className="itemName">Published on :</span> {itemValue.creativeWork.datePublished}
         </div>
       ) : null}
       {itemValue.creativeWork?.license ? (
-        <div className="c2pa-org-section__row">
+        <div className="c2pa-menu-section__row">
           <span className="itemName">Under license:</span> <WebsiteLink href={itemValue.creativeWork.license} />
         </div>
       ) : null}
       {itemValue.dublinCore?.title ? (
-        <div className="c2pa-org-section__row">
+        <div className="c2pa-menu-section__row">
           <span className="itemName">Title:</span> {itemValue.dublinCore.title}
         </div>
       ) : null}
       {itemValue.dublinCore?.publisher ? (
-        <div className="c2pa-org-section__row">
+        <div className="c2pa-menu-section__row">
           <span className="itemName">Publisher:</span> {itemValue.dublinCore.publisher}
         </div>
       ) : null}
       {itemValue.dublinCore?.creator ? (
-        <div className="c2pa-org-section__row">
+        <div className="c2pa-menu-section__row">
           <span className="itemName">Creator:</span> {itemValue.dublinCore.creator}
         </div>
       ) : null}
       {itemValue.dublinCore?.description ? (
-        <div className="c2pa-org-section__row">
+        <div className="c2pa-menu-section__row">
           <span className="itemName">Description:</span> {itemValue.dublinCore.description}
         </div>
       ) : null}
       {itemValue.dublinCore?.rights ? (
-        <div className="c2pa-org-section__row">
+        <div className="c2pa-menu-section__row">
           <span className="itemName">Rights:</span> {itemValue.dublinCore.rights}
         </div>
       ) : null}
@@ -146,9 +146,9 @@ export function OrganizationSection({
 
   return (
     <li className="vjs-menu-item">
-      <div className="c2pa-org-section">
-        <div className="c2pa-org-section__header">
-          <span className="itemName c2pa-org-section__title">{title}</span>
+      <div className="c2pa-menu-section c2pa-org-section">
+        <div className="c2pa-menu-section__header">
+          <span className="itemName c2pa-menu-section__title">{title}</span>
           {validationIndicator ? (
             <span
               className="c2pa-org-section__status"

@@ -14,25 +14,28 @@
  * limitations under the License.
  */
 
-/* Organization section */
-
-.vjs-menu li.vjs-menu-item .c2pa-org-section {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-  width: 100%;
-}
-
-.vjs-menu li.vjs-menu-item .c2pa-org-section__header {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  margin-bottom: 0.25rem;
-}
-
-.vjs-menu li.vjs-menu-item .c2pa-org-section__title {
-  padding-bottom: 0;
-}
+/* Organization section.
+ *
+ * Only what is genuinely specific to it. This sheet used to re-declare the
+ * shared section primitives under `c2pa-org-section*` names, and every other
+ * section emits `c2pa-menu-section c2pa-<name>-section` and adds only its own
+ * rules. Being the exception cost this section three things, all silently:
+ *
+ *  - its heading fell through to `.itemName`'s orange instead of the
+ *    `#7db4ff` every other section heading uses, which is why Organization
+ *    Identity was the one orange heading in the panel;
+ *  - the wrapper and rows lost `min-width: 0`, which is what lets a flex item
+ *    shrink below its content rather than push its parent wider.
+ *
+ * The `min-width` divergence is a robustness fix rather than a demonstrated
+ * bug, and worth being exact about: measured with 240 unbroken characters in
+ * `dc:title`, `dc:publisher` and `dc:rights`, the old rules did *not* overflow.
+ * `overflow-wrap: anywhere` is inherited from `.vjs-menu li.vjs-menu-item`
+ * (menu-shell.css), which reduces the min-content width to one character, so
+ * `min-width: auto` had nothing to hold open. Restored because the section
+ * should not depend on an ancestor for a protection its shared twin states
+ * outright, not because anything was visibly broken. The orange heading was
+ * visibly broken. */
 
 .vjs-menu li.vjs-menu-item .c2pa-org-section__status {
   margin-left: auto;
@@ -66,13 +69,4 @@
   line-height: 1.4;
 }
 
-.vjs-menu li.vjs-menu-item .c2pa-org-section__row {
-  line-height: 1.4;
-  width: auto;
-  max-width: 100%;
-}
 
-.vjs-menu li.vjs-menu-item .c2pa-org-section__row .itemName {
-  padding-bottom: 0;
-  padding-right: 0.25rem;
-}
