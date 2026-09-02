@@ -166,6 +166,29 @@ console.log('\nOperating the panel');
     };
   });
 
+  // Moving focus into the panel is what made this necessary. Video.js erases
+  // the background of anything focused-but-not-focus-visible inside a
+  // `.vjs-menu` (video-js.css:801), to stop a script-focused menu item looking
+  // selected - and this panel is inside a `.vjs-menu`. The first version of
+  // the focus change therefore made the whole panel transparent, and every
+  // keyboard check here still passed, because none of them looked at whether
+  // the thing being focused was still visible.
+  const paint = await page.evaluate(() => {
+    const panel = document.querySelector('.c2pa-menu-panel');
+    const style = panel ? getComputedStyle(panel) : null;
+    return {
+      focused: document.activeElement === panel,
+      backgroundImage: style?.backgroundImage ?? null,
+      backgroundColor: style?.backgroundColor ?? null,
+    };
+  });
+
+  check(
+    'the panel is still painted while focused',
+    paint.backgroundImage !== 'none' || paint.backgroundColor !== 'rgba(0, 0, 0, 0)',
+    `focused=${paint.focused} background-image=${String(paint.backgroundImage).slice(0, 32)}`,
+  );
+
   check('the panel exposes at least one focusable control', controls.focusableCount > 0, `${controls.focusableCount}`);
   check(
     'every collapsible is a real button',
@@ -306,6 +329,7 @@ console.log('\nThe validation log');
         open: panel !== null,
         focused: panel !== null && document.activeElement === panel,
         role: panel?.getAttribute('role') ?? null,
+        background: getComputedStyle(panel ?? document.body).backgroundColor,
         closeSize: (() => {
           const close = panel?.querySelector('.c2pa-debug-console__close');
           if (!close) return null;
@@ -316,6 +340,14 @@ console.log('\nThe validation log');
     });
     check('Enter opens the log', opened.open);
     check('and focus moves into it', opened.focused);
+    // The log sits outside `.vjs-menu`, so video.js's focus-highlight rule
+    // cannot reach it. Asserted rather than assumed, since it is the same
+    // hazard that made the menu panel transparent.
+    check(
+      'and is still painted while focused',
+      opened.background !== 'rgba(0, 0, 0, 0)',
+      String(opened.background),
+    );
     check('it does not claim to be a modal dialog', opened.role !== 'dialog', String(opened.role));
     check(
       'its close button meets the 24px minimum target',

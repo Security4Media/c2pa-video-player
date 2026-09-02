@@ -90,13 +90,36 @@
   box-shadow: none;
 }
 
-/* Focused programmatically when the panel opens, so a screen reader announces
-   it and the next Tab starts inside it rather than back at the control bar.
-   No `:focus-visible` ring: that belongs on the controls a user tabs to, not on
-   a container that took focus on their behalf. The panel stays
-   `tabindex="-1"`, so it never enters the tab order. */
+/* The panel is focused programmatically when it opens, so a screen reader
+   announces it and the next Tab starts inside it rather than back at the
+   control bar. Two consequences have to be handled here.
+ *
+ * No focus ring: that belongs on the controls a user tabs to, not on a
+ * container that took focus on their behalf. The panel is `tabindex="-1"`, so
+ * it never enters the tab order at all.
+ *
+ * And the background has to be restated. Video.js erases the background of
+ * anything focused-but-not-focus-visible inside a `.vjs-menu`, to stop a menu
+ * item focused by script from looking selected:
+ *
+ *     .video-js .vjs-menu *:not(.vjs-selected):focus:not(:focus-visible),
+ *     .js-focus-visible .vjs-menu *:not(.vjs-selected):focus:not(.focus-visible) {
+ *       background: none;
+ *     }                                              (video-js.css:801-804)
+ *
+ * Our panel lives inside a `.vjs-menu`, so the moment it is focused that rule
+ * matches it and the whole panel goes transparent. Video.js's selector is five
+ * compound selectors against the base rule's four, so it wins on specificity;
+ * this one is six and restores the paint for exactly that state.
+ *
+ * The `:focus-visible` case needs no help: video.js's rule excludes it, so a
+ * panel focused after a keyboard interaction keeps the base rule's background. */
 .video-js .c2pa-player-menu-overlay .vjs-menu .c2pa-menu-panel:focus {
   outline: none;
+}
+
+.video-js .c2pa-player-menu-overlay .vjs-menu .c2pa-menu-panel:focus:not(:focus-visible) {
+  background: var(--c2pa-menu-panel-background);
 }
 
 .video-js .c2pa-player-menu-overlay .vjs-menu .c2pa-menu-panel {
@@ -114,7 +137,14 @@
   justify-content: flex-start;
   margin: 0;
   padding: 0;
-  background: linear-gradient(135deg, rgba(14, 65, 148, 0.85) 0%, rgba(10, 46, 106, 0.90) 100%);
+  /* Held in a custom property because the focus rule below has to restate it,
+     and two copies of one gradient would drift. */
+  --c2pa-menu-panel-background: linear-gradient(
+    135deg,
+    rgba(14, 65, 148, 0.85) 0%,
+    rgba(10, 46, 106, 0.9) 100%
+  );
+  background: var(--c2pa-menu-panel-background);
   border: 0.3rem solid #1256c2;
   border-radius: 1rem;
   box-sizing: border-box;
