@@ -1,0 +1,174 @@
+/*
+ * Copyright 2026 European Broadcasting Union
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+/* The validation log.
+ *
+ * Deliberately looks like a log rather than like the Content Credentials menu:
+ * monospaced, dense, plain. The two panels answer different questions and are
+ * for different people, and making this one look like the other would invite
+ * reading engine output as something a viewer is meant to act on. */
+
+/* The button that opens it.
+ *
+ * Its icon is a background image rather than an icon-font glyph. Video.js
+ * ships two icon mechanisms (a font and an SVG sprite) and which one is live
+ * depends on build options; a self-contained data URI depends on neither, and
+ * this is the reason the playhead handle is drawn the same way. */
+.video-js .vjs-control-bar .c2pa-debug-button > .vjs-icon-placeholder::before {
+  content: '';
+  display: block;
+  width: 100%;
+  height: 100%;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M4 6h16M4 12h11M4 18h14'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 1.5em;
+}
+
+.video-js .c2pa-debug-console {
+  position: absolute;
+  right: 0.75rem;
+  bottom: 5.25em;
+  z-index: 5;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  width: min(46rem, calc(100% - 1.5rem));
+  max-height: min(60%, 24rem);
+  border: 1px solid var(--color-overlay-border);
+  border-radius: var(--radius-sm);
+  background: rgba(8, 12, 22, 0.94);
+  box-shadow: var(--shadow-lg);
+  /* Reset from the control bar's 1.2em, so the panel is sized against the page
+     rather than against whatever the control bar happens to be scaled to. */
+  font-size: 0.72rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(0.35rem);
+}
+
+.video-js .c2pa-debug-console__head {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex: 0 0 auto;
+  padding: 0.5rem 0.7rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.video-js .c2pa-debug-console__title {
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.02em;
+}
+
+.video-js .c2pa-debug-console__count {
+  /* Pushes the controls to the right without a spacer element. */
+  margin-right: auto;
+  opacity: 0.65;
+}
+
+.video-js .c2pa-debug-console__filter {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.video-js .c2pa-debug-console__close {
+  padding: 0 0.35rem;
+  border: 0;
+  background: none;
+  color: inherit;
+  font-size: 1.2em;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.video-js .c2pa-debug-console__empty {
+  margin: 0;
+  padding: 1rem 0.7rem;
+  opacity: 0.65;
+}
+
+.video-js .c2pa-debug-console__rows {
+  flex: 1 1 auto;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+/* The column geometry, shared by the header and the rows so the two line up.
+ *
+ * Its own class rather than the header borrowing `__row`: the header is not a
+ * row of the log, and anything selecting `__row` - a test, a script, someone
+ * counting entries in the console - would otherwise pick it up and be off by
+ * one. It was, twice, before this class existed.
+ *
+ * `minmax(0, 1fr)` on the last column, not `1fr`: a long list of error codes
+ * in a track that cannot shrink below its content pushes the whole row wider
+ * than the panel and produces a horizontal scrollbar. */
+.video-js .c2pa-debug-console__grid {
+  display: grid;
+  grid-template-columns: 5.5rem 11rem 6rem 9.5rem minmax(0, 1fr);
+  gap: 0.5rem;
+  padding: 0.2rem 0.7rem;
+  overflow-wrap: anywhere;
+}
+
+.video-js .c2pa-debug-console__row {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.video-js .c2pa-debug-console__row--failure {
+  background: rgba(211, 53, 16, 0.16);
+}
+
+/* Sits outside the scrolling list, so it stays put while the log moves. */
+.video-js .c2pa-debug-console__header {
+  flex: 0 0 auto;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.16);
+  font-weight: var(--font-weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: 0.9em;
+  opacity: 0.55;
+}
+
+.video-js .c2pa-debug-console__at,
+.video-js .c2pa-debug-console__position {
+  opacity: 0.6;
+}
+
+.video-js .c2pa-debug-console__row--failure .c2pa-debug-console__status {
+  color: var(--c2pa-failed);
+  font-weight: var(--font-weight-semibold);
+}
+
+.video-js .c2pa-debug-console__detail {
+  opacity: 0.85;
+}
+
+/* Narrow players cannot carry five columns. Stacked, each row is still one
+   readable unit; five 20%-wide columns would be neither. */
+@media (max-width: 768px) {
+  .video-js .c2pa-debug-console__grid {
+    grid-template-columns: 5.5rem minmax(0, 1fr);
+  }
+}

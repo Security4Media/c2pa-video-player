@@ -78,48 +78,77 @@ export interface C2paMenuRenderState {
     isSegmentView: boolean;
 }
 
-function formatClock(totalSeconds: number) {
-    const wholeSeconds = Math.max(0, Math.floor(totalSeconds));
-
-    return `${String(Math.floor(wholeSeconds / 60)).padStart(2, '0')}:${String(wholeSeconds % 60).padStart(2, '0')}`;
+/** What to call the source in a sentence someone reads. */
+function sourceNoun(isLive: boolean | undefined) {
+    return isLive ? 'livestream' : 'video';
 }
 
 /**
- * Rounds a range outward to whole seconds. C2PA fragments are often shorter
- * than the mm:ss display resolution, so a truthful `[0.02, 0.6]` would read
- * as "00:00-00:00"; widening to at least one second keeps it legible and
- * never understates the affected region.
+ * What a viewer is told when something failed.
+ *
+ * These used to enumerate. The menu said "The segments between 00:08-00:12,
+ * 00:16-00:20 may have been tampered with", which is an inventory rather than
+ * an answer: it reads as a list of identifiers, it grows unboundedly on a live
+ * stream, and it tells someone asking "can I trust this?" to go and
+ * cross-reference timestamps. The list is engine output and now lives in the
+ * validation log (diagnostics/diagnosticsLog.ts), where someone who wants it
+ * has gone looking for it.
+ *
+ * Three sentences, because there are three genuinely different situations and
+ * a viewer can act differently on each:
+ *
+ *  - something earlier failed, but not what is on screen now;
+ *  - what is on screen now failed;
+ *  - the source's own credentials failed, so nothing in it is vouched for.
  */
-function formatCompromisedRange(startTime: number, endTime: number) {
-    const start = Math.max(0, Math.floor(startTime));
+function buildSomePartsInvalidMessage(isLive: boolean | undefined) {
+    // "Earlier" rather than a time: on a rolling live window the affected
+    // moment may already have scrolled off the bar, and saying which second it
+    // was is exactly the detail that sent people to the log.
+    return isLive
+        ? 'Some earlier parts of this livestream are invalid and may have been tampered with.'
+        : 'Some parts of this video are invalid and may have been tampered with.';
+}
 
-    return `${formatClock(start)}-${formatClock(Math.max(start + 1, Math.ceil(endTime)))}`;
+function buildThisMomentInvalidMessage() {
+    return 'The content credentials of this moment are invalid. The content may have been tampered with.';
+}
+
+function buildWholeSourceInvalidMessage(isLive: boolean | undefined) {
+    return `The content credentials for this ${sourceNoun(isLive)} could not be verified. The content may have been tampered with.`;
 }
 
 /**
- * Ranges are derived from the validation timeline itself rather than from
- * `timeline.compromisedRegions`, which is read back out of the rendered DOM
- * and so reflects whatever the renderer did to the values. Monolithic sources
- * report no per-fragment segments, so they still fall back to it (their
- * "region" is the whole asset).
+ * Whether any part of the timeline failed, wherever the playhead is.
+ *
+ * Read from the timeline segments where the adapter reports them, and from
+ * `timeline.hasInvalidSegments` otherwise - monolithic sources report no
+ * per-fragment segments, so their one verdict covers the whole asset.
  */
-function buildAlertMessage(
+function hasInvalidRegion(
     timeline: C2PATimelineState,
     timelineSegments: C2PAStatus['timelineSegments'],
 ) {
-    const invalidRanges = (timelineSegments ?? [])
-        .filter((segment) => segment.validationState === 'Invalid')
-        .filter((segment) => Number.isFinite(segment.startTime) && Number.isFinite(segment.endTime))
-        .map((segment) => formatCompromisedRange(segment.startTime, segment.endTime));
-    const ranges = invalidRanges.length > 0 ? invalidRanges : timeline.compromisedRegions;
+    return (
+        (timelineSegments ?? []).some((segment) => segment.validationState === 'Invalid') ||
+        timeline.hasInvalidSegments
+    );
+}
 
-    if (ranges.length === 0) {
-        return null;
-    }
-
-    const label = ranges.length === 1 ? 'The segment between' : 'The segments between';
-
-    return `${label} ${[...new Set(ranges)].join(', ')} may have been tampered with`;
+/**
+ * The banner for the live/current view: only ever about somewhere *else*.
+ *
+ * When the playhead itself is inside a failure the menu is in 'invalid' mode
+ * and says so in its own headline, so repeating it here would state the same
+ * thing twice in two different ways.
+ */
+function buildAlertMessage(
+    timeline: C2PATimelineState,
+    c2paStatus: C2PAStatus | null,
+) {
+    return hasInvalidRegion(timeline, c2paStatus?.timelineSegments)
+        ? buildSomePartsInvalidMessage(c2paStatus?.isLive)
+        : null;
 }
 
 function formatSignatureDate(timeValue: string | null) {
@@ -207,12 +236,19 @@ export function buildMenuRenderState(
     // to show alongside the failure - surface only the failure message,
     // for every adapter (monolithic, HLS, DASH, live or VOD) alike.
     if (validationStatus === 'Invalid') {
+        // Which failure this is decides the sentence. The source's own
+        // credentials being broken condemns everything in it; one fragment
+        // failing its hash condemns that moment. Reporting the second as the
+        // first would overstate it, and the first as the second would let a
+        // viewer think the rest of the stream was fine.
         return {
             mode: 'invalid',
             manifestId,
             isSegmentView: false,
             sections: buildInvalidOnlySections(
-                buildAlertMessage(timeline, c2paStatus?.timelineSegments),
+                c2paStatus?.wholeAssetInvalid
+                    ? buildWholeSourceInvalidMessage(c2paStatus?.isLive)
+                    : buildThisMomentInvalidMessage(),
             ),
         };
     }
@@ -226,7 +262,7 @@ export function buildMenuRenderState(
                 issuer: selectSignatureIssuer(activeManifest),
                 issuedOn: formatSignatureDate(selectSignatureTime(activeManifest)),
                 validationStatus: validationStatus ?? 'Unknown',
-                alert: buildAlertMessage(timeline, c2paStatus?.timelineSegments),
+                alert: buildAlertMessage(timeline, c2paStatus),
             },
             claimGenerator: selectClaimGeneratorSection(activeManifest),
             organization: selectOrganizationSection(activeManifest, selectorManifestStore ?? undefined),
@@ -262,10 +298,17 @@ function buildInvalidOnlySections(alert: string | null): C2paMenuSections {
     };
 }
 
+/**
+ * What a clicked fragment says.
+ *
+ * This used to read "Segment integrity: replayed - gap_detected", which is the
+ * engine's vocabulary verbatim: two words a viewer has no way to interpret,
+ * offered in place of the one thing they wanted to know. Both words are still
+ * recorded, in the validation log.
+ */
 function buildSegmentAlertMessage(segment: ValidationTimelineSegment): string | null {
-    if (segment.manifestRef?.kind === 'integrity-only' && segment.manifestRef.integrityStatus !== 'valid') {
-        const { integrityStatus, sequenceReason } = segment.manifestRef;
-        return `Segment integrity: ${integrityStatus}` + (sequenceReason ? ` — ${sequenceReason}` : '');
+    if (segment.validationState === 'Invalid') {
+        return buildThisMomentInvalidMessage();
     }
 
     return null;
@@ -293,7 +336,7 @@ function buildSegmentMenuRenderState(segment: ValidationTimelineSegment): C2paMe
                     issuer: null,
                     issuedOn: null,
                     validationStatus,
-                    alert: alert ?? 'No signed manifest is attached to this segment.',
+                    alert: alert ?? 'No content credentials are attached to this moment.',
                 },
                 claimGenerator: null,
                 organization: null,

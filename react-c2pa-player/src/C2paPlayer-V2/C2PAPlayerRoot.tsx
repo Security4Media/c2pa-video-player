@@ -16,6 +16,7 @@
 
 import { type CSSProperties, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import type { C2PAPlayerRootController } from './C2PAPlayerRoot.types';
+import { C2paDebugConsole } from './C2paDebugConsole/C2paDebugConsole';
 import { C2paFrictionOverlay } from './C2paFrictionModal/C2paFrictionOverlay';
 import { C2paMenuRoot } from './C2paMenu/C2paMenuRoot';
 
@@ -226,6 +227,11 @@ export function C2PAPlayerRoot({
                 isVisible={state.isFrictionOverlayVisible}
                 onWatchAnyway={onWatchAnyway}
             />
+            {/* Mounted only while open, so the log's subscription and its row
+                rendering cost nothing for the viewers who never open it. */}
+            {state.isDebugOpen ? (
+                <C2paDebugConsole onClose={() => controller.setState({ isDebugOpen: false })} />
+            ) : null}
             {isMenuRendered ? (
                 <div className={`c2pa-player-menu-overlay c2pa-player-menu-overlay--${menuRenderPhase}`}>
                     <div className="vjs-menu">

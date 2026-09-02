@@ -25,12 +25,18 @@ import type {
 import { createC2PAStatusFromSnapshot } from '../validation';
 import { initializeC2PAControlBar } from './C2paControlBar/C2paControlBarFunctions';
 import {
+    initializeC2PADebugButton,
+    removeC2PADebugButton,
+    setDebugButtonAvailable,
+} from './C2paDebugConsole/C2paDebugButton';
+import {
     displayFrictionOverlay,
     disposeFrictionOverlay,
     initializeFrictionOverlay,
     updatePlayerRootValidationState,
 } from './C2paFrictionModal/C2paFrictionModalFunctions';
 import {
+    closeDebugConsole,
     disposeC2PAMenu,
     handleMenuOpened,
     initializeC2PAMenu,
@@ -246,6 +252,13 @@ export const C2PAPlayer = function (
         initialize: function () {
             initializeC2PAControlBar(videoPlayer);
             initializeC2PAMenu(videoPlayer);
+            initializeC2PADebugButton(videoPlayer);
+            // Shown only where there is a per-segment record to show. The
+            // capability that decides it is the same one that decides whether
+            // the adapter owns the timeline, which is the honest definition of
+            // "fragmented" here - a monolithic MP4 has one verdict for the
+            // whole asset and would open an empty log.
+            setDebugButtonAvailable(videoPlayer, !useStaticTimelineFallback);
             playerRoot = initializeFrictionOverlay(videoPlayer, setPlaybackStarted);
             setPlayerRootController(playerRoot);
 
@@ -303,6 +316,9 @@ export const C2PAPlayer = function (
 
         dispose: function () {
             disposeC2PAMenu();
+            // Before the root goes: the console is mounted in it, and it must
+            // not be left showing over the next source's player.
+            closeDebugConsole();
             disposeFrictionOverlay(playerRoot);
             timelinePreview.dispose();
             // Before the player is released: the timeline's roll holds the
@@ -312,6 +328,9 @@ export const C2PAPlayer = function (
             try {
                 if (c2paMenu && videoPlayer && videoPlayer.controlBar) {
                     videoPlayer.controlBar.removeChild('C2PAMenuButton');
+                }
+                if (videoPlayer?.controlBar) {
+                    removeC2PADebugButton(videoPlayer);
                 }
                 if (c2paControlBar && videoPlayer?.controlBar?.progressControl) {
                     videoPlayer.controlBar.progressControl.seekBar.removeChild('C2PALoadProgressBar');

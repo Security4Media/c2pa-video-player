@@ -28,6 +28,7 @@ import { normalizeDashSegmentRecord } from '../normalization/dash';
 import type { NormalizedValidationResult, ValidationAdapterContext } from '../types';
 import { retainedSegmentCount } from '../policy/liveRetention';
 import { DashSegmentMetadataReader, segmentNumberFromUrl } from './dashSegmentMetadata';
+import { recordDiagnostic } from '../diagnostics/diagnosticsLog';
 
 type RuntimeListener = EmitterListener<void>;
 
@@ -61,6 +62,29 @@ interface DashMediaPlayerLike {
   off(eventName: string, handler: (event: unknown) => void): void;
   reset(): void;
   isDynamic(): boolean;
+}
+
+/**
+ * The values of `sequenceReason` that are actually anomalies.
+ *
+ * An allow-list rather than a check against 'valid', because the field is not
+ * what its type suggests: the plugin declares it as
+ * `SequenceAnomalyReasonValue`, but on a healthy segment it arrives as
+ * `'valid'` - measured on the live feed, `status: 'valid'`, `errorCodes: []`,
+ * `sequenceReason: 'valid'`. Treating any value as an anomaly therefore marked
+ * every segment in the validation log as a failure, which made the log's
+ * failure filter useless on the one stream it was written for.
+ */
+const SEQUENCE_ANOMALIES: ReadonlySet<string> = new Set([
+  'duplicate',
+  'out_of_order',
+  'gap_detected',
+  'sequence_number_below_minimum',
+]);
+
+/** Exported so the rule above can be checked without a dash.js player. */
+export function isSequenceAnomaly(reason: string | undefined): boolean {
+  return reason !== undefined && SEQUENCE_ANOMALIES.has(reason);
 }
 
 // Fallback used only when a segment's real timing couldn't be correlated
@@ -373,6 +397,31 @@ export class DashBridgeRuntime {
     const startTime = timing?.startTime ?? this.#estimatedTimelineEnd;
     const endTime = timing?.endTime ?? startTime + NOMINAL_SEGMENT_DURATION_SECONDS;
     this.#estimatedTimelineEnd = Math.max(this.#estimatedTimelineEnd, endTime);
+
+    // The engine's own words, for the debug console and nowhere else. What
+    // gets kept for the whole window rather than aged out as routine is
+    // anything an operator would scroll back to find: a failed segment, and a
+    // sequence anomaly - a gap, a duplicate, a segment out of order - which is
+    // not a failure of any one segment but is exactly the kind of thing worth
+    // catching.
+    const anomaly = isSequenceAnomaly(record.sequenceReason)
+      ? record.sequenceReason
+      : undefined;
+
+    recordDiagnostic({
+      severity: result.validationState === 'Invalid' || anomaly ? 'failure' : 'info',
+      engine: 'dash',
+      topic: 'segment',
+      status: record.status,
+      mediaType: record.mediaType,
+      segmentNumber: record.segmentNumber,
+      startTime,
+      endTime,
+      sequenceReason: anomaly,
+      errorCodes:
+        record.errorCodes && record.errorCodes.length > 0 ? [...record.errorCodes] : undefined,
+      quality: record.quality,
+    });
 
     this.#segments.push({ startTime, endTime, result });
     this.#evictStaleSegments();

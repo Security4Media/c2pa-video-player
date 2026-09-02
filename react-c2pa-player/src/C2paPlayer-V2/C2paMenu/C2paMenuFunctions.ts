@@ -21,6 +21,7 @@
  */
 export { initializeC2PAMenu } from './C2paMenuShell';
 export {
+    closeDebugConsole,
     disposeC2PAMenu,
     handleMenuOpened,
     setPlayerRootController,

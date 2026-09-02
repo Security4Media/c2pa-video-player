@@ -16,6 +16,7 @@
 
 import { Emitter } from './emitter';
 import { createUnknownResult } from './normalization';
+import { clearDiagnostics, setDiagnosticsRetention } from './diagnostics/diagnosticsLog';
 import { DEFAULT_LIVE_RETENTION_SECONDS } from './policy/liveRetention';
 import type { DashValidationRuntime } from './runtimes/contracts';
 import type { DashSegmentEntry } from './runtimes/dashBridgeRuntime';
@@ -70,6 +71,11 @@ export class DashFragmentedFmp4Session implements ValidationSession {
   }
 
   async load(): Promise<void> {
+    // One stream's log must never show under another's, and the console keeps
+    // what the bar shows rather than a window of its own.
+    clearDiagnostics();
+    setDiagnosticsRetention(this.#retentionSeconds);
+
     this.#unsubscribeRuntime = this.#runtime.subscribe(() => {
       this.#drainNewSegments();
       this.#rebuildSnapshot(this.#lastPlaybackTime, true);

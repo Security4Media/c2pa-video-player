@@ -14,11 +14,13 @@
  * limitations under the License.
  */
 
+import { clearDiagnostics, recordDiagnostic, setDiagnosticsRetention } from './diagnostics/diagnosticsLog';
 import { Emitter } from './emitter';
 import { condemnsWholeAsset } from './evidence';
 import { DEFAULT_LIVE_RETENTION_SECONDS } from './policy/liveRetention';
 import { createUnknownResult, normalizeHlsManifestHelper } from './normalization';
 import type { HlsValidationRuntime } from './runtimes/contracts';
+import type { FragmentVerdict } from './runtimes/hlsBridgeRuntime';
 import {
   FragmentedTimelineProjector,
   isActuallyPlaying,
@@ -75,6 +77,11 @@ export class HlsFragmentedFmp4Session implements ValidationSession {
   }
 
   async load(): Promise<void> {
+    // One stream's log must never show under another's, and the console keeps
+    // what the bar shows rather than a window of its own.
+    clearDiagnostics();
+    setDiagnosticsRetention(this.#retentionSeconds);
+
     this.#unsubscribeRuntime = this.#runtime.subscribe(() => {
       this.#rebuildSnapshot(this.#lastPlaybackTime, true);
     });
@@ -165,7 +172,11 @@ export class HlsFragmentedFmp4Session implements ValidationSession {
    * upsert being idempotent for an unchanged region.
    */
   #observeReadRegions(currentManifestSource: ManifestSource | undefined): void {
-    const regions = selectReadRegions(this.#runtime.getFragmentVerdicts(), this.#watched);
+    const verdicts = this.#runtime.getFragmentVerdicts();
+
+    this.#logFragmentVerdicts(verdicts);
+
+    const regions = selectReadRegions(verdicts, this.#watched);
     const seen = new Set<string>();
 
     regions.forEach((region) => {
@@ -193,6 +204,38 @@ export class HlsFragmentedFmp4Session implements ValidationSession {
     });
 
     this.#observedFragmentKeys = seen;
+  }
+
+  /**
+   * Records each fragment's verdict for the debug console.
+   *
+   * Logged from every verdict rather than from the read regions below: a
+   * fragment that failed matters whether or not anyone watched it, and the
+   * console is where an operator goes to find out that something failed at all.
+   *
+   * The bridge is polled, not pushed - this runs on every rebuild, several
+   * times a second, re-reporting every fragment - so each row carries a key.
+   * The verdict is part of that key, so a fragment whose verdict is later
+   * upgraded logs the change rather than being silently swallowed as a
+   * duplicate.
+   */
+  #logFragmentVerdicts(verdicts: readonly FragmentVerdict[]): void {
+    verdicts.forEach((verdict) => {
+      recordDiagnostic({
+        key: `hls:${verdict.index}:${verdict.startTime.toFixed(3)}:${verdict.validationState}`,
+        severity: verdict.validationState === 'Invalid' ? 'failure' : 'info',
+        engine: 'hls',
+        topic: 'fragment',
+        status: verdict.validationState,
+        segmentNumber: verdict.index,
+        startTime: verdict.startTime,
+        endTime: verdict.endTime,
+        // The bridge reports no error codes of its own. The scope is what it
+        // does know, and it is the difference between one bad fragment and a
+        // broken stream.
+        scope: verdict.failureScope ?? undefined,
+      });
+    });
   }
 
   /**

@@ -101,16 +101,26 @@ export function NoManifestState() {
   );
 }
 
-export function InvalidState() {
+/**
+ * The failure headline.
+ *
+ * The message is passed in rather than fixed here. It used to be fixed, and
+ * the view model's own sentence was then rendered *underneath* it as a second
+ * alert - so a viewer got the same news twice, in two different wordings, one
+ * of which enumerated segment ranges. Which failure it is decides what the
+ * sentence should say (this moment, or the whole source), and only the view
+ * model knows that.
+ */
+export function InvalidState({ message }: { message?: string | null }) {
   return (
     <li className="vjs-menu-item validation-padding" data-testid="c2pa-invalid-state">
-      <div className="alert-div">
+      <div className="alert-div alert-div--failure">
+        <img className="alert-icon" alt="" />
         <div>
-          <strong>Content Credentials are Invalid</strong>
-          <br />
-          The content credentials for this video could not be verified
-          <br />
-          and may have been tampered with.
+          <strong className="alert-div__headline">Content Credentials are invalid</strong>
+          <span className="alert-div__body">
+            {message ?? 'The content may have been tampered with.'}
+          </span>
         </div>
       </div>
     </li>

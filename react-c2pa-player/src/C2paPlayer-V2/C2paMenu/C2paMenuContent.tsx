@@ -154,14 +154,19 @@ export function C2paMenuContent({
     <div className="c2pa-menu-panel">
       <MenuHeader title={headerTitle} leadingAction={headerAction} />
       <ul className="vjs-menu-content c2pa-menu-content-list" role="menu">
-        {mode === 'invalid' ? <InvalidState /> : null}
         {/* Whatever went wrong leads the menu. It used to trail the summary's
             issuer and date, which buried the one line saying something is
             wrong under provenance detail that only matters once nothing is.
-            In 'invalid' mode it follows the headline block, which states the
-            failure in general terms, and adds which part of the timeline it
-            affects. */}
-        {sections.summary.alert ? <AlertItem itemValue={sections.summary.alert} /> : null}
+
+            One block, not two. In 'invalid' mode the headline carries the
+            message; the separate alert below is for the other case, where the
+            playhead is somewhere valid but part of the timeline is not. Both
+            used to render together, which said the same thing twice. */}
+        {mode === 'invalid' ? (
+          <InvalidState message={sections.summary.alert} />
+        ) : sections.summary.alert ? (
+          <AlertItem itemValue={sections.summary.alert} />
+        ) : null}
         <SummarySection section={sections.summary} sectionTitles={sectionTitles} />
         {sections.claimGenerator ? (
           <ClaimGeneratorSection

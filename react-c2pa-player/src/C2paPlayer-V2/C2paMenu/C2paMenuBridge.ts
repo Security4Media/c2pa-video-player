@@ -142,6 +142,23 @@ export function handleMenuOpened() {
 }
 
 /**
+ * Show or hide the validation log.
+ *
+ * Lives here rather than in the button because this is where the player
+ * root's controller reference is held; the button is a video.js component and
+ * knows nothing about React.
+ */
+export function toggleDebugConsole() {
+    const isOpen = playerRootController?.getState().isDebugOpen ?? false;
+
+    playerRootController?.setState({ isDebugOpen: !isOpen });
+}
+
+export function closeDebugConsole() {
+    playerRootController?.setState({ isDebugOpen: false });
+}
+
+/**
  * Mark the menu as closed and bump the reset token so React-only UI
  * state is reset the next time the popup opens.
  */

@@ -39,6 +39,7 @@ function createInitialPlayerRootState(): C2PAPlayerRootState {
     return {
         isFrictionOverlayVisible: false,
         isMenuOpen: false,
+        isDebugOpen: false,
         c2paStatus: null,
         timeline: {
             currentTime: 0,

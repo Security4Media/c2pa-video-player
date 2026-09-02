@@ -21,6 +21,7 @@
    depend on some other file having pulled them in first. */
 @import './design-tokens.css';
 @import '../C2paPlayer-V2/C2paMenu/styles/index.css';
+@import '../C2paPlayer-V2/C2paDebugConsole/styles/debug-console.css';
 
 /* Keyframe animation for menu list border - cycles through EBU blue variations */
 @keyframes ebu-blue-border-pulse {

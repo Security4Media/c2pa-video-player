@@ -23,7 +23,7 @@ export function createC2PAStatusFromResult(
   result: NormalizedC2PAResult,
   metadata: Pick<
     C2PAStatus,
-    'adapterKind' | 'timelineSegments' | 'message' | 'wholeAssetInvalid'
+    'adapterKind' | 'timelineSegments' | 'message' | 'wholeAssetInvalid' | 'isLive'
   > = {}
 ): C2PAStatus {
   return {
@@ -47,6 +47,7 @@ export function createC2PAStatusFromSnapshot(
     timelineSegments: snapshot.timelineSegments,
     message: snapshot.message,
     wholeAssetInvalid: snapshot.wholeAssetInvalid,
+    isLive: snapshot.isLive,
   });
 }
 

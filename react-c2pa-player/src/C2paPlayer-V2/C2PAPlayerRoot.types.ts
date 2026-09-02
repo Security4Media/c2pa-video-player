@@ -34,6 +34,12 @@ export interface C2PATimelineState {
 export interface C2PAPlayerRootState {
     isFrictionOverlayVisible: boolean;
     isMenuOpen: boolean;
+    /**
+     * Whether the validation log is showing. Separate from the menu: the two
+     * answer different questions and are opened from different buttons, so
+     * they are not two views of one panel.
+     */
+    isDebugOpen: boolean;
     c2paStatus: C2PAStatus | null;
     timeline: C2PATimelineState;
     menuResetKey: string;
