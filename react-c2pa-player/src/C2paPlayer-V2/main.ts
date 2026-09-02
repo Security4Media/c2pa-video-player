@@ -25,7 +25,7 @@ import type {
     ValidationStatusSnapshot,
     ValidationTimelineSegment,
 } from '../validation';
-import { createC2PAStatusFromSnapshot } from '../validation';
+import { createC2PAStatusFromSnapshot, readDvrDepthSeconds } from '../validation';
 import { initializeC2PAControlBar } from './C2paControlBar/C2paControlBarFunctions';
 import {
     displayFrictionOverlay,
@@ -42,6 +42,7 @@ import {
 } from './C2paMenu/C2paMenuFunctions';
 import { getTimelineFunctions } from './C2paTimeline/C2paTimelineFunctions';
 import { createTimelinePreview } from './C2paTimeline/C2paTimelinePreview';
+import { decideLiveResume } from './C2paTimeline/liveResume';
 
 interface TimelineComponentLike {
     el(): HTMLElement;
@@ -133,7 +134,7 @@ export interface C2PAPlayerInstance {
 
 export const C2PAPlayer = function (
     videoJsPlayer: C2PAVideoJsPlayer,
-    _videoHtml: C2PAPlayerProps['videoElement'],
+    videoElement: C2PAPlayerProps['videoElement'],
     capabilities: AdapterCapabilities,
 ): C2PAPlayerInstance {
     const videoPlayer = videoJsPlayer;
@@ -143,6 +144,10 @@ export const C2PAPlayer = function (
     let c2paControlBar: TimelineComponentLike | null = null;
     let playerRoot: C2PAPlayerRootController | null = null;
     const timelinePreview = createTimelinePreview();
+    let sourceIsLive = false;
+    // When the stream was paused, so resuming can tell whether the position it
+    // was left at still exists at the origin.
+    let pausedAtEpochMs: number | null = null;
 
     // Referenced by name (not called) before playerRoot is assigned below -
     // by the time a user can actually click a segment, initialize() has
@@ -183,6 +188,46 @@ export const C2PAPlayer = function (
         playbackStarted = true;
     };
 
+    /**
+     * Rejoins the live edge when a pause has outlasted what the origin keeps.
+     *
+     * Pausing a live DASH stream stops dash.js entirely, so the position it was
+     * left at is deleted at the origin while the player still believes it is
+     * seekable. Resuming from it does not fail visibly - it hangs. Measured:
+     * resuming after 25s paused on a 30s window never recovered.
+     */
+    const rejoinLiveIfPositionIsGone = function () {
+        const pausedFor = pausedAtEpochMs === null ? 0 : (Date.now() - pausedAtEpochMs) / 1000;
+        pausedAtEpochMs = null;
+
+        const decision = decideLiveResume(
+            sourceIsLive,
+            pausedFor,
+            readDvrDepthSeconds(videoElement),
+        );
+
+        if (!decision.rejoinAtLiveEdge) {
+            return;
+        }
+
+        const seekable = videoElement.seekable;
+
+        if (seekable.length === 0) {
+            return;
+        }
+
+        // A shade inside the edge rather than exactly on it: the very last
+        // moment of the window is the one most likely to be gone by the time
+        // the seek lands.
+        videoElement.currentTime = Math.max(
+            seekable.start(0),
+            seekable.end(seekable.length - 1) - 1,
+        );
+        console.warn(
+            `[C2PA] Rejoined the live edge: paused ${pausedFor.toFixed(0)}s, longer than the stream retains.`,
+        );
+    };
+
     return {
         initialize: function () {
             initializeC2PAControlBar(videoPlayer);
@@ -194,7 +239,13 @@ export const C2PAPlayer = function (
             c2paControlBar = videoPlayer.controlBar.progressControl.seekBar.getChild('C2PALoadProgressBar');
             timelinePreview.attach(videoPlayer.controlBar.progressControl.el());
 
+            videoElement.addEventListener('pause', function () {
+                pausedAtEpochMs = Date.now();
+            });
+
             videoPlayer.on('play', function () {
+                rejoinLiveIfPositionIsGone();
+
                 if (isManifestInvalid && !playbackStarted && playerRoot) {
                     displayFrictionOverlay(playbackStarted, videoPlayer, playerRoot);
                 } else {
@@ -283,6 +334,7 @@ export const C2PAPlayer = function (
             // origins its times are epoch-based, so the timeline positions
             // against a window at the live edge instead of against zero.
             const isLive = Boolean(snapshot?.isLive);
+            sourceIsLive = isLive;
             // The adapter's own retention, so the bar cannot show a stretch
             // whose verdicts have already been pruned behind it.
             const retentionSeconds = snapshot?.liveRetentionSeconds;

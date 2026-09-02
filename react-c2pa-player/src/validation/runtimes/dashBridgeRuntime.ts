@@ -366,6 +366,15 @@ export class DashBridgeRuntime {
       this.#initInvalid = true;
       this.#errorReason = event.error ?? 'DASH init segment C2PA processing failed';
       this.#message = this.#errorReason;
+    } else {
+      // Cleared, not latched. A live stream processes an init segment again on
+      // every rendition change, so one failing init used to condemn the whole
+      // asset - a permanently red bar - for the rest of the session, even once
+      // the stream had recovered. The verdict now tracks the newest init, which
+      // is the one describing the segments currently arriving.
+      this.#initInvalid = false;
+      this.#errorReason = null;
+      this.#message = 'Live DASH C2PA validation active';
     }
 
     this.#emit();

@@ -23,8 +23,8 @@ import {
 } from './liveRetention';
 
 describe('the configured retention', () => {
-  it('defaults to fifteen minutes', () => {
-    expect(DEFAULT_LIVE_RETENTION_SECONDS).toBe(15 * 60);
+  it('defaults to five minutes', () => {
+    expect(DEFAULT_LIVE_RETENTION_SECONDS).toBe(5 * 60);
     expect(resolveLiveRetentionSeconds(undefined)).toBe(DEFAULT_LIVE_RETENTION_SECONDS);
     expect(resolveLiveRetentionSeconds('')).toBe(DEFAULT_LIVE_RETENTION_SECONDS);
   });

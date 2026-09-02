@@ -127,6 +127,16 @@ export interface ValidationTimelineSegment {
   endTime: number;
   validationState: PlayerValidationState;
   pending?: boolean;
+  /**
+   * Validated, but playback has not reached it and it is still playable - so
+   * "checked" is not yet the same claim as "checked and shown to a viewer".
+   * The timeline renders these dimmed. Distinct from `pending`, which means no
+   * verdict has arrived at all.
+   *
+   * Live only: on VOD an unread verdict is simply not shown (see
+   * readRegionGate.ts), and nothing ever ages out of reach.
+   */
+  provisional?: boolean;
   manifestRef?: ManifestSource;
 }
 

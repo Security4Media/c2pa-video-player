@@ -23,8 +23,15 @@
  * are cached. They were four separate constants at three different values (600s
  * in two places, 900s in two others, and a count of 300), so the bar could show
  * a stretch whose verdicts had already been evicted.
+ *
+ * Five minutes rather than fifteen so the bar has usable resolution. The same
+ * window scales the playhead, and a delay only reads as a delay if it moves the
+ * cursor: twelve seconds behind the live edge is 4% of five minutes but 1.3% of
+ * fifteen, which is indistinguishable from being at the edge. It also puts the
+ * seekable DVR window - 30 seconds on the streams tested - at a tenth of the
+ * bar rather than a thirtieth.
  */
-export const DEFAULT_LIVE_RETENTION_SECONDS = 15 * 60;
+export const DEFAULT_LIVE_RETENTION_SECONDS = 5 * 60;
 
 /**
  * The narrowest the live window is allowed to get.

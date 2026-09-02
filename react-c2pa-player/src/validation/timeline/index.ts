@@ -15,6 +15,12 @@
  */
 
 export { FragmentedTimelineProjector } from './fragmentedTimelineProjector';
+export {
+  readDvrDepthSeconds,
+  resolveSettledBefore,
+  selectLiveRegions,
+} from './liveReadState';
+export type { LiveRegion } from './liveReadState';
 export { readRegionKey, selectReadRegions } from './readRegionGate';
 export type { ReadRegion, SegmentVerdict } from './readRegionGate';
 export { isActuallyPlaying, WatchedTimeline } from './watchedTimeline';

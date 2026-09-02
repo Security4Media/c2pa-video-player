@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+import { DEFAULT_LIVE_RETENTION_SECONDS } from '../policy/liveRetention';
 import type {
   ManifestSource,
   PlayerValidationState,
@@ -22,12 +23,14 @@ import type {
 
 // Segments observed more than this far behind the latest-known time are
 // evicted, but only for confirmed-live sources (see `setLiveMode`) - a VOD
-// asset's duration is finite and bounded, so nothing needs to expire. This is
-// the same 600s value as `runtimes/dashBridgeRuntime.ts`'s
-// `SEGMENT_RETENTION_WINDOW_SECONDS`, which bounds a different list (that
-// runtime's own point-lookup segments) - kept as an independent constant here
-// rather than importing across the timeline/ -> runtimes/ boundary.
-const DEFAULT_LIVE_SEGMENT_RETENTION_WINDOW_SECONDS = 15 * 60;
+// asset's duration is finite and bounded, so nothing needs to expire.
+//
+// Only a fallback: every caller passes the retention in force through
+// `setLiveMode`. It used to be a hand-copied constant here, on the grounds of
+// not importing across a module boundary - but the value lives in `policy/`,
+// which imports nothing, and a second copy that drifted from the first is how
+// the bar came to show stretches whose verdicts had already been evicted.
+const DEFAULT_LIVE_SEGMENT_RETENTION_WINDOW_SECONDS = DEFAULT_LIVE_RETENTION_SECONDS;
 
 // Tolerance for treating two segments as touching/contiguous rather than
 // leaving a hairline gap between them, e.g. from floating-point rounding.

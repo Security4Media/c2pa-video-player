@@ -381,6 +381,66 @@
   overflow-wrap: anywhere;
 }
 
+/* Where seeking actually works, on a live bar.
+ *
+ * The bar spans five minutes of validation history; the origin retains far
+ * less - `timeShiftBufferDepth` was 30 seconds on every stream tested - and
+ * content older than that is deleted there, so a click to the left of this
+ * band cannot go where it points and is clamped to the oldest moment still
+ * available. Rather than let that be a surprise, the reachable part is marked.
+ *
+ * `--c2pa-seekable-from` is set per render by publishLiveWindow; the rule does
+ * nothing without it, which is what keeps it off VOD.
+ */
+.video-js.vjs-live .vjs-progress-control .c2pa-timeline-host {
+  background-image: linear-gradient(
+    to right,
+    transparent 0,
+    transparent var(--c2pa-seekable-from, 100%),
+    rgba(255, 255, 255, 0.16) var(--c2pa-seekable-from, 100%),
+    rgba(255, 255, 255, 0.16) 100%
+  );
+}
+
+/* The seconds readout video.js shows while hovering the bar.
+ *
+ * Removed on live, for two reasons. On an epoch-based live timeline it prints
+ * the raw offset - the same arithmetic that put "496762:21" in the control bar
+ * - and even where it reads sensibly it is a second scale on a bar that now has
+ * one, competing with the C2PA preview that appears in the same place and says
+ * considerably more. */
+.video-js.vjs-live .vjs-progress-control .vjs-mouse-display,
+.video-js.vjs-live .vjs-progress-control .vjs-time-tooltip {
+  display: none;
+}
+
+/* Validated, but playback has not reached it yet and still could.
+ *
+ * On a live bar the verdicts arrive in real time, so showing them as they come
+ * is the point of the thing - but "checked" and "checked and shown to a viewer"
+ * are different claims, and the bar has to be able to say which it means. The
+ * dimmed state says the first; full strength says the second.
+ *
+ * A segment leaves this state either because playback reached it, or because it
+ * fell out of the DVR window and can never be played, at which point the
+ * distinction has nothing left to express (see liveReadState.ts).
+ *
+ * Expressed as opacity plus a hatch rather than a lighter colour per verdict:
+ * the four verdict colours already carry meaning, and a fifth and sixth shade
+ * of each would be four more things to tell apart. The hatch also survives
+ * being printed, screenshotted in greyscale, or read by someone who cannot
+ * separate the greens from the reds. */
+.video-js .vjs-progress-control .seekbar-play-c2pa--provisional {
+  opacity: 0.45;
+  background-image: repeating-linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.45) 0,
+    rgba(255, 255, 255, 0.45) 1px,
+    transparent 1px,
+    transparent 4px
+  );
+}
+
 /* Only non-Valid/Trusted segments are inspectable - re-enable pointer events
    for just those so clicking one opens the menu on that fragment, while the
    rest of the seekbar keeps click-to-seek working through the overlay. */
@@ -403,79 +463,67 @@
   display: flex;
 }
 
-/* The live indicator. Video.js supplies the component and hides it unless the
-   player is in live mode, which it detects correctly for this DASH source, so
-   nothing here has to decide when to show it. This gives it the red dot and
-   keeps it legible against the control bar. */
-/* Two rules have to be beaten here, from opposite directions.
-
-   Video.js gives the live control `flex: auto`; left to grow it took 384px of a
-   1084px bar and halved the progress control with it. Hence `flex: 0 0 auto`.
-
-   This file's own blanket `.video-js .vjs-control { width: 4em }` above then
-   pins it to a box narrower than its contents. Four classes here against that
-   rule's two settles it; while the blanket rule still carried `!important`,
-   specificity could not, and the dot below - an empty flex item, so
-   min-content zero - absorbed the whole overflow and rendered at zero width.
-   The pulse ran the entire time, on a box with no size, which is an unusually
-   quiet way to fail.
-
-   Sized in em so the indicator tracks the bar, which is set in em throughout
-   and drops to 3em at the mobile breakpoint. */
-.video-js.vjs-live .vjs-control-bar .vjs-live-control {
-  display: flex;
+/* The LIVE control.
+ *
+ * This is video.js's `seekToLive`, a button, rather than `liveDisplay`, a
+ * label: clicking it returns to the live edge. Video.js hides it unless the
+ * player has `liveui` enabled, so nothing here decides when to show it.
+ *
+ * Video.js already gives its dot the distinction that matters - grey while
+ * playback is behind the edge, red once at it - so the colour is left to
+ * video.js and only the pulse is added, on the at-edge state alone. A pulsing
+ * dot means "this is running now"; a static grey one means "you are watching
+ * back". Pulsing both would say neither.
+ *
+ * Sized in em so the indicator tracks the bar, which is set in em throughout
+ * and drops to 3em at the mobile breakpoint. `flex: 0 0 auto` because video.js
+ * gives the control `flex: none` but this file's blanket
+ * `.video-js .vjs-control { width: 4em }` above would still pin it to a box
+ * narrower than "LIVE" plus a dot; four classes here against that rule's two
+ * settles it. */
+.video-js.vjs-live .vjs-control-bar .vjs-seek-to-live-control {
+  display: inline-flex;
   align-items: center;
   flex: 0 0 auto;
   width: auto;
   padding: 0 0.6em;
-}
-
-.video-js .vjs-control-bar .vjs-live-display {
-  display: flex;
-  align-items: center;
-  gap: 0.5em;
   font-weight: 600;
   letter-spacing: 0.04em;
 }
 
-/* Drawn rather than loaded, so it cannot fail to appear, and pulsing so a
-   stalled stream still reads differently from a running one at a glance.
+.video-js .vjs-control-bar .vjs-seek-to-live-control .vjs-seek-to-live-text {
+  margin-left: 0.4em;
+}
 
-   The pulse is a ring expanding out of the dot rather than the dot fading.
-   At 8px a fade is too small a change to register in peripheral vision, which
-   is where a status light spends its life; an expanding halo reads at a
-   glance and is the convention viewers already know from broadcast. */
-.video-js .vjs-control-bar .vjs-live-display::before {
-  content: '';
-  /* Never shrink: as an empty flex item its min-content is zero, so under any
-     width pressure it is the first thing sacrificed, silently. */
-  flex: 0 0 auto;
-  width: 0.7em;
-  height: 0.7em;
+/* The pulse rides on video.js's own circle glyph rather than a `::before` of
+   ours, so there is one dot rather than two competing for the same 0.7em.
+   `currentColor` keeps video.js's grey/red distinction intact. */
+.video-js .vjs-control-bar .vjs-seek-to-live-control.vjs-at-live-edge .vjs-icon-placeholder,
+.video-js .vjs-control-bar .vjs-seek-to-live-control.vjs-at-live-edge .vjs-svg-icon {
   border-radius: 50%;
-  background-color: var(--c2pa-live-dot);
   animation: c2pa-live-pulse 1.6s ease-out infinite;
 }
 
 @keyframes c2pa-live-pulse {
   0% {
     opacity: 1;
-    box-shadow: 0 0 0 0 color-mix(in srgb, var(--c2pa-live-dot) 75%, transparent);
+    box-shadow: 0 0 0 0 color-mix(in srgb, currentColor 75%, transparent);
   }
   70% {
     opacity: 0.6;
     /* Ring has travelled out and faded; the dot is at its dimmest. */
-    box-shadow: 0 0 0 0.6em color-mix(in srgb, var(--c2pa-live-dot) 0%, transparent);
+    box-shadow: 0 0 0 0.6em color-mix(in srgb, currentColor 0%, transparent);
   }
   100% {
     opacity: 1;
-    box-shadow: 0 0 0 0 color-mix(in srgb, var(--c2pa-live-dot) 0%, transparent);
+    box-shadow: 0 0 0 0 color-mix(in srgb, currentColor 0%, transparent);
   }
 }
 
 /* Honour a reader who has asked for less motion. */
 @media (prefers-reduced-motion: reduce) {
-  .video-js .vjs-control-bar .vjs-live-display::before {
+  .video-js .vjs-control-bar .vjs-seek-to-live-control.vjs-at-live-edge .vjs-icon-placeholder,
+  .video-js .vjs-control-bar .vjs-seek-to-live-control.vjs-at-live-edge .vjs-svg-icon {
     animation: none;
   }
 }

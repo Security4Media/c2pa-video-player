@@ -70,13 +70,27 @@ interface PlaybackFlags {
   paused: boolean;
   seeking: boolean;
   ended: boolean;
+  /**
+   * The DVR range. Only its *width* is read, to decide how far behind the live
+   * edge content stops being playable - measured on a real paused stream, the
+   * range's position freezes entirely, so nothing may depend on it moving.
+   */
+  seekable: { length: number; start(index: number): number; end(index: number): number };
 }
 
 const videoElement = (state: Partial<PlaybackFlags> = {}): PlaybackFlags => ({
   paused: false,
   seeking: false,
   ended: false,
+  seekable: { length: 0, start: () => 0, end: () => 0 },
   ...state,
+});
+
+/** A DVR range `depth` seconds wide, as a live stream advertises. */
+const dvr = (depth: number) => ({
+  length: 1,
+  start: () => 0,
+  end: () => depth,
 });
 
 const segment = (
@@ -111,8 +125,16 @@ describe('DashFragmentedFmp4Session', () => {
   const play = (from: number, to: number, step = 0.25) => {
     for (let time = from; time <= to + 1e-9; time += step) session.getStatusAt(time);
   };
+  const at = (segments: ValidationStatusSnapshot['timelineSegments'], time: number) =>
+    segments.filter((s) => time >= s.startTime && time < s.endTime);
   const coloured = (segments: ValidationStatusSnapshot['timelineSegments'], time: number) =>
-    segments.some((s) => time >= s.startTime && time < s.endTime);
+    at(segments, time).length > 0;
+  /** Shown at full strength: read, or aged beyond reach. */
+  const settled = (segments: ValidationStatusSnapshot['timelineSegments'], time: number) =>
+    at(segments, time).some((s) => !s.provisional);
+  /** Shown dimmed: validated, not yet played, still playable. */
+  const provisional = (segments: ValidationStatusSnapshot['timelineSegments'], time: number) =>
+    at(segments, time).some((s) => s.provisional === true);
 
   describe('what the timeline may show', () => {
     it('shows nothing before playback, however many segments have validated', () => {
@@ -121,24 +143,68 @@ describe('DashFragmentedFmp4Session', () => {
       expect(session.getStatusAt(0).timelineSegments).toHaveLength(0);
     });
 
-    it('shows only what playback has reached, not what downloaded ahead of it', async () => {
-      // Segments arrive on download, which runs well ahead of the playhead.
+    it('distinguishes what playback has reached from what merely downloaded', async () => {
+      // Segments arrive on download, which runs ahead of the playhead. Both are
+      // shown on a live bar - that is the point of a monitor - but only what
+      // was played is shown at full strength.
       runtime.segments = Array.from({ length: 20 }, (_, i) => segment(i * 4, (i + 1) * 4));
       await session.load();
       play(0, 12);
 
       const { timelineSegments } = session.getStatusAt(12);
-      expect(coloured(timelineSegments, 6)).toBe(true);
-      expect(coloured(timelineSegments, 60)).toBe(false);
+      expect(settled(timelineSegments, 6)).toBe(true);
+      expect(provisional(timelineSegments, 6)).toBe(false);
+      expect(provisional(timelineSegments, 60)).toBe(true);
+      expect(settled(timelineSegments, 60)).toBe(false);
     });
 
-    it('colours nothing while the viewer only scrubs', async () => {
+    it('settles nothing while the viewer only scrubs', async () => {
       runtime.segments = Array.from({ length: 10 }, (_, i) => segment(i * 4, (i + 1) * 4));
       await session.load();
       element.paused = true;
       for (let time = 0; time <= 40; time += 0.25) session.getStatusAt(time);
 
-      expect(session.getStatusAt(40).timelineSegments).toHaveLength(0);
+      // Dragging the scrubber across the bar is not watching it, so every
+      // verdict stays provisional however far the playhead was dragged.
+      const { timelineSegments } = session.getStatusAt(40);
+      expect(timelineSegments.length).toBeGreaterThan(0);
+      expect(timelineSegments.every((s) => s.provisional === true)).toBe(true);
+    });
+
+    it('settles a segment once it can no longer be played', async () => {
+      // A 30s DVR: content more than 30s behind the newest segment is gone from
+      // the origin, so it can never be played and its provisional marking has
+      // nothing left to express.
+      element.seekable = dvr(30);
+      runtime.segments = [segment(0, 4), segment(4, 8)];
+      await session.load();
+
+      // Nobody has played any of it, so both start provisional.
+      expect(session.getStatusAt(0).timelineSegments.every((s) => s.provisional)).toBe(true);
+
+      // The stream runs on for a minute without playback. The first segments
+      // fall out of reach and settle at their verdict; the newest stay
+      // provisional, being still playable.
+      for (let i = 2; i < 20; i += 1) runtime.segments.push(segment(i * 4, (i + 1) * 4));
+      runtime.notify();
+
+      const { timelineSegments } = session.getStatusAt(0);
+      const atTime = (t: number) => timelineSegments.filter((x) => t >= x.startTime && t < x.endTime);
+
+      expect(atTime(2).every((x) => !x.provisional)).toBe(true);
+      expect(atTime(2)).not.toHaveLength(0);
+      expect(atTime(78).every((x) => x.provisional === true)).toBe(true);
+    });
+
+    it('settles nothing on age when the source is not live', async () => {
+      // On VOD nothing ever goes out of reach, so an unread verdict stays
+      // unread however long the asset sits there.
+      runtime.live = false;
+      element.seekable = dvr(30);
+      runtime.segments = Array.from({ length: 20 }, (_, i) => segment(i * 4, (i + 1) * 4));
+      await session.load();
+
+      expect(session.getStatusAt(0).timelineSegments.every((s) => s.provisional)).toBe(true);
     });
 
     it('keeps an invalid segment in its own place', async () => {
@@ -260,9 +326,12 @@ describe('DashFragmentedFmp4Session', () => {
       for (let time = 0; time <= 40; time += 0.25) shortWindow.getStatusAt(time);
 
       const shown = shortWindow.getStatusAt(40).timelineSegments;
-      const span = Math.max(...shown.map((x) => x.endTime)) - Math.min(...shown.map((x) => x.startTime));
+      const newest = Math.max(...shown.map((x) => x.endTime));
 
-      expect(span).toBeLessThanOrEqual(60);
+      // Every segment kept ends within the window of the newest one. Stated as
+      // the end rather than the span because a segment straddling the boundary
+      // is kept whole, so the span can exceed the window by up to one segment.
+      expect(Math.min(...shown.map((x) => x.endTime))).toBeGreaterThanOrEqual(newest - 60);
     });
 
     it('leaves live-ness undefined until the manifest says', () => {

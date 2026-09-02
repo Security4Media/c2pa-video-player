@@ -22,14 +22,17 @@ import type { DashSegmentEntry } from './runtimes/dashBridgeRuntime';
 import {
   FragmentedTimelineProjector,
   isActuallyPlaying,
+  readDvrDepthSeconds,
   readRegionKey,
-  selectReadRegions,
+  resolveSettledBefore,
+  selectLiveRegions,
   WatchedTimeline,
 } from './timeline';
 import type {
   ValidationSession,
   ValidationSessionListener,
   ValidationStatusSnapshot,
+  ValidationTimelineSegment,
 } from './types';
 
 
@@ -48,6 +51,11 @@ export class DashFragmentedFmp4Session implements ValidationSession {
   // ahead of the playhead; #observeReadRegions decides what may be shown.
   readonly #knownSegments: DashSegmentEntry[] = [];
   #observedRegionKeys = new Set<string>();
+  /**
+   * Validated but not yet played, and still playable. Rebuilt every tick by
+   * #observeRegions rather than accumulated.
+   */
+  #provisional: ValidationTimelineSegment[] = [];
   readonly #watched = new WatchedTimeline();
   readonly #videoElement: HTMLVideoElement;
   readonly #retentionSeconds: number;
@@ -133,13 +141,20 @@ export class DashFragmentedFmp4Session implements ValidationSession {
   }
 
   /**
-   * Projects the parts of validated segments that playback has actually read,
-   * clipped at the playhead (see selectReadRegions). Skips regions already
-   * projected, so a fully-read segment is observed once while the segment being
-   * watched refreshes as its clipped end advances.
+   * Splits what has validated into settled and provisional, projecting the
+   * settled part and keeping the rest for the snapshot.
+   *
+   * Settled regions go into the projector, which accumulates them as the
+   * permanent record. Provisional ones are recomputed every tick instead of
+   * accumulated: being provisional is a transient property - it ends the moment
+   * playback arrives or the content ages out of reach - so there is nothing
+   * worth remembering, and deriving it fresh means it can never go stale.
+   *
+   * Already-projected regions are skipped, so a settled segment is observed
+   * once while the one being watched refreshes as its clipped end advances.
    */
-  #observeReadRegions(): void {
-    const regions = selectReadRegions(
+  #observeRegions(): void {
+    const regions = selectLiveRegions(
       this.#knownSegments.map((segment) => ({
         startTime: segment.startTime,
         endTime: segment.endTime,
@@ -147,10 +162,24 @@ export class DashFragmentedFmp4Session implements ValidationSession {
         segment,
       })),
       this.#watched,
+      this.#settledBefore(),
     );
     const seen = new Set<string>();
 
+    this.#provisional = [];
+
     regions.forEach((region) => {
+      if (!region.settled) {
+        this.#provisional.push({
+          startTime: region.startTime,
+          endTime: region.endTime,
+          validationState: region.validationState,
+          provisional: true,
+          manifestRef: region.source.segment.result.manifestSource,
+        });
+        return;
+      }
+
       const key = readRegionKey(region);
       seen.add(key);
 
@@ -158,17 +187,44 @@ export class DashFragmentedFmp4Session implements ValidationSession {
         return;
       }
 
-      const { segment } = region.source;
-
       this.#timelineProjector.observe(
         region.endTime,
         region.validationState,
         region.startTime,
-        segment.result.manifestSource,
+        region.source.segment.result.manifestSource,
       );
     });
 
     this.#observedRegionKeys = seen;
+  }
+
+  /**
+   * The time before which content can no longer be played, so a verdict for it
+   * settles whether or not it was read.
+   *
+   * Only for confirmed-live sources: on VOD nothing ages out of reach, and the
+   * read record stays the only rule.
+   */
+  #settledBefore(): number {
+    if (this.#runtime.isLive() !== true) {
+      return Number.NEGATIVE_INFINITY;
+    }
+
+    const depth = readDvrDepthSeconds(this.#videoElement);
+
+    if (depth === null) {
+      return Number.NEGATIVE_INFINITY;
+    }
+
+    // The newest verdict rather than the element's seekable end: while paused,
+    // dash.js freezes the whole seekable range, and this boundary has to keep
+    // moving for a paused player to resolve itself.
+    const liveEdge = this.#knownSegments.reduce(
+      (latest, segment) => Math.max(latest, segment.endTime),
+      Number.NEGATIVE_INFINITY,
+    );
+
+    return resolveSettledBefore(liveEdge, depth);
   }
 
   #rebuildSnapshot(time: number, shouldEmit: boolean): void {
@@ -183,7 +239,7 @@ export class DashFragmentedFmp4Session implements ValidationSession {
     }
 
     this.#watched.observePlayhead(this.#lastPlaybackTime, isActuallyPlaying(this.#videoElement));
-    this.#observeReadRegions();
+    this.#observeRegions();
 
     const lookedUp = this.#runtime.lookup(this.#lastPlaybackTime);
     const result = lookedUp
@@ -195,7 +251,10 @@ export class DashFragmentedFmp4Session implements ValidationSession {
     this.#snapshot = {
       adapterKind: this.adapterKind,
       result,
-      timelineSegments: this.#timelineProjector.snapshot(),
+      // Settled first, provisional after: the timeline paints in order, and a
+      // provisional region only ever abuts settled ones rather than overlapping
+      // them, so the order is presentational rather than load-bearing.
+      timelineSegments: [...this.#timelineProjector.snapshot(), ...this.#provisional],
       message: this.#runtime.getMessage(),
       // Init-segment C2PA processing failed, so the asset's credentials are
       // broken as a whole rather than one segment being bad.

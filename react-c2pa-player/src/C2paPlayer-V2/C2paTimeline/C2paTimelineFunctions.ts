@@ -21,6 +21,7 @@ import {
 import type { C2PATimelineSegmentUpdate, ValidationState } from '@/types/c2pa.types';
 import type { C2PATimelineState } from '../C2PAPlayerRoot.types';
 import type { VideoJsPlayerLike } from '../C2paMenu/C2paMenu.types';
+import { setLiveTimelineWindow } from './liveWindowState';
 
 type TimelineVerificationStatus = ValidationState | 'unknown' | 'false';
 
@@ -45,6 +46,12 @@ interface TimelineSegmentElement extends HTMLDivElement {
 }
 
 const INSPECTABLE_CLASS = 'seekbar-play-c2pa--inspectable';
+/**
+ * Validated, but playback has not reached it and it still could. Rendered
+ * dimmed, so a live bar can show verdicts as they arrive without claiming
+ * content was checked *and shown*. See ValidationTimelineSegment.provisional.
+ */
+const PROVISIONAL_CLASS = 'seekbar-play-c2pa--provisional';
 
 function isInspectableStatus(status: TimelineVerificationStatus): boolean {
     return status !== 'Valid' && status !== 'Trusted';
@@ -57,6 +64,8 @@ interface TimelineComponentLike {
 interface TimelineVideoPlayer extends VideoJsPlayerLike {
     currentTime(): number;
     duration(): number;
+    /** The DVR range, for marking how much of a live window can be seeked. */
+    seekable?(): { length: number; start(index: number): number; end(index: number): number };
 }
 
 interface TimelineFunctions {
@@ -194,6 +203,43 @@ export function getTimelineWindow(
  * are epoch-based places segments by their offset from the window start rather
  * than by their absolute value.
  */
+/**
+ * Publishes the window the segments were placed against, so the seek bar draws
+ * its playhead to the same scale, and marks how much of it is still seekable.
+ *
+ * Called on every render rather than only on change: the live window rolls
+ * continuously, and a stale value would put the cursor a few seconds out.
+ */
+function publishLiveWindow(
+    window: TimelineWindow,
+    isLive: boolean,
+    videoPlayer: TimelineVideoPlayer,
+    host?: HTMLElement,
+) {
+    if (!isLive || !(window.size > 0)) {
+        setLiveTimelineWindow(null);
+        host?.style.removeProperty('--c2pa-seekable-from');
+        return;
+    }
+
+    const seekable = videoPlayer.seekable?.();
+    const depth =
+        seekable && seekable.length > 0
+            ? seekable.end(seekable.length - 1) - seekable.start(0)
+            : 0;
+    const seekableFraction = depth > 0 ? Math.min(1, depth / window.size) : 0;
+
+    setLiveTimelineWindow({ start: window.start, size: window.size, seekableFraction });
+
+    // Where the seekable band begins, for the shading in the stylesheet. The
+    // origin retains far less than the bar shows, so clicking to the left of
+    // this cannot go where it points.
+    host?.style.setProperty(
+        '--c2pa-seekable-from',
+        `${((1 - seekableFraction) * 100).toFixed(2)}%`,
+    );
+}
+
 function positionTimelineSegment(segment: TimelineSegmentElement, window: TimelineWindow) {
     const startTime = parseFloat(segment.dataset.startTime);
     const endTime = parseFloat(segment.dataset.endTime);
@@ -244,6 +290,7 @@ export function getTimelineFunctions(
         verificationStatus: TimelineVerificationStatus,
         isManifestInvalid = false,
         sourceSegment?: C2PATimelineSegmentUpdate,
+        provisional = false,
     ) {
         const segment = document.createElement('div') as TimelineSegmentElement;
         segment.className = 'seekbar-play-c2pa';
@@ -252,6 +299,10 @@ export function getTimelineFunctions(
         segment.dataset.endTime = String(segmentEndTime);
         segment.dataset.verificationStatus = verificationStatus;
         segment.style.backgroundColor = getSegmentColor(verificationStatus, isManifestInvalid);
+
+        if (provisional) {
+            segment.classList.add(PROVISIONAL_CLASS);
+        }
 
         // Every real per-fragment segment carries its source, so the hover
         // preview can read its manifest. Excluded are the synthesized
@@ -331,6 +382,8 @@ export function getTimelineFunctions(
             earliestKnownStartTime,
             retentionSeconds,
         );
+
+        publishLiveWindow(window, isLive, videoPlayer, progressSegments[0]?.parentElement ?? undefined);
 
         // No z-index laddering: positioned segments cover disjoint stretches of
         // the bar, so none needs to paint over another.
@@ -514,6 +567,8 @@ export function getTimelineFunctions(
             retentionSeconds,
         );
 
+        publishLiveWindow(window, isLive, videoPlayer, c2paControlBar.el());
+
         sortedSegments.forEach((segment) => {
             const verificationStatus = segment.pending
                 ? 'unknown'
@@ -527,6 +582,7 @@ export function getTimelineFunctions(
                 // inspect even though it normalizes to the same "unknown"
                 // status as a real unverified/missing one.
                 segment.pending ? undefined : segment,
+                segment.provisional === true,
             );
 
             positionTimelineSegment(timelineSegment, window);
@@ -564,6 +620,8 @@ export function getTimelineFunctions(
             Number.POSITIVE_INFINITY,
             retentionSeconds,
         );
+        publishLiveWindow(window, isLive, videoPlayer, c2paControlBar.el());
+
         // Spans the window itself, so a condemned live stream is red edge to
         // edge just as a condemned VOD asset is.
         const segment = createTimelineSegment(

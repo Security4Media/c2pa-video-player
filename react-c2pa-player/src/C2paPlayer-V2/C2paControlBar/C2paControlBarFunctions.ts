@@ -15,6 +15,9 @@
  */
 
 import videojs from 'video.js';
+// Imported for its side effect: registering the SeekBar that draws the live
+// playhead to the same scale as the validation segments.
+import './C2paSeekBar';
 import type { VideoJsPlayerLike } from '../C2paMenu/C2paMenu.types';
 
 interface TimelineComponentLike {

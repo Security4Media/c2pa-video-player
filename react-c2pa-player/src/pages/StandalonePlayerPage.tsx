@@ -76,14 +76,23 @@ export function StandalonePlayerPage() {
     controls: true,
     responsive: true,
     fluid: true,
+    // Required for `seekToLive` below to exist at all: video.js hides the
+    // control outright with `.video-js.vjs-live:not(.vjs-liveui)
+    // .vjs-seek-to-live-control { display: none }`. It also turns on video.js's
+    // live seek-bar handling, which is what makes the DVR window seekable.
+    liveui: true,
     controlBar: {
       children: [
         'playToggle',
         'progressControl',
         'currentTimeDisplay',
-        // Video.js hides this unless the player is in live mode, which it
-        // detects correctly here, so it costs nothing on demand-sourced media.
-        'liveDisplay',
+        // `seekToLive`, not `liveDisplay`: the two look almost identical, but
+        // only this one is a button. With `liveDisplay` the LIVE label was
+        // inert - clicking it did nothing, measured - and getting back to the
+        // edge after falling behind meant dragging the bar. Video.js hides it
+        // unless the player is in live mode, so it costs nothing on demand
+        // media.
+        'seekToLive',
         'volumePanel',
         'pictureInPictureToggle',
         'fullscreenToggle',
