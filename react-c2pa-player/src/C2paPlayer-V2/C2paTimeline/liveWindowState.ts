@@ -36,13 +36,6 @@ export interface LiveTimelineWindow {
   start: number;
   /** Seconds the bar spans. */
   size: number;
-  /**
-   * How much of the window is still seekable, as a fraction from the right
-   * edge. The origin retains far less than the bar shows - 30 seconds of five
-   * minutes on the streams tested - and clicking outside that range cannot go
-   * where it points, so the bar has to say where seeking works.
-   */
-  seekableFraction: number;
 }
 
 let current: LiveTimelineWindow | null = null;

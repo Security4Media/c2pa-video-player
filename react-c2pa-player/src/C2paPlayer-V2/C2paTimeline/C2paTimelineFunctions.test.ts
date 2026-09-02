@@ -15,10 +15,10 @@
  */
 
 import { describe, expect, it } from 'vitest';
+import { MIN_LIVE_WINDOW_SECONDS } from '@/validation/policy/liveRetention';
 import {
   getTimelineWindow,
   LIVE_WINDOW_SECONDS,
-  MIN_LIVE_WINDOW_SECONDS,
 } from './C2paTimelineFunctions';
 
 /** What positionTimelineSegment does with a window, as a percentage of the bar. */

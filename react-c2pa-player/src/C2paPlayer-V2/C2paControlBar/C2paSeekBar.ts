@@ -21,25 +21,23 @@
  *
  *     percent = (currentTime - liveTracker.seekableStart()) / liveTracker.liveWindow()
  *
- * That window is what the origin still retains - 30 seconds on the streams
- * tested - while the validation bar spans five minutes. So the two were drawn
+ * which was a different span from the validation bar's, so the two were drawn
  * to different scales on the same strip of pixels: measured on the live feed,
  * the cursor sat at 0% while the segments it was supposed to be moving through
  * sat at 93-100%. Pausing made it worse, the cursor drifting 100% -> 62% -> 49%
  * while the segments did not move at all.
+ *
+ * The bar is now sized to the DVR window too, so the two agree by construction
+ * and this class mostly re-derives the same answer. It stays because the bar's
+ * span is capped by the configured retention, so on a stream retaining more
+ * than that the two part company again - and because the arithmetic then lives
+ * in one place either way.
  *
  * Only two methods need replacing, because video.js derives everything else
  * from them: `getPercent` decides where the playhead is drawn, and
  * `calculateDistance` is the sole input into where a click seeks to. Both defer
  * to video.js whenever there is no live window - VOD, and any live source
  * without a C2PA timeline, behave exactly as before.
- *
- * The seekable range genuinely is shorter than the bar, and no amount of
- * arithmetic changes that: `timeShiftBufferDepth` is the origin's, and content
- * older than it is deleted there. So a click in the left nine tenths of the bar
- * cannot land where it points; it is clamped to the oldest moment still
- * available. The bar shades the seekable part so that is visible rather than
- * surprising.
  */
 
 import videojs from 'video.js';
@@ -84,8 +82,7 @@ class C2PASeekBar extends SeekBar {
    * Video.js turns this into a time with
    * `seekableStart + distance * liveWindow`, so rather than reimplement its
    * mouse handling, the fraction it is given is the one that lands at the time
-   * *our* scale points to - clamped into what is actually seekable, since the
-   * bar is longer than the DVR window.
+   * *our* scale points to, clamped into what is actually seekable.
    *
    * Video.js also treats a distance of 0.99 or more as "go to the live edge",
    * which is the right reading of a click at the right-hand end of our bar too.
@@ -119,5 +116,3 @@ videojs.registerComponent(
   'SeekBar',
   C2PASeekBar as unknown as Parameters<typeof videojs.registerComponent>[1],
 );
-
-export { C2PASeekBar };

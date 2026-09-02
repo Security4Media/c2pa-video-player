@@ -34,11 +34,14 @@
 export const DEFAULT_LIVE_RETENTION_SECONDS = 5 * 60;
 
 /**
- * The narrowest the live window is allowed to get.
+ * The narrowest retention `?window=` will accept.
  *
- * The window grows with the history behind it, so without a floor the very
- * first segment would be the entire window and fill the bar end to end,
- * implying the whole stream had been checked when about four seconds of it had.
+ * A sanity floor on the configurable value, nothing more. It used to be a floor
+ * on the *rendered* window, back when that grew with the history behind it -
+ * without one, the first segment became the whole bar and implied a stream had
+ * been checked end to end when four seconds of it had. The window no longer
+ * grows, so that job is gone; rejecting an unusably small configured value is
+ * still worth doing.
  */
 export const MIN_LIVE_WINDOW_SECONDS = 60;
 

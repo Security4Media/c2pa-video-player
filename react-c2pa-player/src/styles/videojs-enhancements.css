@@ -381,27 +381,6 @@
   overflow-wrap: anywhere;
 }
 
-/* Where seeking actually works, on a live bar.
- *
- * The bar spans five minutes of validation history; the origin retains far
- * less - `timeShiftBufferDepth` was 30 seconds on every stream tested - and
- * content older than that is deleted there, so a click to the left of this
- * band cannot go where it points and is clamped to the oldest moment still
- * available. Rather than let that be a surprise, the reachable part is marked.
- *
- * `--c2pa-seekable-from` is set per render by publishLiveWindow; the rule does
- * nothing without it, which is what keeps it off VOD.
- */
-.video-js.vjs-live .vjs-progress-control .c2pa-timeline-host {
-  background-image: linear-gradient(
-    to right,
-    transparent 0,
-    transparent var(--c2pa-seekable-from, 100%),
-    rgba(255, 255, 255, 0.16) var(--c2pa-seekable-from, 100%),
-    rgba(255, 255, 255, 0.16) 100%
-  );
-}
-
 /* The seconds readout video.js shows while hovering the bar.
  *
  * Removed on live, for two reasons. On an epoch-based live timeline it prints
