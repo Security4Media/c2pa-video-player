@@ -265,6 +265,122 @@
   pointer-events: none;
 }
 
+/* The hover preview.
+ *
+ * Lives inside .vjs-progress-control (which is `overflow: visible`) and sits
+ * above it, clear of the bar. `pointer-events: none` is load-bearing rather
+ * than tidiness: the panel is positioned under the pointer, so anything else
+ * would put it between the pointer and the bar it describes, and the hover
+ * would fight itself. `left` is set per pointer position by the controller. */
+.video-js .vjs-progress-control .c2pa-timeline-preview {
+  position: absolute;
+  bottom: calc(100% + 0.4em);
+  z-index: 4;
+  display: none;
+  box-sizing: border-box;
+  width: max-content;
+  max-width: 22em;
+  padding: 0.6em 0.75em;
+  border: 1px solid var(--color-overlay-border);
+  border-radius: var(--radius-sm);
+  background: linear-gradient(135deg, rgba(14, 65, 148, 0.96) 0%, rgba(10, 46, 106, 0.98) 100%);
+  box-shadow: var(--shadow-lg);
+  pointer-events: none;
+  /* Reset from the control bar's 1.1em, so the panel does not inherit the
+     seek bar's scaling and end up sized against the wrong thing. */
+  font-size: 0.75rem;
+  line-height: 1.45;
+  color: #fff;
+  text-align: left;
+  white-space: normal;
+}
+
+.video-js .vjs-progress-control .c2pa-timeline-preview--visible {
+  display: block;
+}
+
+.video-js .c2pa-timeline-preview__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75em;
+  margin-bottom: 0.35em;
+}
+
+.video-js .c2pa-timeline-preview__time {
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--font-weight-semibold);
+}
+
+.video-js .c2pa-timeline-preview__state {
+  flex: 0 0 auto;
+  padding: 0.05em 0.45em;
+  border-radius: var(--radius-full);
+  background: rgba(255, 255, 255, 0.15);
+  font-weight: var(--font-weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: 0.85em;
+}
+
+/* The same four colours the bar uses, so the badge and the segment under the
+   pointer cannot appear to disagree. */
+.video-js .c2pa-timeline-preview__state--trusted {
+  background: var(--c2pa-trusted);
+  color: #06240f;
+}
+
+.video-js .c2pa-timeline-preview__state--valid {
+  background: var(--c2pa-passed);
+}
+
+.video-js .c2pa-timeline-preview__state--invalid,
+.video-js .c2pa-timeline-preview__state--false {
+  background: var(--c2pa-failed);
+}
+
+.video-js .c2pa-timeline-preview__state--unknown,
+.video-js .c2pa-timeline-preview__state--checking {
+  background: var(--c2pa-unknown);
+  color: #1c1c1c;
+}
+
+.video-js .c2pa-timeline-preview__reason {
+  margin: 0 0 0.4em;
+}
+
+.video-js .c2pa-timeline-preview__row {
+  display: flex;
+  gap: 0.5em;
+}
+
+.video-js .c2pa-timeline-preview__label {
+  flex: 0 0 4.5em;
+  opacity: 0.7;
+}
+
+.video-js .c2pa-timeline-preview__value {
+  flex: 1 1 auto;
+  /* A dc:title can be arbitrarily long; wrap rather than widen past max-width. */
+  overflow-wrap: anywhere;
+}
+
+.video-js .c2pa-timeline-preview__caveat {
+  margin: 0.4em 0 0;
+  opacity: 0.75;
+  font-style: italic;
+}
+
+/* The raw codes. Present but quiet: evidence for the sentence above, not the
+   headline. */
+.video-js .c2pa-timeline-preview__codes {
+  margin: 0.35em 0 0;
+  opacity: 0.6;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.9em;
+  overflow-wrap: anywhere;
+}
+
 /* Only non-Valid/Trusted segments are inspectable - re-enable pointer events
    for just those so clicking one opens the menu on that fragment, while the
    rest of the seekbar keeps click-to-seek working through the overlay. */

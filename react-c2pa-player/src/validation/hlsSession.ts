@@ -176,18 +176,19 @@ export class HlsFragmentedFmp4Session implements ValidationSession {
         return;
       }
 
-      // Only anomalous regions need a manifest reference (for
-      // click-to-inspect); a Valid/Trusted one says everything in its colour.
-      // The manifest is shared across fragments here, so the current lookup's
-      // source is the right one to attach.
-      const isAnomalous =
-        region.validationState !== 'Valid' && region.validationState !== 'Trusted';
-
+      // Attached to every region, not just the anomalous ones. This used to be
+      // withheld from Valid/Trusted regions on the grounds that such a region
+      // "says everything in its colour", which was true while the manifest was
+      // only there for click-to-inspect; the timeline's hover preview now reads
+      // it to show a segment's Dublin Core metadata, and a trusted fragment is
+      // exactly where there is something to show. Costs nothing: one manifest
+      // is shared across this stream's fragments, so every region gets the same
+      // reference rather than a copy.
       this.#timelineProjector.observe(
         region.endTime,
         region.validationState,
         region.startTime,
-        isAnomalous ? currentManifestSource : undefined,
+        currentManifestSource,
       );
     });
 

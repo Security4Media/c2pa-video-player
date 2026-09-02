@@ -17,7 +17,7 @@
 import type { Manifest, ManifestStore } from '@contentauth/c2pa-web';
 import type { C2paManifestHelper } from '@nettrek/c2pa-hls-bridge';
 import { readReaderEvidence } from './evidence';
-import type { PlayerValidationState } from './types';
+import type { AdapterKind, PlayerValidationState } from './types';
 
 export function getActiveManifest(manifestStore: ManifestStore): Manifest | null {
   if (!manifestStore?.active_manifest || !manifestStore?.manifests) {
@@ -39,6 +39,21 @@ export function getHlsValidationState(
   // 'Valid' and 'Trusted' states as valid", collapsing the two, which would
   // leave the timeline permanently blue even for a fully trust-anchored signer.
   return readReaderEvidence(reader).state;
+}
+
+/**
+ * Whether this adapter's engine actually verifies the CAWG identity it reports.
+ *
+ * The DASH path runs @svta/cml-c2pa, which performs no identity or trust check
+ * whatsoever (see `getDashSegmentValidationState`), so a `cawg.identity`
+ * assertion there means only "an identity was claimed". Anything presenting
+ * that identity, or the Dublin Core metadata it vouches for, has to say so
+ * instead of implying it was checked.
+ *
+ * `unsupported` gets `false` for the same reason: nothing ran at all.
+ */
+export function verifiesCawgIdentity(adapterKind: AdapterKind): boolean {
+  return adapterKind === 'monolithic' || adapterKind === 'hls-fragmented-fmp4';
 }
 
 /**

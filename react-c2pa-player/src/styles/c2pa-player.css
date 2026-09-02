@@ -117,10 +117,21 @@
   display: none;
 }
 
-.vjs-live .vjs-time-control, 
-.vjs-live .vjs-time-divider, 
-.video-js .vjs-current-time, 
-.video-js .vjs-duration {
+/* Time readouts, for sources that have a meaningful time to read.
+ *
+ * Excluding live is the whole point of the `:not()`. A live DASH period with
+ * `availabilityStartTime` in 1970 puts `currentTime` near 1.79e9, which
+ * video.js renders as "496762:21" - meaningless to a viewer, and wide enough
+ * that it ran straight through the LIVE indicator. Video.js hides these on live
+ * by default and is right to: the LIVE badge is the honest readout there.
+ *
+ * This rule previously forced them visible on live explicitly. It had no
+ * effect, because video.js's own stylesheet loaded after it; fixing that order
+ * is what made the collision appear. */
+.video-js:not(.vjs-live) .vjs-time-control,
+.video-js:not(.vjs-live) .vjs-time-divider,
+.video-js:not(.vjs-live) .vjs-current-time,
+.video-js:not(.vjs-live) .vjs-duration {
   display: block;
 }
 

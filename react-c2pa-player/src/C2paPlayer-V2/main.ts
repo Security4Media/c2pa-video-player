@@ -41,6 +41,7 @@ import {
     updateC2PAMenu,
 } from './C2paMenu/C2paMenuFunctions';
 import { getTimelineFunctions } from './C2paTimeline/C2paTimelineFunctions';
+import { createTimelinePreview } from './C2paTimeline/C2paTimelinePreview';
 
 interface TimelineComponentLike {
     el(): HTMLElement;
@@ -54,6 +55,10 @@ interface SeekBarLike {
 
 interface ProgressControlLike {
     seekBar: SeekBarLike;
+    // The hover preview attaches here rather than to the seek bar: the control
+    // is the taller box (53px against the bar's 15px), so the whole band is a
+    // hover and tap target.
+    el(): HTMLElement;
 }
 
 interface ControlBarLike {
@@ -137,6 +142,7 @@ export const C2PAPlayer = function (
     let c2paMenu: TimelineComponentLike | null = null;
     let c2paControlBar: TimelineComponentLike | null = null;
     let playerRoot: C2PAPlayerRootController | null = null;
+    const timelinePreview = createTimelinePreview();
 
     // Referenced by name (not called) before playerRoot is assigned below -
     // by the time a user can actually click a segment, initialize() has
@@ -186,6 +192,7 @@ export const C2PAPlayer = function (
 
             c2paMenu = videoPlayer.controlBar.getChild('C2PAMenuButton');
             c2paControlBar = videoPlayer.controlBar.progressControl.seekBar.getChild('C2PALoadProgressBar');
+            timelinePreview.attach(videoPlayer.controlBar.progressControl.el());
 
             videoPlayer.on('play', function () {
                 if (isManifestInvalid && !playbackStarted && playerRoot) {
@@ -220,6 +227,7 @@ export const C2PAPlayer = function (
         dispose: function () {
             disposeC2PAMenu();
             disposeFrictionOverlay(playerRoot);
+            timelinePreview.dispose();
 
             try {
                 if (c2paMenu && videoPlayer && videoPlayer.controlBar) {
@@ -244,6 +252,10 @@ export const C2PAPlayer = function (
         playbackUpdate: function (snapshot) {
             const currentTime = videoPlayer.currentTime();
             const c2paStatus = createC2PAStatusFromSnapshot(snapshot);
+
+            // Which engine produced these verdicts decides whether the preview
+            // may present a segment's CAWG metadata as verified.
+            timelinePreview.setAdapterKind(snapshot?.adapterKind ?? null);
 
             // Adapters that report their own per-fragment segments own the
             // whole timeline, so their state is safe to apply on any tick -

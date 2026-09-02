@@ -34,7 +34,12 @@ interface TimelineSegmentElement extends HTMLDivElement {
      * The full segment this element represents, when it was built from a
      * real per-fragment `ValidationTimelineSegment` (replaceC2PATimelineSegments)
      * rather than synthesized from a bare status string (the two legacy call
-     * sites below). Only elements carrying this are click-inspectable.
+     * sites below).
+     *
+     * Present on every real segment, not just the click-inspectable ones: the
+     * hover preview reads a segment's manifest to show its Dublin Core
+     * metadata, and a Trusted fragment is precisely the case where there is
+     * something worth showing.
      */
     __c2paSegment?: C2PATimelineSegmentUpdate;
 }
@@ -248,12 +253,20 @@ export function getTimelineFunctions(
         segment.dataset.verificationStatus = verificationStatus;
         segment.style.backgroundColor = getSegmentColor(verificationStatus, isManifestInvalid);
 
-        // Only real per-fragment segments (not the synthesized "unknown" gap
-        // filler or the legacy static-fallback status blob) are inspectable,
-        // and only when there's something worth inspecting - a Valid/Trusted
-        // fragment has nothing more to show than the live status already does.
-        if (sourceSegment && onSegmentClick && isInspectableStatus(verificationStatus)) {
+        // Every real per-fragment segment carries its source, so the hover
+        // preview can read its manifest. Excluded are the synthesized
+        // "unknown" gap filler and the legacy static-fallback status blob,
+        // which represent no single fragment and have no manifest of their own.
+        if (sourceSegment) {
             segment.__c2paSegment = sourceSegment;
+        }
+
+        // Clicking, though, stays limited to segments with a problem. A
+        // Valid/Trusted stretch keeps `pointer-events: none` so a click there
+        // falls through to video.js and seeks, which is what a viewer expects
+        // from a progress bar; taking that over for the whole width to open a
+        // panel would cost more than it gives.
+        if (sourceSegment && onSegmentClick && isInspectableStatus(verificationStatus)) {
             segment.classList.add(INSPECTABLE_CLASS);
             segment.addEventListener('click', (event) => {
                 event.stopPropagation();
