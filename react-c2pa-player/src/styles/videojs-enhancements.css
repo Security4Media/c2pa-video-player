@@ -20,16 +20,16 @@
 
 /* Make control bar bigger and more prominent */
 .video-js .vjs-control-bar {
-  height: 4.5em !important;
+  height: 4.5em;
   font-size: 1.2em;
-  background: linear-gradient(180deg, rgba(10, 46, 106, 0.92) 0%, rgba(14, 65, 148, 0.88) 100%) !important;
+  background: linear-gradient(180deg, rgba(10, 46, 106, 0.92) 0%, rgba(14, 65, 148, 0.88) 100%);
   backdrop-filter: blur(8px);
   border-top: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 /* Standard controls sizing */
 .video-js .vjs-control {
-  width: 4em !important;
+  width: 4em;
 }
 
 /* Button icons sizing - exclude C2PA button */
@@ -40,7 +40,7 @@
 
 /* Play button sizing */
 .video-js .vjs-play-control {
-  width: 4em !important;
+  width: 4em;
 }
 
 /* Time controls styling */
@@ -58,7 +58,7 @@
 
 /* C2PA Control Button - positioned BEFORE play button */
 .video-js .vjs-control-bar .vjs-control.vjs-button[title="Content Credentials"] {
-  width: 4.5em !important;
+  width: 4.5em;
   order: -1; /* Position before play button */
 }
 
@@ -69,44 +69,44 @@
 
 /* Volume panel adjustments - fixed layout */
 .video-js .vjs-volume-panel {
-  width: auto !important;
-  display: flex !important;
-  align-items: center !important;
+  width: auto;
+  display: flex;
+  align-items: center;
 }
 
 /* Always use horizontal layout */
 .video-js.vjs-has-started .vjs-volume-panel {
-  width: auto !important;
+  width: auto;
 }
 
 /* Volume control button */
 .video-js .vjs-volume-panel .vjs-mute-control {
-  width: 4em !important;
+  width: 4em;
 }
 
 /* Volume bar container - always visible and fixed position */
 .video-js .vjs-volume-panel .vjs-volume-control {
-  width: 5em !important;
-  display: flex !important;
-  align-items: center !important;
-  opacity: 1 !important;
-  visibility: visible !important;
-  position: relative !important;
-  transition: none !important;
-  pointer-events: auto !important;
+  width: 5em;
+  display: flex;
+  align-items: center;
+  opacity: 1;
+  visibility: visible;
+  position: relative;
+  transition: none;
+  pointer-events: auto;
 }
 
 /* Force horizontal volume control to always show with fixed dimensions */
 .video-js .vjs-volume-panel.vjs-volume-panel-horizontal .vjs-volume-control {
-  opacity: 1 !important;
-  width: 5em !important;
-  height: auto !important;
-  transition: none !important;
+  opacity: 1;
+  width: 5em;
+  height: auto;
+  transition: none;
 }
 
 /* Disable vertical volume control */
 .video-js .vjs-volume-panel.vjs-volume-panel-vertical {
-  display: none !important;
+  display: none;
 }
 
 /* Override all hover and active states to maintain fixed position */
@@ -117,25 +117,31 @@
 .video-js .vjs-volume-panel.vjs-hover .vjs-volume-control,
 .video-js .vjs-volume-panel .vjs-volume-control:hover,
 .video-js.vjs-user-inactive .vjs-volume-panel .vjs-volume-control {
-  opacity: 1 !important;
-  width: 5em !important;
-  transition: none !important;
+  opacity: 1;
+  width: 5em;
+  transition: none;
 }
 
-/* Volume slider - fixed dimensions */
-.video-js .vjs-volume-bar {
-  height: 0.5em !important;
-  margin: 0 0.5em !important;
+/* Volume slider - fixed dimensions.
+ *
+ * Qualified by .vjs-volume-panel rather than marked `!important`. The volume
+ * bar is also a `.vjs-slider`, so the 0.7em the seek bar wants (c2pa-player.css)
+ * matches it too and, loading later, would otherwise win. Three classes beat
+ * two whatever the order, which is the same outcome the `!important` bought and
+ * survives the next stylesheet someone adds. */
+.video-js .vjs-volume-panel .vjs-volume-bar {
+  height: 0.5em;
+  margin: 0 0.5em;
 }
 
 /* Volume level indicator */
-.video-js .vjs-volume-level {
-  height: 0.5em !important;
+.video-js .vjs-volume-panel .vjs-volume-level {
+  height: 0.5em;
 }
 
 /* Hide volume level handle/knob for cleaner display */
-.video-js .vjs-volume-level::before {
-  display: none !important;
+.video-js .vjs-volume-panel .vjs-volume-level::before {
+  display: none;
 }
 
 /* No `font-size` here on purpose.
@@ -157,12 +163,12 @@
 /* Responsive adjustments */
 @media (max-width: 768px) {
   .video-js .vjs-control-bar {
-    height: 3.5em !important;
+    height: 3.5em;
     font-size: 1em;
   }
 
   .video-js .vjs-control {
-    width: 3em !important;
+    width: 3em;
   }
 
   .video-js .vjs-button:not(.c2pa-menu-button) > .vjs-icon-placeholder:before {
@@ -171,8 +177,8 @@
 
   /* Keep C2PA button size consistent on mobile */
   .video-js .vjs-chapters-button.c2pa-menu-button {
-    width: 4em !important;
-    min-width: 4em !important;
+    width: 4em;
+    min-width: 4em;
   }
 
   .video-js {
@@ -191,9 +197,8 @@
    Without overriding the holder, video.js's default slate-blue track read as
    a validation colour.
 
-   Needs three classes to outrank video.js's own `.video-js .vjs-slider`
-   (video-js.css:1152), which the holder also matches and which would
-   otherwise win on source order alone. */
+   Three classes, to outrank video.js's own `.video-js .vjs-slider`
+   (video-js.css:1152), which the holder also matches. */
 .video-js .vjs-progress-control .vjs-progress-holder {
   background-color: var(--c2pa-unknown);
 }
@@ -216,26 +221,17 @@
 
 /* Keep the playhead handle visible above the segments.
 
-   These selectors are deliberately over-qualified (four classes) rather than
-   relying on cascade order. video.js's own stylesheet is injected *after* this
-   one - it arrives both from the CDN <link> in index.html and from the
-   `video.js/dist/video-js.css` module import in VideoJS.tsx - so any rule of
-   ours at equal specificity loses. That is what silently reduced this handle
-   to video.js's own `z-index: 1` (video-js.css:1059), tying with the segment
-   host and losing to it on DOM order, and left `content` blank so no handle
-   was drawn at all.
-
    `.vjs-play-progress` itself is left at `z-index: auto` on purpose: it must
    stay *behind* the segments, since its own background would otherwise hide
    them. Only the handle is lifted. z-index 3 clears both the segment host and
    `.vjs-mouse-display`, which video.js puts at 1.
 
-   The handle is drawn here as a plain round box rather than reusing video.js's
-   icon-font glyph. Two video.js stylesheets are in play (the CDN 8.3.0 <link>
-   and the bundled 8.23.7 module import) and between them the glyph's `content`
-   ends up empty, so nothing rendered. A self-contained circle sidesteps the
-   icon-font and SVG-icon paths altogether. White, because it has to stay
-   legible against all four verdict colours as well as the grey track. */
+   The handle is drawn as a plain round box rather than reusing video.js's
+   icon-font glyph, whose `content` came out empty when two video.js
+   stylesheets were in play. Only one is now, but a self-contained circle still
+   sidesteps the icon-font and SVG-icon paths, so it cannot depend on which of
+   them a build enables. White, because it has to stay legible against all four
+   verdict colours as well as the grey track. */
 .video-js .vjs-progress-control .vjs-progress-holder .vjs-play-progress::before {
   content: '';
   display: block;
@@ -285,9 +281,8 @@
    that is never displayed, and the timeline appears simply not to work on live
    sources.
 
-   Over-qualified past video.js's own rule, which is equally specific and, being
-   loaded from both the CDN link in index.html and the module import in
-   VideoJS.tsx, may come after this file. */
+   One class more than video.js's own rule, which is otherwise equally
+   specific. */
 .video-js.vjs-live .vjs-control-bar .vjs-progress-control {
   display: flex;
 }
@@ -301,12 +296,13 @@
    Video.js gives the live control `flex: auto`; left to grow it took 384px of a
    1084px bar and halved the progress control with it. Hence `flex: 0 0 auto`.
 
-   This file's own blanket `.video-js .vjs-control { width: 4em !important }`
-   (see above) then pins it to a box narrower than its contents. `!important`
-   ignores specificity, so `width: auto` alone loses, and since the dot below is
-   an empty flex item its min-content is zero: it absorbs the whole overflow and
-   renders at zero width. The pulse still runs, on a box with no size, which is
-   an unusually quiet way to fail. Hence `width: auto !important`.
+   This file's own blanket `.video-js .vjs-control { width: 4em }` above then
+   pins it to a box narrower than its contents. Four classes here against that
+   rule's two settles it; while the blanket rule still carried `!important`,
+   specificity could not, and the dot below - an empty flex item, so
+   min-content zero - absorbed the whole overflow and rendered at zero width.
+   The pulse ran the entire time, on a box with no size, which is an unusually
+   quiet way to fail.
 
    Sized in em so the indicator tracks the bar, which is set in em throughout
    and drops to 3em at the mobile breakpoint. */
@@ -314,7 +310,7 @@
   display: flex;
   align-items: center;
   flex: 0 0 auto;
-  width: auto !important;
+  width: auto;
   padding: 0 0.6em;
 }
 

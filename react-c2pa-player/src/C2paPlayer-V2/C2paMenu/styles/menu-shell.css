@@ -17,42 +17,50 @@
 /* C2PA menu shell and overlay layout */
 
 .video-js .vjs-menu-button-popup.c2pa-menu-button {
-  position: static !important;
-  overflow: visible !important;
+  position: static;
+  overflow: visible;
 }
 
+/* Video.js's own popup menu, suppressed: the panel the viewer sees is rendered
+   by React into .c2pa-player-menu-overlay below, and without this both appear.
+ *
+   `!important` is unavoidable here, and is the only one left in this file.
+   Video.js marks the menu visible with `.vjs-lock-showing { display: block
+   !important }` (video-js.css:618) - a vendor `!important` at one class, which
+   no amount of specificity on our side can outrank. Matching it is the only
+   available move. */
 .video-js .vjs-menu-button-popup.c2pa-menu-button > .vjs-menu {
   display: none !important;
 }
 
 .video-js .c2pa-player-menu-overlay {
-  position: absolute !important;
-  inset: 0 !important;
-  margin: 0 !important;
-  z-index: 10 !important;
-  pointer-events: auto !important;
-  transform: none !important;
-  width: auto !important;
-  height: auto !important;
-  display: flex !important;
-  align-items: flex-end !important;
-  justify-content: flex-start !important;
-  padding: 1rem 1rem 4.5rem 1rem !important;
-  box-sizing: border-box !important;
-  overflow: visible !important;
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  z-index: 10;
+  pointer-events: auto;
+  transform: none;
+  width: auto;
+  height: auto;
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-start;
+  padding: 1rem 1rem 4.5rem 1rem;
+  box-sizing: border-box;
+  overflow: visible;
 }
 
 .video-js .c2pa-player-menu-overlay--closing {
-  pointer-events: none !important;
+  pointer-events: none;
 }
 
 .video-js .c2pa-player-menu-overlay .vjs-menu {
-  display: flex !important;
-  align-items: flex-end !important;
-  justify-content: flex-start !important;
-  width: 100% !important;
-  height: 100% !important;
-  overflow: visible !important;
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-start;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
 }
 
 .video-js .c2pa-player-menu-overlay .vjs-menu .c2pa-menu-panel-shell {
@@ -84,31 +92,31 @@
 
 .video-js .c2pa-player-menu-overlay .vjs-menu .c2pa-menu-panel {
   position: relative;
-  margin-left: var(--c2pa-menu-panel-offset-x, 0) !important;
-  width: min(32rem, calc(100% - 1.5rem)) !important;
-  max-width: min(32rem, calc(100% - 1.5rem)) !important;
-  min-width: min(32rem, calc(100% - 1.5rem)) !important;
-  min-height: min(42rem, calc(100% - 1.5rem)) !important;
-  height: min(42rem, calc(100% - 1.5rem)) !important;
-  max-height: min(42rem, calc(100% - 1.5rem)) !important;
-  display: flex !important;
-  flex-direction: column !important;
-  align-items: flex-start !important;
-  justify-content: flex-start !important;
-  margin: 0 !important;
-  padding: 0 !important;
-  background: linear-gradient(135deg, rgba(14, 65, 148, 0.85) 0%, rgba(10, 46, 106, 0.90) 100%) !important;
-  border: 0.3rem solid #1256c2 !important;
-  border-radius: 1rem !important;
-  box-sizing: border-box !important;
-  animation: ebu-blue-border-pulse 4s ease-in-out infinite !important;
-  backdrop-filter: blur(0.5rem) !important;
+  margin-left: var(--c2pa-menu-panel-offset-x, 0);
+  width: min(32rem, calc(100% - 1.5rem));
+  max-width: min(32rem, calc(100% - 1.5rem));
+  min-width: min(32rem, calc(100% - 1.5rem));
+  min-height: min(42rem, calc(100% - 1.5rem));
+  height: min(42rem, calc(100% - 1.5rem));
+  max-height: min(42rem, calc(100% - 1.5rem));
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-start;
+  margin: 0;
+  padding: 0;
+  background: linear-gradient(135deg, rgba(14, 65, 148, 0.85) 0%, rgba(10, 46, 106, 0.90) 100%);
+  border: 0.3rem solid #1256c2;
+  border-radius: 1rem;
+  box-sizing: border-box;
+  animation: ebu-blue-border-pulse 4s ease-in-out infinite;
+  backdrop-filter: blur(0.5rem);
   box-shadow:
     0 1.2rem 2rem rgba(14, 65, 148, 0.3),
     0 0 2rem rgba(14, 65, 148, 0.6),
     0 0.5rem 2rem rgba(0, 0, 0, 0.5),
-    0 0 0 1px rgba(255, 255, 255, 0.15) inset !important;
-  overflow: hidden !important;
+    0 0 0 1px rgba(255, 255, 255, 0.15) inset;
+  overflow: hidden;
   transform-origin: var(--c2pa-menu-anchor-origin-x, 2.4rem) calc(100% + 1rem);
 }
 
@@ -130,11 +138,11 @@
 
 .video-js .c2pa-player-menu-overlay .vjs-menu .c2pa-menu-content-list {
   width: 100%;
-  margin: 0 !important;
-  padding: 0 2rem 2rem 2rem !important;
-  list-style: none !important;
+  margin: 0;
+  padding: 0 2rem 2rem 2rem;
+  list-style: none;
   box-sizing: border-box;
-  overflow-y: auto !important;
+  overflow-y: auto;
   overflow-x: hidden;
   min-height: 0;
   flex: 1 1 auto;
@@ -149,32 +157,32 @@
 }
 
 .vjs-menu .c2pa-menu-header {
-  display: inline-flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  position: sticky !important;
-  top: 0 !important;
-  z-index: 2 !important;
-  text-transform: uppercase !important;
-  border-bottom: 0.2rem solid rgba(255, 255, 255, 0.4) !important;
-  padding-left: 2rem !important;
-  padding-right: 2rem !important;
-  padding-bottom: 1rem !important;
-  padding-top: 0.75rem !important;
-  margin: 0 0 1.5rem 0 !important;
-  width: 100% !important;
-  min-width: 0 !important;
-  max-width: 100% !important;
-  font-family: 'Plus Jakarta Sans', sans-serif !important;
-  font-weight: 800 !important;
-  font-size: 1.5rem !important;
-  color: #ffffff !important;
-  line-height: 1.3 !important;
-  text-shadow: 0 0.2rem 0.5rem rgba(0, 0, 0, 0.3) !important;
-  letter-spacing: -0.03em !important;
-  background: linear-gradient(135deg, rgba(14, 65, 148, 0.85) 0%, rgba(10, 46, 106, 0.90) 100%) !important;
-  border-top-left-radius: 0.85rem !important;
-  border-top-right-radius: 0.85rem !important;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  text-transform: uppercase;
+  border-bottom: 0.2rem solid rgba(255, 255, 255, 0.4);
+  padding-left: 2rem;
+  padding-right: 2rem;
+  padding-bottom: 1rem;
+  padding-top: 0.75rem;
+  margin: 0 0 1.5rem 0;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-weight: 800;
+  font-size: 1.5rem;
+  color: #ffffff;
+  line-height: 1.3;
+  text-shadow: 0 0.2rem 0.5rem rgba(0, 0, 0, 0.3);
+  letter-spacing: -0.03em;
+  background: linear-gradient(135deg, rgba(14, 65, 148, 0.85) 0%, rgba(10, 46, 106, 0.90) 100%);
+  border-top-left-radius: 0.85rem;
+  border-top-right-radius: 0.85rem;
   box-sizing: border-box;
 }
 
@@ -239,16 +247,16 @@
 
 @media (max-width: 768px) {
   .video-js .c2pa-player-menu-overlay .vjs-menu .c2pa-menu-panel {
-    width: calc(100% - 1rem) !important;
-    max-width: calc(100% - 1rem) !important;
-    min-width: calc(100% - 1rem) !important;
-    min-height: min(32rem, calc(100% - 1rem)) !important;
-    height: min(32rem, calc(100% - 1rem)) !important;
-    max-height: min(32rem, calc(100% - 1rem)) !important;
+    width: calc(100% - 1rem);
+    max-width: calc(100% - 1rem);
+    min-width: calc(100% - 1rem);
+    min-height: min(32rem, calc(100% - 1rem));
+    height: min(32rem, calc(100% - 1rem));
+    max-height: min(32rem, calc(100% - 1rem));
   }
 
   .video-js .c2pa-player-menu-overlay {
-    padding: 0.75rem 0.5rem 4rem 0.5rem !important;
+    padding: 0.75rem 0.5rem 4rem 0.5rem;
   }
 
   .video-js .c2pa-player-menu-overlay .vjs-menu .c2pa-menu-panel::after {
@@ -256,14 +264,14 @@
   }
 
   .vjs-menu .c2pa-menu-header {
-    font-size: 1.3rem !important;
-    margin-bottom: 1.2rem !important;
-    padding-left: 1.5rem !important;
-    padding-right: 1.5rem !important;
+    font-size: 1.3rem;
+    margin-bottom: 1.2rem;
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
   }
 
   .video-js .c2pa-player-menu-overlay .vjs-menu .c2pa-menu-content-list {
-    padding: 0 1.5rem 1.5rem 1.5rem !important;
+    padding: 0 1.5rem 1.5rem 1.5rem;
   }
 
   .vjs-menu .c2pa-menu-header .c2pa-menu-title__action {

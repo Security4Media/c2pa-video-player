@@ -56,18 +56,18 @@
 }
 
 /*** TIMELINE CSS ***/
-/* Default colors for the videojs timeline and tooltip */
-.video-js .vjs-control-bar {
-  background-color: var(--background);
-}
+/* No control-bar background here: videojs-enhancements.css paints it with a
+   gradient, and this file used to restate a flat `background-color` that landed
+   on top of it. That only stayed invisible because the gradient carried
+   `!important`; with the order fixed and the `!important` gone, the flat colour
+   would have won. The gradient is the design, so the flat colour goes. */
 
 .video-js .vjs-progress-control {
   color: var(--c2pa-unknown);
 }
 
 /* Grey means "no C2PA verdict yet" - see the matching rule and rationale in
-   videojs-enhancements.css (three classes, to outrank video.js's
-   `.video-js .vjs-slider`). */
+   videojs-enhancements.css. */
 .video-js .vjs-progress-control .vjs-progress-holder {
   background-color: var(--c2pa-unknown);
 }
@@ -79,61 +79,60 @@
 /* Hide default chapters button icon content */
 .vjs-icon-chapters:before, 
 .video-js .vjs-chapters-button .vjs-icon-placeholder:before {
-  content: '' !important;
-  display: none !important;
+  content: '';
+  display: none;
 }
 
 /* Hide any default VideoJS chapters button that's not our C2PA button */
 .video-js .vjs-chapters-button:not(.c2pa-menu-button) {
-  display: none !important;
+  display: none;
 }
 
-/* Make C2PA menu button bigger */
+/* Make C2PA menu button bigger.
+ *
+   No `position` here. menu-shell.css sets `position: static` so the menu can
+   escape the button's box and lay itself out across the whole player; the
+   `position: relative` this rule used to declare contradicted that and was
+   only ever suppressed by the `!important` on menu-shell's side. */
 .video-js .vjs-chapters-button.c2pa-menu-button {
-  width: 5em !important;
-  min-width: 5em !important;
-  position: relative;
-  border-radius: 0 !important;
-  transition: none !important;
-  background: transparent !important;
+  width: 5em;
+  min-width: 5em;
+  border-radius: 0;
+  transition: none;
+  background: transparent;
 }
 
 /* Disable hover effects */
 .video-js .vjs-chapters-button.c2pa-menu-button:hover,
 .video-js .vjs-chapters-button.c2pa-menu-button:focus,
 .video-js .vjs-chapters-button.c2pa-menu-button.vjs-hover {
-  background: transparent !important;
-  border-radius: 0 !important;
-  transition: none !important;
+  background: transparent;
+  border-radius: 0;
+  transition: none;
 }
 
 /* Active state - dark blue square shape filling control bar height */
 .video-js .vjs-chapters-button.c2pa-menu-button[aria-expanded="true"] {
-  background: rgba(10, 46, 106, 1) !important;
-  border-radius: 0 !important;
-  height: 100% !important;
-  width: 5em !important;
+  background: rgba(10, 46, 106, 1);
+  border-radius: 0;
+  height: 100%;
+  width: 5em;
 }
 
 /* Disable hover on active state too */
 .video-js .vjs-chapters-button.c2pa-menu-button[aria-expanded="true"]:hover,
 .video-js .vjs-chapters-button.c2pa-menu-button[aria-expanded="true"]:focus,
 .video-js .vjs-chapters-button.c2pa-menu-button[aria-expanded="true"].vjs-hover {
-  background: rgba(10, 46, 106, 1) !important;
-  border-radius: 0 !important;
-  transition: none !important;
+  background: rgba(10, 46, 106, 1);
+  border-radius: 0;
+  transition: none;
 }
 
 /* Remove any icon placeholder before/after content for C2PA button */
 .video-js .vjs-chapters-button.c2pa-menu-button .vjs-icon-placeholder:before,
 .video-js .vjs-chapters-button.c2pa-menu-button .vjs-icon-placeholder:after {
-  content: '' !important;
-  display: none !important;
-}
-
-/* Ensure menu popup is properly positioned */
-.video-js .vjs-chapters-button.c2pa-menu-button.vjs-menu-button-popup {
-  position: relative;
+  content: '';
+  display: none;
 }
 
 .vjs-live .vjs-time-control, 
@@ -144,7 +143,7 @@
 }
 
 .vjs-subs-caps-button {
-  display: block !important;
+  display: block;
 }
 
 .video-js .vjs-play-progress::before {
@@ -159,11 +158,10 @@
   z-index: 1;
 }
 
+/* The seek bar. This also matches `.vjs-volume-bar`, which wants 0.5em - see
+   the .vjs-volume-panel rules in videojs-enhancements.css, qualified one class
+   further so they win here without `!important`. */
 .video-js .vjs-slider {
-  height: 0.7em;
-}
-
-.video-js .vjs-volume-level {
   height: 0.7em;
 }
 
@@ -174,41 +172,41 @@
 
 /* C2PA Menu Button Icons */
 .vjs-chapters-button.c2pa-menu-button[aria-expanded="false"] .vjs-icon-placeholder {
-  width: 48px !important;
-  height: 30px !important;
-  background: url('/src/assets/icons/cr-icon.svg') center center no-repeat !important;
-  background-size: contain !important;
+  width: 48px;
+  height: 30px;
+  background: url('/src/assets/icons/cr-icon.svg') center center no-repeat;
+  background-size: contain;
 }
 
 .vjs-chapters-button.c2pa-menu-button[aria-expanded="false"] .vjs-icon-placeholder:before {
-  content: '' !important;
-  display: none !important;
+  content: '';
+  display: none;
 }
 
 .vjs-chapters-button.c2pa-menu-button[aria-expanded="true"] .vjs-icon-placeholder {
-  width: 48px !important;
-  height: 30px !important;
-  background: url('/src/assets/icons/cr-icon.svg') center center no-repeat !important;
-  background-size: contain !important;
+  width: 48px;
+  height: 30px;
+  background: url('/src/assets/icons/cr-icon.svg') center center no-repeat;
+  background-size: contain;
 }
 
 .vjs-chapters-button.c2pa-menu-button[aria-expanded="true"] .vjs-icon-placeholder:before {
-  content: '' !important;
-  display: none !important;
+  content: '';
+  display: none;
 }
 
 .vjs-chapters-button.c2pa-menu-button.c2pa-menu-button-invalid[aria-expanded="false"] .vjs-icon-placeholder {
-  width: 48px !important;
-  height: 30px !important;
-  background: url('/src/assets/icons/cr-invalid.svg') center center no-repeat !important;
-  background-size: contain !important;
+  width: 48px;
+  height: 30px;
+  background: url('/src/assets/icons/cr-invalid.svg') center center no-repeat;
+  background-size: contain;
 }
 
 .vjs-chapters-button.c2pa-menu-button.c2pa-menu-button-invalid[aria-expanded="true"] .vjs-icon-placeholder {
-  width: 48px !important;
-  height: 30px !important;
-  background: url('/src/assets/icons/cr-invalid.svg') center center no-repeat !important;
-  background-size: contain !important;
+  width: 48px;
+  height: 30px;
+  background: url('/src/assets/icons/cr-invalid.svg') center center no-repeat;
+  background-size: contain;
 }
 
 /* Style of c2pa progress bar */
