@@ -161,27 +161,43 @@ export function getTimelineWindow(
     latestKnownEndTime: number,
     isLive = false,
     retentionSeconds = LIVE_WINDOW_SECONDS,
+    dvrDepthSeconds: number | null = null,
 ): TimelineWindow {
     if (isLive) {
-        // A fixed span, anchored to the live edge, so the newest content sits at
-        // the right and everything else scrolls left at a constant rate.
+        // The bar spans what can actually be reached: the DVR window the origin
+        // advertises, capped by how much we choose to remember. A fixed span
+        // either way, anchored to the live edge, so content scrolls left at a
+        // constant rate and the scale never changes under the viewer.
         //
-        // This used to grow with the history behind it - `edge` minus the oldest
-        // segment known - which made the scale change under the viewer. Pausing
-        // exposed it plainly: pause for 28 seconds and the window stretched from
-        // 60s to 104s to span the gap, so the history that had been sitting in
-        // the right-hand 6% of the bar was squashed into the left-hand 3.7% with
-        // grey after it. Nothing had been lost, but it read exactly like a
-        // reset, and reported as one.
+        // Two earlier versions of this were wrong in opposite directions.
         //
-        // A fixed window costs an emptier bar for the first few minutes of a
-        // session. That was the argument for growing, and it carried more weight
-        // when the window was fifteen minutes than it does at five - and an
-        // emptier bar is the honest picture of having watched for one minute,
-        // where a window shrunk to fit flatters however little has been checked.
+        // Growing it with the history behind it made the scale depend on the
+        // data: pause 28 seconds and the window stretched from 60s to 104s to
+        // span the gap, squashing history from the right-hand 6% of the bar
+        // into the left-hand 3.7%. Nothing was lost but it read as a reset.
+        //
+        // Fixing it at the retention then made the bar fill at 1x real time -
+        // roughly 90% grey for the first four and a half minutes of a
+        // five-minute window, which reads as nothing being validated.
+        //
+        // Sizing it to the DVR settles both. The bar fills in the 30 seconds
+        // these streams retain rather than in five minutes; the cursor, the
+        // segments and the seekable range end up on one scale, so a click lands
+        // where it points anywhere on the bar rather than only in its
+        // right-hand tenth; and a 3.84s segment is a legible 12.8% of the width
+        // instead of 1.3%.
+        //
+        // The cap still matters for a stream retaining hours: the bar is a
+        // record of recent provenance, not an archive, and the retained history
+        // of failures belongs in the debug console rather than in a bar too
+        // dense to read.
         const edge = Math.max(currentTime, latestKnownEndTime);
+        const size =
+            dvrDepthSeconds !== null && dvrDepthSeconds > 0
+                ? Math.min(retentionSeconds, dvrDepthSeconds)
+                : retentionSeconds;
 
-        return { start: edge - retentionSeconds, size: retentionSeconds };
+        return { start: edge - size, size };
     }
 
     if (Number.isFinite(rawDuration) && rawDuration > 0) {
@@ -213,10 +229,23 @@ export function getTimelineWindow(
  * Called on every render rather than only on change: the live window rolls
  * continuously, and a stale value would put the cursor a few seconds out.
  */
+/** The DVR window the origin advertises, or null before there is one. */
+function readDvrDepth(videoPlayer: TimelineVideoPlayer): number | null {
+    const seekable = videoPlayer.seekable?.();
+
+    if (!seekable || seekable.length === 0) {
+        return null;
+    }
+
+    const depth = seekable.end(seekable.length - 1) - seekable.start(0);
+
+    return Number.isFinite(depth) && depth > 0 ? depth : null;
+}
+
 function publishLiveWindow(
     window: TimelineWindow,
     isLive: boolean,
-    videoPlayer: TimelineVideoPlayer,
+    dvrDepthSeconds: number | null,
     host?: HTMLElement,
 ) {
     if (!isLive || !(window.size > 0)) {
@@ -225,18 +254,19 @@ function publishLiveWindow(
         return;
     }
 
-    const seekable = videoPlayer.seekable?.();
-    const depth =
-        seekable && seekable.length > 0
-            ? seekable.end(seekable.length - 1) - seekable.start(0)
-            : 0;
-    const seekableFraction = depth > 0 ? Math.min(1, depth / window.size) : 0;
+    const seekableFraction =
+        dvrDepthSeconds !== null ? Math.min(1, dvrDepthSeconds / window.size) : 0;
 
     setLiveTimelineWindow({ start: window.start, size: window.size, seekableFraction });
 
-    // Where the seekable band begins, for the shading in the stylesheet. The
-    // origin retains far less than the bar shows, so clicking to the left of
-    // this cannot go where it points.
+    // Shading only where part of the bar genuinely cannot be seeked - which is
+    // now only when the retention cap is narrower than the DVR. Shading a bar
+    // that is seekable end to end would say nothing at all.
+    if (seekableFraction >= 0.999) {
+        host?.style.removeProperty('--c2pa-seekable-from');
+        return;
+    }
+
     host?.style.setProperty(
         '--c2pa-seekable-from',
         `${((1 - seekableFraction) * 100).toFixed(2)}%`,
@@ -373,15 +403,17 @@ export function getTimelineFunctions(
             (max, segment) => Math.max(max, parseFloat(segment.dataset.endTime)),
             0,
         );
+        const dvrDepth = readDvrDepth(videoPlayer);
         const window = getTimelineWindow(
             videoPlayer.duration(),
             currentTime,
             latestKnownEndTime,
             isLive,
             retentionSeconds,
+            dvrDepth,
         );
 
-        publishLiveWindow(window, isLive, videoPlayer, progressSegments[0]?.parentElement ?? undefined);
+        publishLiveWindow(window, isLive, dvrDepth, progressSegments[0]?.parentElement ?? undefined);
 
         // No z-index laddering: positioned segments cover disjoint stretches of
         // the bar, so none needs to paint over another.
@@ -556,15 +588,17 @@ export function getTimelineFunctions(
             (max, segment) => Math.max(max, segment.endTime),
             0,
         );
+        const dvrDepth = readDvrDepth(videoPlayer);
         const window = getTimelineWindow(
             videoPlayer.duration(),
             videoPlayer.currentTime(),
             latestKnownEndTime,
             isLive,
             retentionSeconds,
+            dvrDepth,
         );
 
-        publishLiveWindow(window, isLive, videoPlayer, c2paControlBar.el());
+        publishLiveWindow(window, isLive, dvrDepth, c2paControlBar.el());
 
         sortedSegments.forEach((segment) => {
             const verificationStatus = segment.pending
@@ -609,14 +643,16 @@ export function getTimelineFunctions(
     ) {
         removeProgressSegments();
 
+        const dvrDepth = readDvrDepth(videoPlayer);
         const window = getTimelineWindow(
             videoPlayer.duration(),
             videoPlayer.currentTime(),
             0,
             isLive,
             retentionSeconds,
+            dvrDepth,
         );
-        publishLiveWindow(window, isLive, videoPlayer, c2paControlBar.el());
+        publishLiveWindow(window, isLive, dvrDepth, c2paControlBar.el());
 
         // Spans the window itself, so a condemned live stream is red edge to
         // edge just as a condemned VOD asset is.

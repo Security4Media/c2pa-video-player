@@ -85,6 +85,46 @@ describe('getTimelineWindow', () => {
       });
     });
 
+    it('spans the DVR window when the origin retains less than we would keep', () => {
+      // The streams tested advertise timeShiftBufferDepth=PT30S. A five-minute
+      // bar then fills at 1x real time and is ~90% grey for four and a half
+      // minutes, which reads as nothing being validated; a 30s bar fills in
+      // thirty seconds, and every part of it can be seeked.
+      const edge = 1_000_000;
+
+      expect(getTimelineWindow(INF, edge, edge, true, 300, 30)).toEqual({
+        start: edge - 30,
+        size: 30,
+      });
+    });
+
+    it('caps at the retention when the origin retains more', () => {
+      // The bar is a record of recent provenance, not an archive.
+      const edge = 1_000_000;
+
+      expect(getTimelineWindow(INF, edge, edge, true, 300, 3600)).toEqual({
+        start: edge - 300,
+        size: 300,
+      });
+    });
+
+    it('falls back to the retention before a DVR range exists', () => {
+      const edge = 1_000_000;
+
+      for (const depth of [null, 0, -5]) {
+        expect(getTimelineWindow(INF, edge, edge, true, 300, depth).size).toBe(300);
+      }
+    });
+
+    it('still does not rescale across a gap, whichever sizes it', () => {
+      const edge = 1_000_000;
+      const before = getTimelineWindow(INF, edge, edge, true, 300, 30);
+      const after = getTimelineWindow(INF, edge + 100, edge + 100, true, 300, 30);
+
+      expect(after.size).toBe(before.size);
+      expect(after.start - before.start).toBe(100);
+    });
+
     it('always ends at the live edge, whichever side is further ahead', () => {
       expect(getTimelineWindow(Number.NaN, 500, 900, true).start).toBe(900 - LIVE_WINDOW_SECONDS);
       expect(getTimelineWindow(Number.NaN, 900, 500, true).start).toBe(900 - LIVE_WINDOW_SECONDS);
