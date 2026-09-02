@@ -71,4 +71,10 @@ export interface DashValidationRuntime extends ValidationRuntime {
   getSegmentsSince(count: number): DashSegmentEntry[];
   getSegmentCount(): number;
   getErrorReason(): string | null;
+  /**
+   * `timeShiftBufferDepth` from the manifest, or `null` before it has said.
+   * The timeline sizes itself to this rather than to `video.seekable`, which
+   * grows toward it and would make the bar rescale while it settled.
+   */
+  getDvrWindowSeconds(): number | null;
 }

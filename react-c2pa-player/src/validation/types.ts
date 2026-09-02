@@ -171,6 +171,12 @@ export interface ValidationStatusSnapshot {
    * same value the adapter prunes by rather than its own copy of the default.
    */
   liveRetentionSeconds?: number;
+  /**
+   * How far back the origin lets anyone seek (`timeShiftBufferDepth`), in
+   * seconds. The timeline spans this, capped by the retention, so the bar
+   * covers exactly what can be reached. `undefined` until the manifest says.
+   */
+  dvrWindowSeconds?: number;
 }
 
 export type ValidationSessionListener = (snapshot: ValidationStatusSnapshot) => void;

@@ -22,7 +22,6 @@ import type { DashSegmentEntry } from './runtimes/dashBridgeRuntime';
 import {
   FragmentedTimelineProjector,
   isActuallyPlaying,
-  readDvrDepthSeconds,
   readRegionKey,
   resolveSettledBefore,
   selectLiveRegions,
@@ -210,15 +209,16 @@ export class DashFragmentedFmp4Session implements ValidationSession {
       return Number.NEGATIVE_INFINITY;
     }
 
-    const depth = readDvrDepthSeconds(this.#videoElement);
+    const depth = this.#runtime.getDvrWindowSeconds();
 
     if (depth === null) {
       return Number.NEGATIVE_INFINITY;
     }
 
-    // The newest verdict rather than the element's seekable end: while paused,
-    // dash.js freezes the whole seekable range, and this boundary has to keep
-    // moving for a paused player to resolve itself.
+    // The newest verdict, not the element's seekable end: while paused dash.js
+    // freezes the whole seekable range, and this boundary has to keep moving
+    // for a paused player to resolve itself. The depth above is the manifest's
+    // declared value for the same reason - the seekable width grows toward it.
     const liveEdge = this.#knownSegments.reduce(
       (latest, segment) => Math.max(latest, segment.endTime),
       Number.NEGATIVE_INFINITY,
@@ -263,6 +263,9 @@ export class DashFragmentedFmp4Session implements ValidationSession {
       // against, and its times may be epoch-based.
       isLive: liveSignal ?? undefined,
       liveRetentionSeconds: this.#retentionSeconds,
+      // What the origin actually lets anyone seek back to, so the bar can span
+      // exactly that rather than a figure of our own choosing.
+      dvrWindowSeconds: this.#runtime.getDvrWindowSeconds() ?? undefined,
     };
 
     if (shouldEmit) {

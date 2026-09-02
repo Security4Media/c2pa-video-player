@@ -234,18 +234,3 @@ export function resolveSettledBefore(liveEdge: number, dvrDepthSeconds: number):
 
   return liveEdge - dvrDepthSeconds;
 }
-
-/** The width of the element's seekable range, or null when it has none yet. */
-export function readDvrDepthSeconds(videoElement: {
-  seekable?: { length: number; start(index: number): number; end(index: number): number };
-}): number | null {
-  const seekable = videoElement.seekable;
-
-  if (!seekable || seekable.length === 0) {
-    return null;
-  }
-
-  const depth = seekable.end(seekable.length - 1) - seekable.start(0);
-
-  return Number.isFinite(depth) && depth > 0 ? depth : null;
-}

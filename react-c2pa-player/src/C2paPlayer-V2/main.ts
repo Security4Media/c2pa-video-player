@@ -15,17 +15,14 @@
  */
 
 import type { C2PAPlayerProps } from '../types/c2pa.types';
-import type {
-    C2PAPlayerRootController,
-    C2PATimelineState,
-} from './C2PAPlayerRoot.types';
+import type { C2PAPlayerRootController } from './C2PAPlayerRoot.types';
 import type { VideoJsMenuButtonComponentLike, VideoJsPlayerLike } from './C2paMenu/C2paMenu.types';
 import type {
     AdapterCapabilities,
     ValidationStatusSnapshot,
     ValidationTimelineSegment,
 } from '../validation';
-import { createC2PAStatusFromSnapshot, readDvrDepthSeconds } from '../validation';
+import { createC2PAStatusFromSnapshot } from '../validation';
 import { initializeC2PAControlBar } from './C2paControlBar/C2paControlBarFunctions';
 import {
     displayFrictionOverlay,
@@ -79,48 +76,6 @@ interface C2PAVideoJsPlayer extends VideoJsPlayerLike {
     play(): void;
 }
 
-interface TimelineFunctions {
-    getTimelineState: (
-        useStaticTimelineFallback: boolean,
-        videoPlayer: C2PAVideoJsPlayer,
-        currentTime?: number,
-    ) => C2PATimelineState;
-    handleC2PAValidation: (
-        verificationStatus: string,
-        currentTime: number,
-        c2paControlBar: TimelineComponentLike,
-    ) => void;
-    handleOnSeeked: (time: number) => boolean;
-    handleOnSeeking: (
-        time: number,
-        playbackStarted: boolean,
-        lastPlaybackTime: number,
-        useStaticTimelineFallback: boolean,
-        c2paControlBar: TimelineComponentLike,
-        videoPlayer: C2PAVideoJsPlayer,
-    ) => [boolean, number];
-    updateC2PATimeline: (
-        currentTime: number,
-        videoPlayer: C2PAVideoJsPlayer,
-        extendTrailingSegmentToPlayhead?: boolean,
-        isLive?: boolean,
-        retentionSeconds?: number,
-    ) => void;
-    replaceC2PATimelineSegments: (
-        segments: NonNullable<ValidationStatusSnapshot['timelineSegments']>,
-        videoPlayer: C2PAVideoJsPlayer,
-        c2paControlBar: TimelineComponentLike,
-        isLive?: boolean,
-        retentionSeconds?: number,
-    ) => void;
-    renderWholeAssetVerdict: (
-        verificationStatus: string,
-        videoPlayer: C2PAVideoJsPlayer,
-        c2paControlBar: TimelineComponentLike,
-        isLive?: boolean,
-        retentionSeconds?: number,
-    ) => void;
-}
 
 function getValidationState(snapshot: ValidationStatusSnapshot | null): string {
     return snapshot?.result?.validationState ?? 'Unknown';
@@ -145,6 +100,9 @@ export const C2PAPlayer = function (
     let playerRoot: C2PAPlayerRootController | null = null;
     const timelinePreview = createTimelinePreview();
     let sourceIsLive = false;
+    // `timeShiftBufferDepth`, as the manifest declares it. Sizes the bar and
+    // decides whether a paused position still exists at the origin.
+    let dvrWindowSeconds: number | null = null;
     // When the stream was paused, so resuming can tell whether the position it
     // was left at still exists at the origin.
     let pausedAtEpochMs: number | null = null;
@@ -175,7 +133,7 @@ export const C2PAPlayer = function (
         updateC2PATimeline,
         replaceC2PATimelineSegments,
         renderWholeAssetVerdict,
-    } = getTimelineFunctions(handleTimelineSegmentClick) as TimelineFunctions;
+    } = getTimelineFunctions(handleTimelineSegmentClick);
 
     let isManifestInvalid = false;
     let seeking = false;
@@ -203,7 +161,7 @@ export const C2PAPlayer = function (
         const decision = decideLiveResume(
             sourceIsLive,
             pausedFor,
-            readDvrDepthSeconds(videoElement),
+            dvrWindowSeconds,
         );
 
         if (!decision.rejoinAtLiveEdge) {
@@ -350,10 +308,18 @@ export const C2PAPlayer = function (
             // The adapter's own retention, so the bar cannot show a stretch
             // whose verdicts have already been pruned behind it.
             const retentionSeconds = snapshot?.liveRetentionSeconds;
+            dvrWindowSeconds = snapshot?.dvrWindowSeconds ?? null;
 
             if (c2paControlBar && (wholeAssetInvalid || ownsFullTimeline || isOrdinaryForwardTick)) {
                 if (wholeAssetInvalid) {
-                    renderWholeAssetVerdict('Invalid', videoPlayer, c2paControlBar, isLive, retentionSeconds);
+                    renderWholeAssetVerdict(
+                        'Invalid',
+                        videoPlayer,
+                        c2paControlBar,
+                        isLive,
+                        retentionSeconds,
+                        dvrWindowSeconds,
+                    );
                 } else if (ownsFullTimeline) {
                     replaceC2PATimelineSegments(
                         snapshot?.timelineSegments ?? [],
@@ -361,6 +327,7 @@ export const C2PAPlayer = function (
                         c2paControlBar,
                         isLive,
                         retentionSeconds,
+                        dvrWindowSeconds,
                     );
                 } else {
                     handleC2PAValidation(
@@ -371,7 +338,14 @@ export const C2PAPlayer = function (
                     // Playhead-appended fallback: stretch the trailing segment
                     // to the playhead, since its verdict covers the asset from
                     // where it started through wherever playback has reached.
-                    updateC2PATimeline(currentTime, videoPlayer, true, isLive, retentionSeconds);
+                    updateC2PATimeline(
+                        currentTime,
+                        videoPlayer,
+                        true,
+                        isLive,
+                        retentionSeconds,
+                        dvrWindowSeconds,
+                    );
                 }
 
                 const timeline = getTimelineState(useStaticTimelineFallback, videoPlayer, currentTime);

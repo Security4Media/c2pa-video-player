@@ -34,10 +34,11 @@
  * in one place either way.
  *
  * Only two methods need replacing, because video.js derives everything else
- * from them: `getPercent` decides where the playhead is drawn, and
- * `calculateDistance` is the sole input into where a click seeks to. Both defer
- * to video.js whenever there is no live window - VOD, and any live source
- * without a C2PA timeline, behave exactly as before.
+ * from them: `getPercent` decides where the playhead is drawn - pinned to the
+ * right on live, see below - and `calculateDistance` is the sole input into
+ * where a click seeks to. Both defer to video.js whenever there is no live
+ * window, so VOD and any live source without a C2PA timeline behave exactly as
+ * before.
  */
 
 import videojs from 'video.js';
@@ -65,7 +66,20 @@ const SeekBar = videojs.getComponent('SeekBar') as unknown as {
 };
 
 class C2PASeekBar extends SeekBar {
-  /** Where the playhead is drawn. */
+  /**
+   * Where the playhead is drawn: pinned to the right on a live source.
+   *
+   * The bar's right edge is the live edge, so the handle sitting there reads
+   * as "now" and stops moving about - it no longer drifts left while paused,
+   * and no longer disagrees with the segments beside it.
+   *
+   * It also stops carrying any information, which is the deliberate trade.
+   * Whether playback is at the edge or behind it is said by the LIVE button
+   * instead, whose dot video.js colours grey when behind and red when at the
+   * edge; and how much has been watched is said by the settled/provisional
+   * boundary in the segments themselves. A handle that is always in the same
+   * place cannot contradict either of them.
+   */
   getPercent(): number {
     const window = getLiveTimelineWindow();
 
@@ -73,7 +87,7 @@ class C2PASeekBar extends SeekBar {
       return super.getPercent();
     }
 
-    return clampFraction((this.player_.currentTime() - window.start) / window.size);
+    return 1;
   }
 
   /**

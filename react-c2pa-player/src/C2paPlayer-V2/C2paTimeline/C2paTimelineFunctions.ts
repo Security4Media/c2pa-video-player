@@ -15,7 +15,6 @@
  */
 
 import { DEFAULT_LIVE_RETENTION_SECONDS } from '@/validation/policy/liveRetention';
-import { readDvrDepthSeconds } from '@/validation/timeline';
 import type { C2PATimelineSegmentUpdate, ValidationState } from '@/types/c2pa.types';
 import type { C2PATimelineState } from '../C2PAPlayerRoot.types';
 import type { VideoJsPlayerLike } from '../C2paMenu/C2paMenu.types';
@@ -62,11 +61,9 @@ interface TimelineComponentLike {
 interface TimelineVideoPlayer extends VideoJsPlayerLike {
     currentTime(): number;
     duration(): number;
-    /** The DVR range, for marking how much of a live window can be seeked. */
-    seekable?(): { length: number; start(index: number): number; end(index: number): number };
 }
 
-interface TimelineFunctions {
+export interface TimelineFunctions {
     getTimelineState: (
         isMonolithic: boolean,
         videoPlayer: TimelineVideoPlayer,
@@ -92,6 +89,8 @@ interface TimelineFunctions {
         videoPlayer: TimelineVideoPlayer,
         extendTrailingSegmentToPlayhead?: boolean,
         isLive?: boolean,
+        retentionSeconds?: number,
+        dvrWindowSeconds?: number | null,
     ) => void;
     replaceC2PATimelineSegments: (
         segments: C2PATimelineSegmentUpdate[],
@@ -99,6 +98,7 @@ interface TimelineFunctions {
         c2paControlBar: TimelineComponentLike,
         isLive?: boolean,
         retentionSeconds?: number,
+        dvrWindowSeconds?: number | null,
     ) => void;
     renderWholeAssetVerdict: (
         verificationStatus: TimelineVerificationStatus,
@@ -106,6 +106,7 @@ interface TimelineFunctions {
         c2paControlBar: TimelineComponentLike,
         isLive?: boolean,
         retentionSeconds?: number,
+        dvrWindowSeconds?: number | null,
     ) => void;
 }
 
@@ -343,6 +344,7 @@ export function getTimelineFunctions(
         extendTrailingSegmentToPlayhead = false,
         isLive = false,
         retentionSeconds = DEFAULT_LIVE_RETENTION_SECONDS,
+        dvrWindowSeconds: number | null = null,
     ) {
         // No synthetic "unknown" placeholder when there is nothing to show: an
         // empty list is the correct initial state now that the track's own grey
@@ -360,14 +362,13 @@ export function getTimelineFunctions(
             (max, segment) => Math.max(max, parseFloat(segment.dataset.endTime)),
             0,
         );
-        const dvrDepth = readDvrDepthSeconds({ seekable: videoPlayer.seekable?.() });
         const window = getTimelineWindow(
             videoPlayer.duration(),
             currentTime,
             latestKnownEndTime,
             isLive,
             retentionSeconds,
-            dvrDepth,
+            dvrWindowSeconds,
         );
 
         publishLiveWindow(window, isLive);
@@ -533,6 +534,7 @@ export function getTimelineFunctions(
         c2paControlBar: TimelineComponentLike,
         isLive = false,
         retentionSeconds = DEFAULT_LIVE_RETENTION_SECONDS,
+        dvrWindowSeconds: number | null = null,
     ) {
         removeProgressSegments();
 
@@ -545,14 +547,13 @@ export function getTimelineFunctions(
             (max, segment) => Math.max(max, segment.endTime),
             0,
         );
-        const dvrDepth = readDvrDepthSeconds({ seekable: videoPlayer.seekable?.() });
         const window = getTimelineWindow(
             videoPlayer.duration(),
             videoPlayer.currentTime(),
             latestKnownEndTime,
             isLive,
             retentionSeconds,
-            dvrDepth,
+            dvrWindowSeconds,
         );
 
         publishLiveWindow(window, isLive);
@@ -597,17 +598,17 @@ export function getTimelineFunctions(
         c2paControlBar: TimelineComponentLike,
         isLive = false,
         retentionSeconds = DEFAULT_LIVE_RETENTION_SECONDS,
+        dvrWindowSeconds: number | null = null,
     ) {
         removeProgressSegments();
 
-        const dvrDepth = readDvrDepthSeconds({ seekable: videoPlayer.seekable?.() });
         const window = getTimelineWindow(
             videoPlayer.duration(),
             videoPlayer.currentTime(),
             0,
             isLive,
             retentionSeconds,
-            dvrDepth,
+            dvrWindowSeconds,
         );
         publishLiveWindow(window, isLive);
 

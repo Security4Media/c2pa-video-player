@@ -61,6 +61,11 @@ class StubRuntime implements DashValidationRuntime {
   getErrorReason(): string | null {
     return this.errorReason;
   }
+  /** `timeShiftBufferDepth`, as the manifest declares it. */
+  dvrWindowSeconds: number | null = null;
+  getDvrWindowSeconds(): number | null {
+    return this.dvrWindowSeconds;
+  }
   notify(): void {
     for (const listener of this.#listeners) listener();
   }
@@ -70,27 +75,13 @@ interface PlaybackFlags {
   paused: boolean;
   seeking: boolean;
   ended: boolean;
-  /**
-   * The DVR range. Only its *width* is read, to decide how far behind the live
-   * edge content stops being playable - measured on a real paused stream, the
-   * range's position freezes entirely, so nothing may depend on it moving.
-   */
-  seekable: { length: number; start(index: number): number; end(index: number): number };
 }
 
 const videoElement = (state: Partial<PlaybackFlags> = {}): PlaybackFlags => ({
   paused: false,
   seeking: false,
   ended: false,
-  seekable: { length: 0, start: () => 0, end: () => 0 },
   ...state,
-});
-
-/** A DVR range `depth` seconds wide, as a live stream advertises. */
-const dvr = (depth: number) => ({
-  length: 1,
-  start: () => 0,
-  end: () => depth,
 });
 
 const segment = (
@@ -172,10 +163,10 @@ describe('DashFragmentedFmp4Session', () => {
     });
 
     it('settles a segment once it can no longer be played', async () => {
-      // A 30s DVR: content more than 30s behind the newest segment is gone from
-      // the origin, so it can never be played and its provisional marking has
-      // nothing left to express.
-      element.seekable = dvr(30);
+      // A 30s DVR, as the manifest declares it: content more than 30s behind
+      // the newest segment is gone from the origin, so it can never be played
+      // and its provisional marking has nothing left to express.
+      runtime.dvrWindowSeconds = 30;
       runtime.segments = [segment(0, 4), segment(4, 8)];
       await session.load();
 
@@ -200,7 +191,7 @@ describe('DashFragmentedFmp4Session', () => {
       // On VOD nothing ever goes out of reach, so an unread verdict stays
       // unread however long the asset sits there.
       runtime.live = false;
-      element.seekable = dvr(30);
+      runtime.dvrWindowSeconds = 30;
       runtime.segments = Array.from({ length: 20 }, (_, i) => segment(i * 4, (i + 1) * 4));
       await session.load();
 

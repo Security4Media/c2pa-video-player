@@ -47,7 +47,7 @@ export {
   KNOWN_MIME_TYPE_EXTENSIONS,
   type CreateMediaSourceDescriptorInput,
 } from './sourceDetection';
-export { FragmentedTimelineProjector, readDvrDepthSeconds } from './timeline';
+export { FragmentedTimelineProjector } from './timeline';
 export { UnsupportedValidationAdapter } from './unsupportedAdapter';
 export type {
   AdapterCapabilities,

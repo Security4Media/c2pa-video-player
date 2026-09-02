@@ -100,6 +100,17 @@ export class DashBridgeRuntime {
   #controller: C2paController | null = null;
   #fragmentLoadingEventName: string | null = null;
   #streamInitializedEventName: string | null = null;
+  #manifestLoadedEventName: string | null = null;
+  /**
+   * `timeShiftBufferDepth`, as the MPD declares it.
+   *
+   * Deliberately the declared value rather than the width of
+   * `video.seekable`: dash.js grows the seekable range toward this as content
+   * is published, so early on it reports less than the origin actually keeps -
+   * and anything sized from it would rescale while it settled. This is stable
+   * from the first manifest.
+   */
+  #dvrWindowSeconds: number | null = null;
   #message = 'Live DASH C2PA validation pending';
   #errorReason: string | null = null;
   #estimatedTimelineEnd = 0;
@@ -136,6 +147,8 @@ export class DashBridgeRuntime {
 
     this.#streamInitializedEventName = MediaPlayer.events.STREAM_INITIALIZED;
     player.on(this.#streamInitializedEventName, this.#onStreamInitialized);
+    this.#manifestLoadedEventName = MediaPlayer.events.MANIFEST_LOADED;
+    player.on(this.#manifestLoadedEventName, this.#onManifestLoaded);
 
     this.#context.videoElement.addEventListener('seeking', this.#onVideoSeeking);
 
@@ -166,6 +179,10 @@ export class DashBridgeRuntime {
     this.#metadata = null;
     if (this.#player && this.#fragmentLoadingEventName) {
       this.#player.off(this.#fragmentLoadingEventName, this.#onFragmentLoadingCompleted);
+    }
+
+    if (this.#player && this.#manifestLoadedEventName) {
+      this.#player.off(this.#manifestLoadedEventName, this.#onManifestLoaded);
     }
 
     if (this.#player && this.#streamInitializedEventName) {
@@ -239,6 +256,15 @@ export class DashBridgeRuntime {
 
   getErrorReason(): string | null {
     return this.#errorReason;
+  }
+
+  /**
+   * How far back the origin lets anyone seek, in seconds, or `null` before the
+   * manifest has said. Sizes the timeline window and decides whether a paused
+   * position still exists.
+   */
+  getDvrWindowSeconds(): number | null {
+    return this.#dvrWindowSeconds;
   }
 
   /** `null` until STREAM_INITIALIZED fires and reveals live vs. VOD. */
@@ -351,6 +377,16 @@ export class DashBridgeRuntime {
     this.#segments.push({ startTime, endTime, result });
     this.#evictStaleSegments();
     this.#emit();
+  };
+
+  #onManifestLoaded = (event: unknown): void => {
+    // dash.js parses the MPD's ISO-8601 duration into seconds for us.
+    const declared = (event as { data?: { timeShiftBufferDepth?: unknown } } | null)?.data
+      ?.timeShiftBufferDepth;
+
+    if (typeof declared === 'number' && Number.isFinite(declared) && declared > 0) {
+      this.#dvrWindowSeconds = declared;
+    }
   };
 
   #onInitProcessed = (event: InitProcessedEvent): void => {

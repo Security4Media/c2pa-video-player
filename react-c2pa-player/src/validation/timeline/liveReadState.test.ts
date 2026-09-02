@@ -15,11 +15,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import {
-  readDvrDepthSeconds,
-  resolveSettledBefore,
-  selectLiveRegions,
-} from './liveReadState';
+import { resolveSettledBefore, selectLiveRegions } from './liveReadState';
 import type { SegmentVerdict } from './readRegionGate';
 import { WatchedTimeline } from './watchedTimeline';
 
@@ -171,21 +167,5 @@ describe('resolveSettledBefore', () => {
     expect(resolveSettledBefore(Number.NEGATIVE_INFINITY, 30)).toBe(Number.NEGATIVE_INFINITY);
     expect(resolveSettledBefore(100, 0)).toBe(Number.NEGATIVE_INFINITY);
     expect(resolveSettledBefore(100, Number.NaN)).toBe(Number.NEGATIVE_INFINITY);
-  });
-});
-
-describe('readDvrDepthSeconds', () => {
-  const seekable = (start: number, end: number) => ({
-    seekable: { length: 1, start: () => start, end: () => end },
-  });
-
-  it('reads the width of the seekable range', () => {
-    expect(readDvrDepthSeconds(seekable(1_788_348_841.7, 1_788_348_871.7))).toBeCloseTo(30, 1);
-  });
-
-  it('returns null before there is a range, rather than guessing zero', () => {
-    expect(readDvrDepthSeconds({ seekable: { length: 0, start: () => 0, end: () => 0 } })).toBeNull();
-    expect(readDvrDepthSeconds({})).toBeNull();
-    expect(readDvrDepthSeconds(seekable(10, 10))).toBeNull();
   });
 });
