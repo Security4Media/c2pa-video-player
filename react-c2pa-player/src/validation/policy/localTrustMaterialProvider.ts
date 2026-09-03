@@ -27,6 +27,7 @@ import prodTrustAnchorsUrl from '/trust/prod/trust_anchors.pem?url';
 import prodTrustConfigUrl from '/trust/prod/c2pa_store.cfg?url';
 import devAllowedListUrl from '/trust/dev/dev_allowed_list.pem?url';
 import devTrustAnchorsUrl from '/trust/dev/dev_trust_anchors.pem?url';
+import tsaTrustAnchorsUrl from '/trust/tsa/tsa_trust_anchors.pem?url';
 import type { TrustMaterial, TrustMaterialProvider } from '../types';
 import { buildTrustMaterial } from './trustMaterial';
 
@@ -43,6 +44,24 @@ const REMOTE_TRUST_ANCHORS_URL =
   'https://raw.githubusercontent.com/contentauth/verify-site/refs/heads/main/static/trust/anchors.pem';
 const REMOTE_ALLOWED_LIST_URL =
   'https://raw.githubusercontent.com/contentauth/verify-site/refs/heads/main/static/trust/allowed.pem';
+
+/**
+ * The C2PA conformance programme's timestamp-authority trust list.
+ *
+ * Fetched rather than vendored, deliberately: a TSA list is the one piece of
+ * trust material where being current matters more than being reproducible,
+ * because a timestamp that cannot be trusted silently downgrades every
+ * signature made with an since-expired certificate. Unlike the two community
+ * lists above it is fetched by **both** profiles, including `full-prod`, and
+ * so is the one runtime dependency the shipped policy has.
+ *
+ * It fails open, like the others: no TSA list means timestamps are validated
+ * but not trusted, so certificate validity is judged against `now` instead of
+ * the timestamp's genTime. That is a degradation (old content stops reading
+ * as Trusted), never a widening.
+ */
+const REMOTE_TSA_TRUST_LIST_URL =
+  'https://raw.githubusercontent.com/c2pa-org/conformance-public/refs/heads/main/trust-list/C2PA-TSA-TRUST-LIST.pem';
 
 /**
  * Where each list is read from.
@@ -64,6 +83,14 @@ export interface TrustResourceUrls {
   cawgAllowed: readonly string[];
   /** Trust store configuration, `.cfg`. One file, used for both policies. */
   trustConfig: string;
+  /**
+   * Timestamp-authority anchors. Held apart from `anchors` so a profile can
+   * say whether it wants TSA trust, and so the negative controls can drop it,
+   * but unioned into the same pool at the end because the engine has only one.
+   */
+  tsaAnchors?: readonly string[];
+  /** The C2PA TSA trust list, fetched at runtime. Omit to skip the fetch. */
+  tsaRemoteUrl?: string;
   /** Community lists are skipped when false, e.g. to keep a test offline. */
   includeRemote?: boolean;
   /**
@@ -88,6 +115,11 @@ export const defaultTrustResourceUrls: TrustResourceUrls = {
   // prod/ is a single list used for both sections, as its README states.
   cawgAllowed: [prodAllowedListUrl],
   trustConfig: prodTrustConfigUrl,
+  // Timestamp trust is not a development affordance, so it is in both
+  // profiles: without it a signature made before its certificate expired
+  // reads as untrusted, which is a wrong answer rather than a cautious one.
+  tsaAnchors: [tsaTrustAnchorsUrl],
+  tsaRemoteUrl: REMOTE_TSA_TRUST_LIST_URL,
   includeRemote: false,
 };
 
@@ -97,6 +129,8 @@ export const devTrustResourceUrls: TrustResourceUrls = {
   c2paAllowed: [prodAllowedListUrl, devAllowedListUrl],
   cawgAllowed: [prodAllowedListUrl, devAllowedListUrl],
   trustConfig: prodTrustConfigUrl,
+  tsaAnchors: [tsaTrustAnchorsUrl],
+  tsaRemoteUrl: REMOTE_TSA_TRUST_LIST_URL,
   includeRemote: true,
 };
 
@@ -120,11 +154,14 @@ export class LocalTrustMaterialProvider implements TrustMaterialProvider {
   async #load(): Promise<TrustMaterial> {
     const includeRemote = this.#urls.includeRemote ?? true;
     const override = this.#urls.cawgOverride;
+    const tsaUrls = this.#urls.tsaAnchors ?? [];
     const [
       anchors,
       cawgAllowed,
       c2paAllowed,
       trustConfig,
+      tsaAnchors,
+      remoteTsaAnchors,
       remoteAnchors,
       remoteAllowed,
       cawgOverrideAnchors,
@@ -134,6 +171,8 @@ export class LocalTrustMaterialProvider implements TrustMaterialProvider {
       fetchJoined(this.#urls.cawgAllowed),
       fetchJoined(this.#urls.c2paAllowed),
       fetchText(this.#urls.trustConfig),
+      tsaUrls.length > 0 ? fetchJoined(tsaUrls) : null,
+      this.#urls.tsaRemoteUrl ? fetchTextOrNull(this.#urls.tsaRemoteUrl) : null,
       includeRemote ? fetchTextOrNull(REMOTE_TRUST_ANCHORS_URL) : null,
       includeRemote ? fetchTextOrNull(REMOTE_ALLOWED_LIST_URL) : null,
       override ? fetchJoined(override.anchors) : null,
@@ -145,6 +184,8 @@ export class LocalTrustMaterialProvider implements TrustMaterialProvider {
       c2paAllowed,
       cawgAllowed,
       trustConfig,
+      tsaAnchors,
+      remoteTsaAnchors,
       remoteAnchors,
       remoteAllowed,
       ...(cawgOverrideAnchors !== null && cawgOverrideAllowed !== null

@@ -37,6 +37,19 @@ export interface TrustMaterialSources {
   /** Community end-entity certificates, when reachable. */
   remoteAllowed?: string | null;
   /**
+   * Timestamp-authority anchors, local and remote.
+   *
+   * They are unioned into `trustAnchors` rather than given a slot of their
+   * own because the engine gives them none: @nettrek/c2pa-web-crypto derives
+   * the TSA store from the caller's store (`tsaTrustStore`, which spreads it
+   * and only narrows `allowedEku` to id-kp-timeStamping and empties
+   * `allowedEndEntities`). There is one anchor pool and TSA trust reads from
+   * it, so a TSA anchor necessarily widens claim-signer trust as well. See
+   * trust/tsa/README.md, which says what that costs.
+   */
+  tsaAnchors?: string | null;
+  remoteTsaAnchors?: string | null;
+  /**
    * Replaces the derived CAWG identity policy outright.
    *
    * The default policy is deliberately the C2PA one widened by the CAWG-only
@@ -59,7 +72,12 @@ export interface TrustMaterialSources {
  * that does.
  */
 export function buildTrustMaterial(sources: TrustMaterialSources): TrustMaterial {
-  const anchors = unionPem(sources.anchors, sources.remoteAnchors);
+  const anchors = unionPem(
+    sources.anchors,
+    sources.remoteAnchors,
+    sources.tsaAnchors,
+    sources.remoteTsaAnchors,
+  );
   const c2paAllowed = unionPem(sources.c2paAllowed, sources.remoteAllowed);
 
   return {
@@ -87,6 +105,13 @@ export function buildTrustMaterial(sources: TrustMaterialSources): TrustMaterial
   };
 }
 
-function unionPem(local: string, remote: string | null | undefined): string {
-  return remote ? `${local}\n${remote}` : local;
+/**
+ * Concatenates PEM bundles, skipping the ones that are absent or empty.
+ *
+ * A newline between them, never a bare join: a bundle with no trailing newline
+ * would otherwise run its last base64 line into the next one's
+ * `-----BEGIN CERTIFICATE-----` and lose both certificates.
+ */
+function unionPem(...parts: readonly (string | null | undefined)[]): string {
+  return parts.filter((part): part is string => Boolean(part)).join('\n');
 }

@@ -85,12 +85,16 @@ content whose certificate happens to be in the right state.
 
 | `?trust=` | Certificates | For |
 |---|---|---|
-| omitted, or `full-prod` | `trust/prod/` only | what a deployment does. Test-signed content reads as valid but untrusted |
-| `full-dev` | `trust/prod/` + `trust/dev/` | demoing the bundled test assets, which are signed by test roots |
+| omitted, or `full-prod` | `trust/prod/` + `trust/tsa/` | what a deployment does. Test-signed content reads as valid but untrusted |
+| `full-dev` | the same, plus `trust/dev/` | demoing the bundled test assets, which are signed by test roots |
 | `anchors-only` | `full-dev`, allow-lists emptied | proving trust can be reached by chaining rather than by allow-listing |
 | `cawg-missing` | `full-dev`, CAWG identity policy emptied | proving the CAWG identity is evaluated separately from the claim |
-| `empty` | nothing | proving a correctly signed asset still validates, untrusted |
+| `empty` | nothing, timestamp anchors included | proving a correctly signed asset still validates, untrusted |
 | `wrong-anchor` | one anchor belonging to no one | negative control |
+
+The last two clear `trust/tsa/` as well, both the file and the fetch. It lands
+in the same anchor pool as everything else, so inheriting it would quietly
+refill the two profiles whose whole job is to have nothing to chain to.
 
 The four narrowing profiles start from `full-dev`, not from the shipped policy:
 they demonstrate a mechanism against the bundled test assets, and several of
@@ -155,14 +159,27 @@ removed. `LocalTrustMaterialProvider` loads everything under it. Full detail is
 in `trust/README.md`; the short version:
 
 ```
-trust/prod/    the pinned production bundle. The shipped policy, and nothing else.
-trust/dev/     test roots and broadcaster test identities, layered on top of prod.
+trust/prod/    the pinned production bundle. The shipped policy.
+trust/tsa/     timestamp-authority anchors. Read by BOTH profiles.
+trust/dev/     test roots and broadcaster test identities. full-dev only.
 trust/fixtures/  an empty list and an anchor belonging to no one.
 ```
 
 `trust/dev/` is an **overlay**: it holds only what `prod/` does not, and both
 profiles name the same production file. A self-contained dev bundle would be a
 second copy of 178 certificates that drifts every time `prod/` is regenerated.
+
+`trust/tsa/` is not a development affordance, which is why it sits beside
+`prod/` rather than inside `dev/`. A C2PA signature carries an RFC 3161
+timestamp, and if that timestamp cannot be trusted the signing certificate is
+judged against *now* instead of the moment it signed, so content signed
+correctly before its certificate expired reads as untrusted. 86 of the 192
+bundled certificates are already expired, so that is the common case here. It
+holds the CAs behind `http://timestamp.digicert.com` and fetches the C2PA
+conformance TSA trust list at runtime, which is the one network dependency the
+shipped policy has. `trust/tsa/README.md` says what it costs; the short version
+is that the engine has a single anchor pool, so a timestamp anchor widens
+claim-signer trust as well.
 
 **The shipped policy does not trust any test certificate.** A page with no
 `?trust=` parameter gets `prod/` alone, so test-signed content reports as valid
@@ -210,6 +227,13 @@ Trusted, because they need different fixes:
    That file lists six OIDs and is used for both the C2PA and CAWG policies.
    `cawg_store.cfg` is narrower and is currently **not read**; see
    `trust/prod/README.md` for why that decision is still open.
+
+A fourth, separate from the three above: the signature's **timestamp** may be
+untrusted, in which case the certificate is checked against now rather than
+against its signing time, and an otherwise sound signature by a since-expired
+certificate reads as Valid rather than Trusted. That is what `trust/tsa/` is
+for. TSA trust is anchor-only and gated on `id-kp-timeStamping`, so a
+timestamp authority cannot be allow-listed into trust, only anchored.
 
 ## License
 

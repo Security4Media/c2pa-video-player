@@ -75,6 +75,10 @@ export const trustFixtures: Record<TrustFixtureName, TrustResourceUrls> = {
     cawgAllowed: [emptyListUrl],
     // The community lists would put the anchors back.
     includeRemote: false,
+    // So would the timestamp anchors: they land in the same pool, and "nothing
+    // trusted" has to mean nothing. Both cleared, the file and the fetch.
+    tsaAnchors: [],
+    tsaRemoteUrl: undefined,
   },
   // Emptying the CAWG list alone would change nothing, since the identity
   // policy is the C2PA one widened by it; the policy is stated outright.
@@ -88,6 +92,9 @@ export const trustFixtures: Record<TrustFixtureName, TrustResourceUrls> = {
     c2paAllowed: [emptyListUrl],
     cawgAllowed: [emptyListUrl],
     includeRemote: false,
+    // One anchor belonging to no one means one, not one plus the TSA pool.
+    tsaAnchors: [],
+    tsaRemoteUrl: undefined,
   },
 };
 

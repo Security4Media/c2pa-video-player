@@ -46,7 +46,14 @@ TRUST = Path(__file__).resolve().parent.parent / 'trust'
 # Only these are loaded by localTrustMaterialProvider.ts. fixtures/ is
 # deliberately excluded: an empty list and an anchor belonging to no one are
 # both "wrong" by every check here, which is what makes them useful.
-ANCHOR_FILES = ['prod/trust_anchors.pem', 'dev/dev_trust_anchors.pem']
+ANCHOR_FILES = [
+    'prod/trust_anchors.pem',
+    'dev/dev_trust_anchors.pem',
+    # Timestamp anchors land in the same pool, so they are checked as
+    # anchors. The C2PA TSA trust list is fetched at runtime and is not
+    # covered here.
+    'tsa/tsa_trust_anchors.pem',
+]
 ALLOWED_FILES = ['prod/allowed_list.pem', 'dev/dev_allowed_list.pem']
 
 EXPIRY_WARNING_DAYS = 90
@@ -96,7 +103,7 @@ def main():
                 entry = describe(block)
                 entry.update(
                     slot=slot, file=name, fingerprint=fingerprint,
-                    layer='dev' if name.startswith('dev/') else 'prod',
+                    layer=name.split('/')[0],
                 )
                 inventory.append(entry)
 
@@ -105,7 +112,7 @@ def main():
         prod = {e['fingerprint'] for e in inventory
                 if e['slot'] == slot and e['layer'] == 'prod'}
         duplicates += [e for e in inventory
-                       if e['slot'] == slot and e['layer'] == 'dev'
+                       if e['slot'] == slot and e['layer'] != 'prod'
                        and e['fingerprint'] in prod]
 
     expired = [e for e in inventory if e['expires'] and e['expires'] < now]
@@ -143,11 +150,12 @@ def main():
                 print('%-32s %3d certificates' % (name, count))
         print()
 
-        report('dev/ repeats what prod/ already has', duplicates, fatal=True)
+        report('an overlay repeats what prod/ already has', duplicates,
+               fatal=True)
         # Split by layer: an expired entry in prod/ is upstream's deliberate
         # choice, an expired entry in dev/ is usually a dead fixture.
-        report('expired, in dev/', [e for e in expired if e['layer'] == 'dev'],
-               fatal=False)
+        report('expired, outside prod/',
+               [e for e in expired if e['layer'] != 'prod'], fatal=False)
         report('expires within %d days' % EXPIRY_WARNING_DAYS, soon, fatal=False)
         report('in the slot that cannot use it', misplaced, fatal=False)
         print('%d of %d entries are already expired (%d in prod/, retained '

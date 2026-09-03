@@ -91,7 +91,16 @@ const result = await page.evaluate(
         };
       }
 
+      // The timestamp anchors land in the same pool as everything else, so
+      // the only way to see whether a profile actually got them is to look
+      // for a known one. This is the DigiCert Trusted Root G4 that
+      // timestamp.digicert.com chains to, self-signed copy.
+      const G4_ROOT = await digest(
+        '552F7BDCF1A7AF9E6CE672017F4F12ABF77240C78E761AC203D1D9D20AC89988',
+      );
+
       out[name] = {
+        tsaRootPresent: anchorDigests.includes(G4_ROOT),
         anchors: countPem(material.trust.trustAnchors),
         c2paAllowed: countPem(material.trust.allowedList),
         cawgAllowed: countPem(material.cawgTrust.allowedList),
@@ -128,6 +137,7 @@ for (const [name, data] of Object.entries(result)) {
   console.log(
     `  trust config      ${data.trustConfigOids} OIDs, shared with CAWG: ${data.sameTrustConfig}, verifyTrustList: ${data.cawgVerifyTrustList}`,
   );
+  console.log(`  DigiCert Trusted Root G4 in the anchor pool  ${data.tsaRootPresent}`);
 }
 
 await browser.close();

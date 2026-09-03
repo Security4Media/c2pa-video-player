@@ -70,8 +70,9 @@ npm run preview --workspace react-c2pa-player
 ## Trust Stores and Sample Media
 
 Trust configuration lives in one place, `react-c2pa-player/trust/`, split into
-`prod/` (the pinned production bundle, which is what a deployment trusts) and
-`dev/` (test roots and broadcaster test identities, reachable only through
+`prod/` (the pinned production bundle, which is what a deployment trusts),
+`tsa/` (timestamp-authority anchors, read by every profile) and `dev/` (test
+roots and broadcaster test identities, reachable only through
 `?trust=full-dev`). A duplicate `trust/` directory used to sit here at the
 repository root; it was read by no code and has been removed. See
 `react-c2pa-player/trust/README.md`.

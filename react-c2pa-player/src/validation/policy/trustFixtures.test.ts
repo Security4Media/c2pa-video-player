@@ -59,6 +59,18 @@ describe('the shipped trust policy', () => {
   it('does not fetch the community lists at runtime', () => {
     expect(defaultTrustResourceUrls.includeRemote).toBe(false);
   });
+
+  // Timestamp trust is not a development affordance. Without it, a signature
+  // made before its certificate expired is judged against now and reads as
+  // untrusted, and most of the certificates in these bundles are expired.
+  it('carries the timestamp anchors, which full-dev must not be alone in having', () => {
+    expect(defaultTrustResourceUrls.tsaAnchors).toEqual([
+      expect.stringContaining('tsa_trust_anchors'),
+    ]);
+    expect(defaultTrustResourceUrls.tsaRemoteUrl).toContain('C2PA-TSA-TRUST-LIST.pem');
+    expect(trustFixtures['full-dev'].tsaAnchors).toEqual(defaultTrustResourceUrls.tsaAnchors);
+    expect(trustFixtures['full-dev'].tsaRemoteUrl).toBe(defaultTrustResourceUrls.tsaRemoteUrl);
+  });
 });
 
 describe('the development trust profile', () => {
@@ -86,6 +98,23 @@ describe('the development trust profile', () => {
     // would stop telling "allow-listed, not chainable" apart from "no anchors".
     expect(mentionsDevMaterial('anchors-only')).toBe(true);
     expect(mentionsDevMaterial('cawg-missing')).toBe(true);
+  });
+});
+
+describe('the negative controls', () => {
+  // The timestamp anchors are unioned into the same pool as everything else,
+  // so inheriting them from full-dev would quietly refill the two profiles
+  // whose entire job is to have nothing to chain to. Both the file list and
+  // the fetch have to be cleared; clearing one would leave the control blunt
+  // in a way no assertion on the anchors alone would catch.
+  it.each(['empty', 'wrong-anchor'] as const)('%s carries no timestamp anchors', (name) => {
+    expect(trustFixtures[name].tsaAnchors).toEqual([]);
+    expect(trustFixtures[name].tsaRemoteUrl).toBeUndefined();
+    expect(trustFixtures[name].includeRemote).toBe(false);
+  });
+
+  it('anchors-only keeps them, since chaining is the thing it demonstrates', () => {
+    expect(trustFixtures['anchors-only'].tsaAnchors).not.toEqual([]);
   });
 });
 
