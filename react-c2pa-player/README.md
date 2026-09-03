@@ -2,9 +2,18 @@
 
 A React component library and pluggable validation-adapter framework for displaying [C2PA](https://c2pa.org/) Content Credentials during video playback, across three source kinds: monolithic (whole-file mp4/webm/mov), HLS (fragmented fMP4), and live DASH (fragmented fMP4).
 
+Published as [`@security4media/c2pa-player`](#installing-the-package) via GitHub Packages. This
+directory also contains the demo/dev harness app used to build and test it (`src/demo/`), and
+serves as the source for a standalone Docker image (see the root `Dockerfile`).
+
+## Layout
+
+- `src/lib/` — the publishable library: everything under [Public API](#public-api-srclibindexts) below.
+- `src/demo/` — the dev harness/demo app (`App.tsx`, `main.tsx`, `pages/StandalonePlayerPage.tsx`), not published. This is what `npm run dev`, `npm run build`, `npm run build-deploy` and `npm run build-container` all build.
+
 ## Architecture
 
-`src/validation/` is the adapter framework — nothing here is tied to one stream format:
+`src/lib/validation/` is the adapter framework — nothing here is tied to one stream format:
 
 - `registry.ts` resolves a `MediaSourceDescriptor` to the right adapter, using `sourceDetection.ts` (MIME type / extension / manifest content-type sniffing).
 - Three adapters, one per source kind: `monolithicAdapter.ts`, `hlsAdapter.ts`, `dashAdapter.ts`. Each owns a **runtime** (`runtimes/`) that talks to the underlying validation library, and a **normalization** step (`normalization/`) that maps that library's adapter-specific output onto a shared shape (`types.ts`): `NormalizedValidationResult` and the `ManifestSource` union (`manifest-store` / `single-manifest` / `integrity-only` / `none`). The UI layer branches on `ManifestSource`, not on adapter kind.
@@ -15,16 +24,38 @@ A React component library and pluggable validation-adapter framework for display
 - Monolithic and HLS validate via the WebCrypto engine (`@nettrek/c2pa-web-crypto`) rather than the WASM engine (`@contentauth/c2pa-web`) that ships as those libraries' default. This sidesteps a bundler/WASM-integrity mismatch under this repo's dependency tree — see the comments in `runtimes/monolithicBridgeRuntime.ts` and `runtimes/hlsBridgeRuntime.ts`. HLS still falls back to WASM in browsers without `crypto.subtle`.
 - DASH validates via `@qualabs/c2pa-live-dashjs-plugin` (dash.js + `@svta/cml-c2pa`), which performs cryptographic/structural checks only — no trust-anchor evaluation — so DASH segments are capped at `'Valid'`, never `'Trusted'` (see `rules.ts#getDashSegmentValidationState`).
 
-**Player UI** (`src/C2paPlayer-V2/`): the timeline is a legacy imperative Video.js/DOM integration, not a React tree, bridged into a small React-rendered menu (`C2paMenu/`) and friction-warning modal (`C2paFrictionModal/`) via a hand-rolled external store (`C2PAPlayerRoot.types.ts` — `getState`/`setState`/`subscribe`, no context/hooks). Clicking a non-Valid/Trusted timeline segment opens the menu into that fragment's own manifest or integrity verdict instead of the live/current status.
+**Player UI** (`src/lib/C2paPlayer-V2/`): the timeline is a legacy imperative Video.js/DOM integration, not a React tree, bridged into a small React-rendered menu (`C2paMenu/`) and friction-warning modal (`C2paFrictionModal/`) via a hand-rolled external store (`C2PAPlayerRoot.types.ts` — `getState`/`setState`/`subscribe`, no context/hooks). Clicking a non-Valid/Trusted timeline segment opens the menu into that fragment's own manifest or integrity verdict instead of the live/current status.
 
-## Public API (`src/index.ts`)
+## Public API (`src/lib/index.ts`)
 
 ```ts
-import { VideoPlayerSection, useC2PAPlayer } from 'react-c2pa-player';
-import type { C2PAStatus } from 'react-c2pa-player';
+import { VideoPlayerSection, useC2PAPlayer } from '@security4media/c2pa-player';
+import '@security4media/c2pa-player/style.css';
+import type { C2PAStatus } from '@security4media/c2pa-player';
 ```
 
-This is deliberately small — trimmed to what's actually consumed. `VideoPlayerSection` (which internally uses `useC2PAPlayer`) is what `src/pages/StandalonePlayerPage.tsx` uses; that page, wired up via `App.tsx`/`main.tsx`, is the actual app entry point.
+This is deliberately small — trimmed to what's actually consumed. `VideoPlayerSection` (which internally uses `useC2PAPlayer`) is what `src/demo/pages/StandalonePlayerPage.tsx` uses; that page, wired up via `src/demo/App.tsx`/`main.tsx`, is the demo app's entry point.
+
+**Consumers need a Vite-based build.** `useC2PAPlayer` loads the C2PA WASM engine via a
+Vite-only `?url` asset import (`@contentauth/c2pa-web/resources/c2pa.wasm?url`), which is left
+external so consumers get their own installed copy rather than a second one bundled into this
+package. Plain Node `require`/`import` and non-Vite bundlers cannot resolve that import, so this
+package is published as ESM only and is only consumable from a Vite-based app today.
+
+### Installing the package
+
+The package is published to GitHub Packages, not the public npm registry. Add this to the
+consuming project's `.npmrc`:
+
+```
+@security4media:registry=https://npm.pkg.github.com
+```
+
+Then:
+
+```bash
+npm install @security4media/c2pa-player
+```
 
 ## Development
 
@@ -32,11 +63,13 @@ Run from the repository root (this package is an npm workspace member):
 
 ```bash
 npm install
-npm run dev            # Vite dev server (react-c2pa-player workspace)
-npm run build           # tsc && vite build
-npm run build-deploy    # tsc && vite build --config vite.config.deploy.ts (GitHub Pages)
-npm run preview         # preview a production build
-npm start               # http-server on :9000, serving the public/mp4s test fixtures
+npm run dev             # Vite dev server (react-c2pa-player workspace)
+npm run build            # tsc && vite build (src/demo app)
+npm run build-deploy     # tsc && vite build --config vite.config.deploy.ts (GitHub Pages)
+npm run build-container  # tsc && vite build --config vite.config.container.ts (Docker image)
+npm run build-lib        # vite build --config vite.config.lib.ts (published package, dist-lib/)
+npm run preview          # preview a production build
+npm start                # http-server on :9000, serving the public/mp4s test fixtures
 ```
 
 ```bash
@@ -104,7 +137,7 @@ editorial decisions and neither implies the other.
 
 ## Trust material
 
-`react-c2pa-player/trust/` holds the local trust-anchor/allow-list/config files that `LocalTrustMaterialProvider` loads. A second, byte-different `trust/` directory exists at the repository root — only `react-c2pa-player/trust/` is actually read by code; the root one should be reconciled or clarified with whoever owns trust-anchor provisioning.
+`react-c2pa-player/trust/` holds the local trust-anchor/allow-list/config files that `LocalTrustMaterialProvider` (`src/lib/validation/policy/localTrustMaterialProvider.ts`) loads via root-relative Vite asset imports (`/trust/...pem?url`) — resolved against this package's root regardless of where the importing file lives under `src/`, so this keeps working unchanged for the demo build, the container build, and the published library build alike. A second, byte-different `trust/` directory exists at the repository root — only `react-c2pa-player/trust/` is actually read by code; the root one should be reconciled or clarified with whoever owns trust-anchor provisioning.
 
 ## License
 

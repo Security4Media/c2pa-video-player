@@ -1,15 +1,41 @@
 {
-    "name": "react-c2pa-player",
+    "name": "@security4media/c2pa-player",
     "version": "1.0.0",
-    "private": true,
+    "private": false,
     "type": "module",
-    "description": "EBU C2PA Monolithic player",
+    "description": "EBU C2PA video player: a React component and pluggable validation-adapter framework for Content Credentials playback",
     "homepage": "https://Security4Media.github.io/c2pa-player/",
+    "license": "Apache-2.0",
+    "engines": {
+        "node": ">=20"
+    },
+    "publishConfig": {
+        "registry": "https://npm.pkg.github.com"
+    },
+    "main": "./dist-lib/index.js",
+    "module": "./dist-lib/index.js",
+    "types": "./dist-lib/index.d.ts",
+    "exports": {
+        ".": {
+            "types": "./dist-lib/index.d.ts",
+            "import": "./dist-lib/index.js"
+        },
+        "./style.css": "./dist-lib/style.css",
+        "./package.json": "./package.json"
+    },
+    "files": [
+        "dist-lib",
+        "README.md",
+        "LICENSE"
+    ],
     "scripts": {
         "dev-server": "concurrently -n http,vite -c blue,green vite",
         "dev": "vite --",
         "build": "tsc && vite build",
         "build-deploy": "tsc && vite build --config vite.config.deploy.ts",
+        "build-container": "tsc && vite build --config vite.config.container.ts",
+        "build-lib": "vite build --config vite.config.lib.ts",
+        "prepublishOnly": "npm run build-lib",
         "preview": "vite preview",
         "start": "http-server -p 9000 -c-1 -d false -g",
         "test": "vitest run",
@@ -28,11 +54,11 @@
         "@qualabs/c2pa-live-dashjs-plugin": "^1.2.0",
         "dashjs": "^5.2.0",
         "hls.js": "^1.6.16",
-        "http-server": "^14.1.1",
-        "jsx-runtime": "^1.2.0",
-        "react": "^19.0.0",
-        "react-dom": "^19.0.0",
         "video.js": "^8.3.0"
+    },
+    "peerDependencies": {
+        "react": "^19.0.0",
+        "react-dom": "^19.0.0"
     },
     "devDependencies": {
         "@types/node": "^26.4.0",
@@ -41,9 +67,13 @@
         "@types/video.js": "^7.3.58",
         "@vitejs/plugin-react": "^4.2.1",
         "concurrently": "^9.1.2",
+        "http-server": "^14.1.1",
         "playwright-core": "^1.62.1",
+        "react": "^19.0.0",
+        "react-dom": "^19.0.0",
         "typescript": "^5.3.3",
         "vite": "^5.1.0",
+        "vite-plugin-dts": "^4.0.0",
         "vitest": "^4.1.11"
     }
 }
