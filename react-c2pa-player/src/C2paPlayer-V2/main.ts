@@ -33,7 +33,10 @@ import {
     displayFrictionOverlay,
     disposeFrictionOverlay,
     initializeFrictionOverlay,
+    requestConsent,
+    updateAuthenticityLabel,
     updatePlayerRootValidationState,
+    withdrawConsent,
 } from './C2paFrictionModal/C2paFrictionModalFunctions';
 import {
     closeDebugConsole,
@@ -43,9 +46,18 @@ import {
     setPlayerRootController,
     updateC2PAMenu,
 } from './C2paMenu/C2paMenuFunctions';
+import {
+    advanceAuthenticityGate,
+    initialAuthenticityGateState,
+    type AuthenticityGateDecision,
+    type AuthenticityGateEvent,
+    type AuthenticityGateInputs,
+    type AuthenticityGateState,
+} from './C2paAuthenticity/authenticityGate';
 import { getTimelineFunctions } from './C2paTimeline/C2paTimelineFunctions';
 import { createTimelinePreview } from './C2paTimeline/C2paTimelinePreview';
 import { decideLiveResume } from './C2paTimeline/liveResume';
+import { selectPlayheadVerdict } from './C2paTimeline/playheadVerdict';
 import {
     decideValidatedPlayback,
     newestVerdictEnd,
@@ -87,6 +99,19 @@ interface C2PAVideoJsPlayer extends VideoJsPlayerLike {
 }
 
 
+/**
+ * How often to re-evaluate the gate while nothing else is ticking.
+ *
+ * Only running while a decision reports a deadline, which is a collapse a few
+ * seconds out or a consent question counting down. `playbackUpdate` is driven
+ * by `timeupdate`, `play`, `seeking`, `seeked` and session emissions, and a
+ * paused player produces none of them - paused DASH emits nothing at all - so
+ * without this the countdown would freeze on the second it was raised and the
+ * question would never withdraw. 250ms so a whole-second countdown never
+ * appears to skip a number.
+ */
+const AUTHENTICITY_TICK_MS = 250;
+
 function getValidationState(snapshot: ValidationStatusSnapshot | null): string {
     return snapshot?.result?.validationState ?? 'Unknown';
 }
@@ -119,11 +144,40 @@ export const C2PAPlayer = function (
     // When the stream was paused, so resuming can tell whether the position it
     // was left at still exists at the origin.
     let pausedAtEpochMs: number | null = null;
+    // True while playback is being held for an unanswered consent question.
+    let heldForConsent = false;
+    // Whether *we* are the reason the picture is stopped. Read on the falling
+    // edge so releasing a hold cannot resume a pause the viewer asked for.
+    let holdingPlayback = false;
+    let authenticityGate: AuthenticityGateState = initialAuthenticityGateState(Date.now());
+    /**
+     * The last inputs the gate was given, minus the two that are always fresh.
+     *
+     * Cached so the timer above can re-evaluate without a snapshot. Safe
+     * because the verdict at the playhead cannot move under a paused player:
+     * `WatchedTimeline.observePlayhead` ignores samples while playback is not
+     * actually running, so no new region can appear over a stationary
+     * playhead. Null until the first tick, which is what stops the timer
+     * running before there is anything to decide.
+     */
+    let authenticityInputs:
+        | Omit<AuthenticityGateInputs, 'event' | 'nowMs' | 'alreadyPausedSeconds'>
+        | null = null;
+    let authenticityTimerId: ReturnType<typeof setInterval> | null = null;
+    // Whether the per-run question is in force, which suppresses the legacy
+    // once-per-source one. Read off the snapshot rather than the URL so the
+    // policy has one path into the player layer.
+    let consentIsPerRun = false;
 
     // Referenced by name (not called) before playerRoot is assigned below -
     // by the time a user can actually click a segment, initialize() has
     // already run and playerRoot is set.
-    const handleTimelineSegmentClick = function (segment: ValidationTimelineSegment) {
+    //
+    // Takes a nullable segment because the authenticity label opens the same
+    // panel: on the offending fragment when it is warning about one, and on the
+    // general status when it is not. One function, so a click on the bar and a
+    // click on the label cannot open the panel two different ways.
+    const openMenuOnSegment = function (segment: ValidationTimelineSegment | null) {
         if (!playerRoot) {
             return;
         }
@@ -147,7 +201,7 @@ export const C2PAPlayer = function (
         replaceC2PATimelineSegments,
         renderWholeAssetVerdict,
         disposeTimeline,
-    } = getTimelineFunctions(handleTimelineSegmentClick);
+    } = getTimelineFunctions(openMenuOnSegment);
 
     let isManifestInvalid = false;
     let seeking = false;
@@ -168,6 +222,38 @@ export const C2PAPlayer = function (
      * seekable. Resuming from it does not fail visibly - it hangs. Measured:
      * resuming after 25s paused on a 30s window never recovered.
      */
+    /**
+     * The only place playback is held or released.
+     *
+     * Two mechanisms want to stop the picture - the validated-playback gate and
+     * an unanswered consent question - and before this each called `pause()`
+     * and `play()` for itself. Two writers on one element is how the gate's
+     * falling-edge `play()` ended up fighting the consent pause. Holding is a
+     * level, so it is safe to reassert on every tick; releasing is an edge, so
+     * that resuming can never restart a pause the viewer asked for.
+     */
+    const syncPlaybackHold = function () {
+        if (heldForConsent || heldForValidation) {
+            holdingPlayback = true;
+
+            if (!videoElement.paused) {
+                videoElement.pause();
+            }
+
+            return;
+        }
+
+        if (!holdingPlayback) {
+            return;
+        }
+
+        holdingPlayback = false;
+        void videoElement.play().catch(() => {
+            // The viewer may have paused deliberately while we were holding;
+            // not resuming is the right outcome then.
+        });
+    };
+
     /**
      * Holds the picture rather than show a segment no verdict covers.
      *
@@ -199,21 +285,81 @@ export const C2PAPlayer = function (
                         'Add ?gate=off to play unvalidated content.',
                 );
             }
+        } else {
+            heldForValidation = false;
+        }
 
-            if (!videoElement.paused) {
-                videoElement.pause();
-            }
+        syncPlaybackHold();
+    };
 
+    /**
+     * Keeps the timer running only while something is waiting on it.
+     */
+    const syncAuthenticityTimer = function (nextDeadlineMs: number | null) {
+        if (nextDeadlineMs !== null && authenticityTimerId === null) {
+            authenticityTimerId = setInterval(() => {
+                runAuthenticityGate('tick');
+            }, AUTHENTICITY_TICK_MS);
             return;
         }
 
-        if (heldForValidation) {
-            heldForValidation = false;
-            void videoElement.play().catch(() => {
-                // The viewer may have paused deliberately while we were
-                // holding; not resuming is the right outcome then.
-            });
+        if (nextDeadlineMs === null && authenticityTimerId !== null) {
+            clearInterval(authenticityTimerId);
+            authenticityTimerId = null;
         }
+    };
+
+    const applyAuthenticityDecision = function (decision: AuthenticityGateDecision) {
+        updateAuthenticityLabel(playerRoot, decision.label);
+
+        if (decision.showConsent) {
+            // A level, so reasserting it every tick is what keeps the countdown
+            // moving; the overlay is already showing by the second call.
+            requestConsent(playerRoot, decision.consentSecondsRemaining);
+        } else if (heldForConsent) {
+            // Was up and is not any more: either accepted or withdrawn, and the
+            // state machine has already decided which. Taking it down here
+            // covers both, and covers the seek-away case where neither
+            // happened.
+            withdrawConsent(playerRoot);
+        }
+
+        heldForConsent = decision.holdForConsent;
+        syncPlaybackHold();
+        syncAuthenticityTimer(decision.nextDeadlineMs);
+
+        if (decision.openMenu) {
+            // A deliberate pause rather than a hold: the viewer asked to look
+            // at this, so it must not be resumed by a hold being released.
+            videoElement.pause();
+            openMenuOnSegment(decision.openMenu.segment);
+        }
+    };
+
+    /**
+     * Feeds the gate one event and applies what it decides.
+     *
+     * Every caller goes through here - the render tick, the timer, the consent
+     * accept and the label click - so the state can only advance one way.
+     */
+    const runAuthenticityGate = function (event: AuthenticityGateEvent) {
+        if (!authenticityInputs) {
+            return;
+        }
+
+        const decision = advanceAuthenticityGate(authenticityGate, {
+            ...authenticityInputs,
+            event,
+            // Measured fresh, because the countdown has to account for a pause
+            // the viewer started before the question was raised: the rejoin
+            // measures its budget from the pause, not from the question.
+            alreadyPausedSeconds:
+                pausedAtEpochMs === null ? 0 : (Date.now() - pausedAtEpochMs) / 1000,
+            nowMs: Date.now(),
+        });
+
+        authenticityGate = decision.state;
+        applyAuthenticityDecision(decision);
     };
 
     const rejoinLiveIfPositionIsGone = function () {
@@ -259,7 +405,14 @@ export const C2PAPlayer = function (
             // "fragmented" here - a monolithic MP4 has one verdict for the
             // whole asset and would open an empty log.
             setDebugButtonAvailable(videoPlayer, !useStaticTimelineFallback);
-            playerRoot = initializeFrictionOverlay(videoPlayer, setPlaybackStarted);
+            playerRoot = initializeFrictionOverlay(videoPlayer, setPlaybackStarted, {
+                onConsentAccepted: () => {
+                    runAuthenticityGate('consent-accepted');
+                },
+                onAuthenticityLabelClick: () => {
+                    runAuthenticityGate('label-clicked');
+                },
+            });
             setPlayerRootController(playerRoot);
 
             c2paMenu = videoPlayer.controlBar.getChild('C2PAMenuButton');
@@ -273,7 +426,12 @@ export const C2PAPlayer = function (
             videoPlayer.on('play', function () {
                 rejoinLiveIfPositionIsGone();
 
-                if (isManifestInvalid && !playbackStarted && playerRoot) {
+                // The per-run question subsumes this one and is strictly more
+                // capable, so it is not asked twice. No ordering hazard in
+                // reading the mode off a snapshot: `isManifestInvalid` is only
+                // ever set inside playbackUpdate, so if no snapshot has
+                // arrived this branch cannot be reached anyway.
+                if (isManifestInvalid && !playbackStarted && playerRoot && !consentIsPerRun) {
                     displayFrictionOverlay(playbackStarted, videoPlayer, playerRoot);
                 } else {
                     setPlaybackStarted();
@@ -339,6 +497,11 @@ export const C2PAPlayer = function (
                 console.warn('[C2PA] Error removing UI components:', error);
             }
 
+            if (authenticityTimerId !== null) {
+                clearInterval(authenticityTimerId);
+                authenticityTimerId = null;
+            }
+
             c2paMenu = null;
             c2paControlBar = null;
             playerRoot = null;
@@ -346,6 +509,17 @@ export const C2PAPlayer = function (
             playbackStarted = false;
             lastPlaybackTime = 0.0;
             isManifestInvalid = false;
+            // Holds do not survive a source switch. `heldForValidation` did
+            // not reset here before, so a source released while held left the
+            // flag set and the next source's first release would fire a
+            // `play()` nothing had asked for.
+            heldForValidation = false;
+            heldForConsent = false;
+            holdingPlayback = false;
+            consentIsPerRun = false;
+            pausedAtEpochMs = null;
+            authenticityInputs = null;
+            authenticityGate = initialAuthenticityGateState(Date.now());
         },
 
         playbackUpdate: function (snapshot) {
@@ -443,6 +617,41 @@ export const C2PAPlayer = function (
                 );
             }
 
+            // Outside the render guard above, because that guard skips
+            // non-forward ticks: inside it, the label would freeze mid-seek
+            // and the question would not be raised for a stretch the viewer
+            // seeked into.
+            const showLabel = snapshot?.showAuthenticityLabel === true;
+            consentIsPerRun = snapshot?.consentMode === 'per-run';
+
+            if (showLabel || consentIsPerRun) {
+                authenticityInputs = {
+                    verdict: selectPlayheadVerdict({
+                        segments: snapshot?.timelineSegments,
+                        time: currentTime,
+                        ownsTimeline: ownsFullTimeline,
+                        wholeAssetInvalid,
+                        fallbackState: snapshot?.result?.validationState ?? null,
+                    }),
+                    labelEnabled: showLabel,
+                    consentPerRun: consentIsPerRun,
+                    isLive,
+                    dvrDepthSeconds: dvrWindowSeconds,
+                };
+                runAuthenticityGate('tick');
+            }
+
+            // Runs while a question is unanswered too, deliberately. Guarding
+            // it looked safer and was not: skipping it freezes
+            // `heldForValidation` at whatever it was, and a paused DASH stream
+            // emits nothing, so a hold latched just before the question was
+            // raised would survive the acceptance and pause the picture
+            // straight back with nothing left to clear it.
+            //
+            // Safe because `syncPlaybackHold` is the only writer, so the two
+            // cannot fight over the element; and because a question is only
+            // raised when a verdict covers the playhead, which is exactly the
+            // condition under which this gate does not hold.
             enforceValidatedPlayback(snapshot, currentTime, isLive);
 
             lastPlaybackTime = currentTime;

@@ -40,6 +40,31 @@
  */
 const PAUSE_BUDGET_FRACTION = 0.8;
 
+/**
+ * How long a pause may last before the paused position is treated as gone.
+ *
+ * Exported because a second thing now needs the same number: the consent gate's
+ * countdown, which asks the viewer to decide *before* the moment they are being
+ * asked about stops existing. If the two used different figures they would
+ * contradict each other - the question could expire while the position was
+ * still good, or promise time that had already run out. One number, one
+ * meaning.
+ *
+ * `null` when there is nothing to measure against, which the callers read as
+ * "no budget": no rejoin, and no countdown.
+ */
+export function pauseBudgetSeconds(dvrDepthSeconds: number | null): number | null {
+  if (
+    dvrDepthSeconds === null ||
+    !Number.isFinite(dvrDepthSeconds) ||
+    dvrDepthSeconds <= 0
+  ) {
+    return null;
+  }
+
+  return dvrDepthSeconds * PAUSE_BUDGET_FRACTION;
+}
+
 export interface LiveResumeDecision {
   /** Whether the paused position has to be abandoned for the live edge. */
   rejoinAtLiveEdge: boolean;
@@ -63,19 +88,16 @@ export function decideLiveResume(
     return { rejoinAtLiveEdge: false, reason: 'not-live' };
   }
 
-  if (
-    dvrDepthSeconds === null ||
-    !Number.isFinite(dvrDepthSeconds) ||
-    dvrDepthSeconds <= 0 ||
-    !Number.isFinite(pausedForSeconds)
-  ) {
+  const budget = pauseBudgetSeconds(dvrDepthSeconds);
+
+  if (budget === null || !Number.isFinite(pausedForSeconds)) {
     // Nothing to measure against. Leaving the position alone risks a stall;
     // yanking to the edge on a guess loses content the viewer chose to watch.
     // The stall is recoverable by clicking LIVE, so prefer not to move them.
     return { rejoinAtLiveEdge: false, reason: 'unknown-window' };
   }
 
-  return pausedForSeconds > dvrDepthSeconds * PAUSE_BUDGET_FRACTION
+  return pausedForSeconds > budget
     ? { rejoinAtLiveEdge: true, reason: 'pause-outlasted-window' }
     : { rejoinAtLiveEdge: false, reason: 'within-window' };
 }

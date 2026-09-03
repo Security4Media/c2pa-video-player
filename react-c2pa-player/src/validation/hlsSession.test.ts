@@ -213,6 +213,39 @@ describe('HlsFragmentedFmp4Session', () => {
       expect(seen.length).toBeGreaterThan(1);
     });
 
+    it('carries the policy the player layer acts on', () => {
+      // A regression guard. HLS took a retention and nothing else, so
+      // `?gate=off` was silently inert on every HLS source: the field never
+      // reached the snapshot `main.ts` reads it from. One carried object now,
+      // so a new setting cannot reach one session and miss another.
+      const carrying = new HlsFragmentedFmp4Session(
+        runtime,
+        element as unknown as HTMLVideoElement,
+        undefined,
+        {
+          enforceValidatedPlayback: false,
+          showAuthenticityLabel: true,
+          consentMode: 'per-run',
+        },
+      );
+
+      expect(carrying.getStatusAt(0)).toMatchObject({
+        enforceValidatedPlayback: false,
+        showAuthenticityLabel: true,
+        consentMode: 'per-run',
+      });
+    });
+
+    it('says nothing about policy when it was given none', () => {
+      // Absent rather than defaulted, because every reader already treats
+      // undefined as its own default.
+      const snapshot = session.getStatusAt(0);
+
+      expect(snapshot.enforceValidatedPlayback).toBeUndefined();
+      expect(snapshot.showAuthenticityLabel).toBeUndefined();
+      expect(snapshot.consentMode).toBeUndefined();
+    });
+
     it('stops listening once disposed', async () => {
       await session.load();
       const seen: ValidationStatusSnapshot[] = [];

@@ -85,6 +85,37 @@ export interface ValidationPolicy {
    * stops the picture when validation stops.
    */
   enforceValidatedPlayback: boolean;
+  /**
+   * Whether to state the provenance of the moment on screen, over the picture.
+   *
+   * Off by default. See policy/authenticity.ts for why this is separate from
+   * the consent mode below.
+   */
+  showAuthenticityLabel: boolean;
+  /**
+   * Where the consent question is raised: once per source as it always has
+   * been, or once per contiguous stretch of invalid content.
+   */
+  consentMode: ConsentMode;
+}
+
+/** Where the consent question is raised, if anywhere. */
+export type ConsentMode = 'whole-asset' | 'per-run';
+
+/**
+ * The part of the policy the player layer reads off the snapshot.
+ *
+ * One object rather than a field per setting, because a field per setting is
+ * what went wrong: `enforceValidatedPlayback` was threaded into the DASH
+ * session and its snapshot and silently left out of the other two, so `?gate=`
+ * had no effect on HLS at all. Nothing here changes how a session validates;
+ * these are decisions the player layer acts on, riding along because `main.ts`
+ * holds a snapshot and not a policy.
+ */
+export interface CarriedSessionPolicy {
+  enforceValidatedPlayback: boolean;
+  showAuthenticityLabel: boolean;
+  consentMode: ConsentMode;
 }
 
 /**
@@ -203,6 +234,10 @@ export interface ValidationStatusSnapshot {
    * layer reads one snapshot rather than reaching into the policy.
    */
   enforceValidatedPlayback?: boolean;
+  /** Whether to show the authenticity label. See CarriedSessionPolicy. */
+  showAuthenticityLabel?: boolean;
+  /** Where to raise the consent question. See CarriedSessionPolicy. */
+  consentMode?: ConsentMode;
 }
 
 export type ValidationSessionListener = (snapshot: ValidationStatusSnapshot) => void;

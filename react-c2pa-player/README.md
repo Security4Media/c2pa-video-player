@@ -39,7 +39,48 @@ npm run preview         # preview a production build
 npm start               # http-server on :9000, serving the public/mp4s test fixtures
 ```
 
-No automated test suite exists — verification is manual, against the fixtures in `public/mp4s/` (signed/unsigned/tampered variants) and real HLS/DASH streams.
+```bash
+npm test                    # Vitest, the pure decision modules and sessions
+npm run test:browser        # the trust matrix: 10 source/policy cases end to end
+npm run test:keyboard       # the panel and the log without a mouse
+npm run test:source-switch  # shared state cleared between sources
+npm run test:friction       # the consent gate's legibility and focus handling
+npm run test:authenticity   # the authenticity label and per-run consent
+```
+
+The browser checks drive a real Chromium against a running dev server, so start
+one first (`npm run dev`) and point them at it with `C2PA_TEST_URL` if it is not
+on the default port. They measure computed styles, hit-testing and focus rather
+than snapshotting markup, which is what lets them catch the video.js cascade
+beating our own rules.
+
+Beyond that, verification is manual against the fixtures in `public/mp4s/`
+(signed/unsigned/tampered variants), the HLS fixtures in `public/hls-fixtures/`,
+and real HLS/DASH streams.
+
+## Runtime parameters
+
+Query-string only, and each one defaults to the behaviour a deployment gets
+without it. There is no UI surface for any of them: they exist so the states can
+be demonstrated and tested against the same asset, rather than by hunting for
+content whose certificate happens to be in the right state.
+
+| Parameter | Default | What it does |
+|---|---|---|
+| `?trust=<fixture>` | the shipped policy | Swaps the trust material for one of the fixtures in `policy/trustFixtures.ts` (`full`, `anchors-only`, `cawg-missing`, `empty`), so trusted / valid / untrusted outcomes can be shown on one file. Unrecognised values fall back to the shipped policy. |
+| `?window=<seconds>` | 300 | How much of a live stream the player remembers: the width of the timeline window, the retained validation history, and the failure retention in the validation log. Values under 60 are ignored. |
+| `?gate=off` | on | Turns off the validated-playback gate, which otherwise holds the picture rather than show live content whose verdict has not arrived. Only the exact value `off` disables it, since a switch that fails open on a typo is the wrong way round for a protection. |
+| `?label=on` | off | Shows the authenticity label in the top-right of the picture, stating the provenance of the moment on screen. Green "Authenticity established" and blue "Valid" collapse to a dot after five seconds; red "Invalid Authenticity" and grey "Unknown provenance" stay expanded and pulse. Clicking it pauses and opens the Content Credentials panel. |
+| `?consent=per-run` | once per source | Asks for consent once per contiguous stretch of invalid content, rather than once per source. This is the only setting under which the consent question can appear mid-playback on a fragmented source at all: the once-per-source path is raised from the `play` handler and only when the manifest is already known bad, which a fragmented source cannot know before playback. On a live stream the question carries a countdown and withdraws itself if the pause would outlast what the origin retains. |
+
+`?label=on` and `?consent=per-run` are independent. A deployment may want to
+state provenance continuously without interrupting the viewer, or interrupt on
+bad content without leaving a permanent badge over live output; those are
+different editorial decisions and neither implies the other.
+
+Per-run consent is only meaningful on a fragmented source (live DASH, HLS). A
+monolithic MP4 has one verdict for its whole self, so it has exactly one run,
+which the once-per-source behaviour already covers.
 
 ## Trust material
 

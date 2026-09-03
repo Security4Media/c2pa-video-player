@@ -15,7 +15,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { decideLiveResume } from './liveResume';
+import { decideLiveResume, pauseBudgetSeconds } from './liveResume';
 
 describe('decideLiveResume', () => {
   it('leaves a VOD position alone, however long the pause', () => {
@@ -63,5 +63,33 @@ describe('decideLiveResume', () => {
     }
 
     expect(decideLiveResume(true, Number.NaN, 30).rejoinAtLiveEdge).toBe(false);
+  });
+});
+
+describe('pauseBudgetSeconds', () => {
+  it('is the fraction of the window a pause may consume', () => {
+    expect(pauseBudgetSeconds(30)).toBeCloseTo(24, 5);
+    expect(pauseBudgetSeconds(300)).toBeCloseTo(240, 5);
+  });
+
+  it('is null when there is nothing to measure against', () => {
+    // Read by both callers as "no budget": no rejoin, and no countdown on the
+    // consent gate. Correct rather than a shortcut - a position that cannot
+    // expire needs no deadline.
+    expect(pauseBudgetSeconds(null)).toBeNull();
+    expect(pauseBudgetSeconds(0)).toBeNull();
+    expect(pauseBudgetSeconds(-30)).toBeNull();
+    expect(pauseBudgetSeconds(Number.NaN)).toBeNull();
+    expect(pauseBudgetSeconds(Number.POSITIVE_INFINITY)).toBeNull();
+  });
+
+  it('is the same number decideLiveResume judges against', () => {
+    // The whole reason it is exported. 24s on a 30s window means a 24.1s pause
+    // rejoins and a 23.9s one does not, and the consent countdown has to expire
+    // at exactly that boundary or the two contradict each other.
+    const budget = pauseBudgetSeconds(30) as number;
+
+    expect(decideLiveResume(true, budget - 0.1, 30).rejoinAtLiveEdge).toBe(false);
+    expect(decideLiveResume(true, budget + 0.1, 30).rejoinAtLiveEdge).toBe(true);
   });
 });

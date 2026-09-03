@@ -40,7 +40,7 @@
  * live edge.
  */
 
-import type { TimeInterval } from '../types';
+import type { PlayerValidationState, TimeInterval } from '../types';
 import type { ReadRegion, SegmentVerdict } from './readRegionGate';
 import type { WatchedTimeline } from './watchedTimeline';
 
@@ -92,6 +92,28 @@ function normalize(intervals: readonly TimeInterval[]): TimeInterval[] {
  * verified one, so it must not be hidden behind a neighbour's Valid.
  */
 const SEVERITY: Record<string, number> = { Invalid: 3, Unknown: 2, Valid: 1, Trusted: 0 };
+
+/**
+ * The worst of several verdicts, by the ordering above.
+ *
+ * Exported because the authenticity label has to answer the same question for
+ * the moment being played, and a second copy of this ordering would let the
+ * label read greener than the stretch of bar underneath it. One ordering, so
+ * the two cannot disagree.
+ *
+ * `null` for an empty list, which callers read as "nothing to report".
+ */
+export function worstValidationState(
+  states: readonly PlayerValidationState[],
+): PlayerValidationState | null {
+  if (states.length === 0) {
+    return null;
+  }
+
+  return states.reduce((worst, candidate) =>
+    (SEVERITY[candidate] ?? 0) > (SEVERITY[worst] ?? 0) ? candidate : worst,
+  );
+}
 
 /**
  * Collapses overlapping regions into disjoint ones, worst verdict winning

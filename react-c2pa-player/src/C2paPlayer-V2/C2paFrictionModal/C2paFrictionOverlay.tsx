@@ -18,8 +18,25 @@ import { useEffect, useId, useRef } from 'react';
 
 interface C2paFrictionOverlayProps {
     isVisible: boolean;
+    scope: 'whole-asset' | 'invalid-run';
+    /** Seconds before the question withdraws itself, or null when it will not. */
+    countdownSeconds: number | null;
     onWatchAnyway: () => void;
 }
+
+/**
+ * What each question actually claims.
+ *
+ * Two sentences rather than one, because the two are different claims and a
+ * viewer acts on them differently. The whole-asset wording is unchanged from
+ * before this file learned about runs.
+ */
+const CONSENT_MESSAGE = {
+    'whole-asset':
+        "The information in this video's Content Credentials is no longer trustworthy and the video's history cannot be confirmed.",
+    'invalid-run':
+        'The Content Credentials for the part now playing are invalid. This part of the stream may have been tampered with.',
+} as const;
 
 /**
  * The consent gate shown when an asset's own credentials failed to verify.
@@ -42,6 +59,8 @@ interface C2paFrictionOverlayProps {
  */
 export function C2paFrictionOverlay({
     isVisible,
+    scope,
+    countdownSeconds,
     onWatchAnyway,
 }: C2paFrictionOverlayProps) {
     const messageId = useId();
@@ -73,10 +92,17 @@ export function C2paFrictionOverlay({
             aria-labelledby={messageId}
             style={{ display: isVisible ? 'flex' : 'none' }}
         >
-            <p id={messageId}>
-                The information in this video&apos;s Content Credentials is no longer trustworthy and the video&apos;s
-                history cannot be confirmed.
-            </p>
+            <p id={messageId}>{CONSENT_MESSAGE[scope]}</p>
+            {/* Only when there is a real deadline. Saying what happens when it
+                runs out matters more than the number: a countdown with no
+                consequence attached just adds pressure. */}
+            {countdownSeconds === null ? null : (
+                <p className="friction-countdown">
+                    If you do not choose within{' '}
+                    <strong className="friction-countdown__seconds">{countdownSeconds}s</strong>,
+                    this question will close and playback will continue from the live edge.
+                </p>
+            )}
             <button
                 ref={buttonRef}
                 type="button"

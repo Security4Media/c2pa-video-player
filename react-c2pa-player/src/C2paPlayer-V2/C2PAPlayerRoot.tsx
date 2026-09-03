@@ -16,6 +16,7 @@
 
 import { type CSSProperties, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import type { C2PAPlayerRootController } from './C2PAPlayerRoot.types';
+import { C2paAuthenticityLabel } from './C2paAuthenticity/C2paAuthenticityLabel';
 import { C2paDebugConsole } from './C2paDebugConsole/C2paDebugConsole';
 import { C2paFrictionOverlay } from './C2paFrictionModal/C2paFrictionOverlay';
 import { closeC2PAMenu } from './C2paMenu/C2paMenuBridge';
@@ -129,7 +130,14 @@ export function C2PAPlayerRoot({
         const handlePointerDown = (event: PointerEvent) => {
             const target = event.target as Element | null;
 
-            if (target?.closest('.c2pa-menu-panel') || target?.closest('.c2pa-menu-button')) {
+            if (
+                target?.closest('.c2pa-menu-panel') ||
+                target?.closest('.c2pa-menu-button') ||
+                // The label's own click opens the panel. Closing here first
+                // would let that reopen what this just dismissed, so a click
+                // on the label would toggle instead of opening.
+                target?.closest('.c2pa-authenticity-label')
+            ) {
                 return;
             }
 
@@ -373,7 +381,13 @@ export function C2PAPlayerRoot({
         <>
             <C2paFrictionOverlay
                 isVisible={state.isFrictionOverlayVisible}
+                scope={state.consentScope}
+                countdownSeconds={state.consentCountdownSeconds}
                 onWatchAnyway={onWatchAnyway}
+            />
+            <C2paAuthenticityLabel
+                label={state.authenticityLabel}
+                onClick={controller.onAuthenticityLabelClick}
             />
             {/* Mounted only while open, so the log's subscription and its row
                 rendering cost nothing for the viewers who never open it. */}

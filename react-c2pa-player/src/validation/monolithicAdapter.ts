@@ -15,6 +15,7 @@
  */
 
 import { MonolithicC2PASession } from './monolithicSession';
+import { carriedSessionPolicy } from './policy';
 // Imported straight from its module rather than through the runtimes barrel,
 // which would pull hls.js and dash.js in alongside it.
 import { MonolithicBridgeRuntime } from './runtimes/monolithicBridgeRuntime';
@@ -50,6 +51,9 @@ export class MonolithicC2PAAdapter implements MediaValidationAdapter {
   }
 
   createSession(context: ValidationAdapterContext): ValidationSession {
-    return new MonolithicC2PASession(new MonolithicBridgeRuntime(context));
+    return new MonolithicC2PASession(
+      new MonolithicBridgeRuntime(context),
+      carriedSessionPolicy(context.policy),
+    );
   }
 }

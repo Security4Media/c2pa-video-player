@@ -15,7 +15,7 @@
  */
 
 export { FragmentedTimelineProjector } from './fragmentedTimelineProjector';
-export { resolveSettledBefore, selectLiveRegions } from './liveReadState';
+export { resolveSettledBefore, selectLiveRegions, worstValidationState } from './liveReadState';
 export type { LiveRegion } from './liveReadState';
 export { readRegionKey, selectReadRegions } from './readRegionGate';
 export type { ReadRegion, SegmentVerdict } from './readRegionGate';

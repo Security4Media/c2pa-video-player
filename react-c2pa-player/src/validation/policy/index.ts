@@ -14,7 +14,8 @@
  * limitations under the License.
  */
 
-import type { ValidationPolicy } from '../types';
+import type { CarriedSessionPolicy, ValidationPolicy } from '../types';
+import { resolveConsentMode, resolveShowAuthenticityLabel } from './authenticity';
 import { LocalTrustMaterialProvider } from './localTrustMaterialProvider';
 import {
   resolveEnforceValidatedPlayback,
@@ -64,10 +65,28 @@ export function createDefaultValidationPolicy(): ValidationPolicy {
     trustMaterialProvider: selectedTrustProvider(),
     liveRetentionSeconds: resolveLiveRetentionSeconds(),
     enforceValidatedPlayback: resolveEnforceValidatedPlayback(),
+    showAuthenticityLabel: resolveShowAuthenticityLabel(),
+    consentMode: resolveConsentMode(),
+  };
+}
+
+/**
+ * The subset of the policy every session hands to the player layer.
+ *
+ * One function so a new carried setting is one edit here rather than an edit in
+ * each of three sessions, three snapshots and three adapters - which is the
+ * shape that lost `enforceValidatedPlayback` on HLS.
+ */
+export function carriedSessionPolicy(policy: ValidationPolicy): CarriedSessionPolicy {
+  return {
+    enforceValidatedPlayback: policy.enforceValidatedPlayback,
+    showAuthenticityLabel: policy.showAuthenticityLabel,
+    consentMode: policy.consentMode,
   };
 }
 
 export { LocalTrustMaterialProvider };
+export { resolveConsentMode, resolveShowAuthenticityLabel } from './authenticity';
 export {
   DEFAULT_LIVE_RETENTION_SECONDS,
   MIN_LIVE_WINDOW_SECONDS,

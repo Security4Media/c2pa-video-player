@@ -15,6 +15,7 @@
  */
 
 import { HlsFragmentedFmp4Session } from './hlsSession';
+import { carriedSessionPolicy } from './policy';
 // Imported straight from its module rather than through the runtimes barrel,
 // which would pull dash.js and the monolithic engine in alongside it.
 import { HlsBridgeRuntime } from './runtimes/hlsBridgeRuntime';
@@ -54,6 +55,7 @@ export class HlsFragmentedFmp4Adapter implements MediaValidationAdapter {
       new HlsBridgeRuntime(context),
       context.videoElement,
       context.policy.liveRetentionSeconds,
+      carriedSessionPolicy(context.policy),
     );
   }
 }

@@ -29,6 +29,7 @@ import {
   WatchedTimeline,
 } from './timeline';
 import type {
+  CarriedSessionPolicy,
   ManifestSource,
   ValidationSession,
   ValidationSessionListener,
@@ -65,15 +66,26 @@ export class HlsFragmentedFmp4Session implements ValidationSession {
   readonly #watched = new WatchedTimeline();
   readonly #videoElement: HTMLVideoElement;
   readonly #retentionSeconds: number;
+  /**
+   * Policy the player layer reads back off the snapshot, carried verbatim.
+   *
+   * Optional, and omitted from the snapshot when absent rather than defaulted:
+   * every reader already treats `undefined` as the default for its own field
+   * (the gate reads `!== false`, the label reads `=== true`), so a session
+   * built without a policy simply says nothing about one.
+   */
+  readonly #carried: CarriedSessionPolicy | undefined;
 
   constructor(
     runtime: HlsValidationRuntime,
     videoElement: HTMLVideoElement,
     retentionSeconds: number = DEFAULT_LIVE_RETENTION_SECONDS,
+    carried?: CarriedSessionPolicy,
   ) {
     this.#runtime = runtime;
     this.#videoElement = videoElement;
     this.#retentionSeconds = retentionSeconds;
+    this.#carried = carried;
   }
 
   async load(): Promise<void> {
@@ -153,6 +165,7 @@ export class HlsFragmentedFmp4Session implements ValidationSession {
       wholeAssetInvalid: this.#wholeAssetInvalid(),
       isLive: liveSignal ?? undefined,
       liveRetentionSeconds: this.#retentionSeconds,
+      ...this.#carried,
     };
 
     if (shouldEmit) {

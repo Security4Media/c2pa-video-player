@@ -18,6 +18,7 @@ import { Emitter } from './emitter';
 import { normalizeMonolithicManifestStore } from './normalization';
 import type { MonolithicValidationRuntime } from './runtimes/contracts';
 import type {
+  CarriedSessionPolicy,
   ValidationSession,
   ValidationSessionListener,
   ValidationStatusSnapshot,
@@ -36,8 +37,19 @@ export class MonolithicC2PASession implements ValidationSession {
     message: 'Monolithic C2PA validation pending',
   };
 
-  constructor(runtime: MonolithicValidationRuntime) {
+  /**
+   * Policy the player layer reads back off the snapshot, carried verbatim.
+   *
+   * Optional, and omitted from the snapshot when absent rather than defaulted:
+   * every reader already treats `undefined` as the default for its own field
+   * (the gate reads `!== false`, the label reads `=== true`), so a session
+   * built without a policy simply says nothing about one.
+   */
+  readonly #carried: CarriedSessionPolicy | undefined;
+
+  constructor(runtime: MonolithicValidationRuntime, carried?: CarriedSessionPolicy) {
     this.#runtime = runtime;
+    this.#carried = carried;
   }
 
   async load(): Promise<void> {
@@ -81,6 +93,7 @@ export class MonolithicC2PASession implements ValidationSession {
       // invalid one condemns the entire timeline from the moment it is known -
       // it must not depend on how far playback has progressed.
       wholeAssetInvalid: result.validationState === 'Invalid',
+      ...this.#carried,
     };
   }
 
