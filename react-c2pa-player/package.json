@@ -18,7 +18,8 @@
         "test:keyboard": "node tests/browser/keyboardAccess.mjs",
         "test:source-switch": "node tests/browser/sourceSwitch.mjs",
         "test:friction": "node tests/browser/frictionOverlay.mjs",
-        "test:authenticity": "node tests/browser/authenticityLabel.mjs"
+        "test:authenticity": "node tests/browser/authenticityLabel.mjs",
+        "test:seams": "node tests/browser/timelineSeams.mjs"
     },
     "dependencies": {
         "@contentauth/c2pa-web": "^0.7.1",

@@ -46,6 +46,7 @@ npm run test:keyboard       # the panel and the log without a mouse
 npm run test:source-switch  # shared state cleared between sources
 npm run test:friction       # the consent gate's legibility and focus handling
 npm run test:authenticity   # the authenticity label and per-run consent
+npm run test:seams          # the timeline bar, from screenshotted pixels
 ```
 
 The browser checks drive a real Chromium against a running dev server, so start
