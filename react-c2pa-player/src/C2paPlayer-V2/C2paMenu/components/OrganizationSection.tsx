@@ -19,6 +19,7 @@ import type {
   OrganizationIdentityItem,
   OrganizationSectionItem,
 } from '../models';
+import { UNVERIFIED_IDENTITY_CAVEAT } from '@/validation/rules';
 import { WebsiteLink } from './shared';
 
 function getValidationIndicator(validationStatus: CawgOrganizationItem['validationStatus']) {
@@ -36,6 +37,18 @@ function getValidationIndicator(validationStatus: CawgOrganizationItem['validati
     };
   }
 
+  // Nobody checked. Distinct from Invalid, and it used to fall through to it:
+  // any status that was not Trusted or Valid rendered a red cross reading
+  // "could not be verified", which on a DASH stream - where the engine runs no
+  // identity check at all - accused a signer the player had never examined.
+  // Also reached when there is no store to read a verdict from.
+  if (validationStatus === 'Unknown') {
+    return {
+      icon: '❔',
+      message: `Not verified: ${UNVERIFIED_IDENTITY_CAVEAT}`,
+    };
+  }
+
   return {
     icon: '❌',
     message: 'Invalid: the organization identity could not be verified.',
@@ -46,22 +59,22 @@ function OrganizationDetails({ organization }: { organization: OrganizationIdent
   return (
     <div className="c2pa-org-section__details">
       {organization.website ? (
-        <div className="c2pa-org-section__row">
+        <div className="c2pa-menu-section__row">
           <span className="itemName">Website:</span> <WebsiteLink href={organization.website} />
         </div>
       ) : null}
       {organization.identifier ? (
-        <div className="c2pa-org-section__row">
+        <div className="c2pa-menu-section__row">
           <span className="itemName">Identifier:</span> {organization.identifier}
         </div>
       ) : null}
       {organization.leiCode ? (
-        <div className="c2pa-org-section__row">
+        <div className="c2pa-menu-section__row">
           <span className="itemName">LEI:</span> {organization.leiCode}
         </div>
       ) : null}
       {organization.iso6523Code ? (
-        <div className="c2pa-org-section__row">
+        <div className="c2pa-menu-section__row">
           <span className="itemName">ISO 6523:</span> {organization.iso6523Code}
         </div>
       ) : null}
@@ -77,18 +90,43 @@ function IdentityDetails({ itemValue }: { itemValue: CawgOrganizationItem }) {
   return (
     <div className="c2pa-org-section__identity">
       {signedByText ? (
-        <div className="c2pa-org-section__row">
+        <div className="c2pa-menu-section__row">
           {signedByText}
         </div>
       ) : null}
       {itemValue.creativeWork?.datePublished ? (
-        <div className="c2pa-org-section__row">
+        <div className="c2pa-menu-section__row">
           <span className="itemName">Published on :</span> {itemValue.creativeWork.datePublished}
         </div>
       ) : null}
       {itemValue.creativeWork?.license ? (
-        <div className="c2pa-org-section__row">
+        <div className="c2pa-menu-section__row">
           <span className="itemName">Under license:</span> <WebsiteLink href={itemValue.creativeWork.license} />
+        </div>
+      ) : null}
+      {itemValue.dublinCore?.title ? (
+        <div className="c2pa-menu-section__row">
+          <span className="itemName">Title:</span> {itemValue.dublinCore.title}
+        </div>
+      ) : null}
+      {itemValue.dublinCore?.publisher ? (
+        <div className="c2pa-menu-section__row">
+          <span className="itemName">Publisher:</span> {itemValue.dublinCore.publisher}
+        </div>
+      ) : null}
+      {itemValue.dublinCore?.creator ? (
+        <div className="c2pa-menu-section__row">
+          <span className="itemName">Creator:</span> {itemValue.dublinCore.creator}
+        </div>
+      ) : null}
+      {itemValue.dublinCore?.description ? (
+        <div className="c2pa-menu-section__row">
+          <span className="itemName">Description:</span> {itemValue.dublinCore.description}
+        </div>
+      ) : null}
+      {itemValue.dublinCore?.rights ? (
+        <div className="c2pa-menu-section__row">
+          <span className="itemName">Rights:</span> {itemValue.dublinCore.rights}
         </div>
       ) : null}
     </div>
@@ -108,27 +146,39 @@ export function OrganizationSection({
 
   return (
     <li className="vjs-menu-item">
-      <div className="c2pa-org-section">
-        <div className="c2pa-org-section__header">
-          <span className="itemName c2pa-org-section__title">{title}</span>
+      <div className="c2pa-menu-section c2pa-org-section">
+        <div className="c2pa-menu-section__header">
+          <span className="itemName c2pa-menu-section__title">{title}</span>
           {validationIndicator ? (
             <span
               className="c2pa-org-section__status"
               aria-label={`Organization identity status: ${section.cawg?.validationStatus}`}
               title={validationIndicator.message}
+              data-testid="c2pa-identity-status"
+              data-validation-state={section.cawg?.validationStatus ?? 'Unknown'}
             >
               {validationIndicator.icon}
             </span>
           ) : null}
         </div>
          {section.cawg ? <IdentityDetails itemValue={section.cawg} /> : null}
+        {/* Spelled out rather than left to the icon's tooltip. The whole point
+            of this section is the names in it, and a viewer reading a title
+            and a publisher has no reason to hover a glyph to find out that
+            nothing vouched for them. */}
+        {section.cawg?.validationStatus === 'Unknown' ? (
+          <p className="c2pa-org-section__caveat">{UNVERIFIED_IDENTITY_CAVEAT}</p>
+        ) : null}
         {section.organization && (
           section.organization.website ||
           section.organization.identifier ||
           section.organization.leiCode ||
           section.organization.iso6523Code
         ) ? (
-          <details className="c2pa-org-section__collapsible" tabIndex={0}>
+          // No `tabIndex` here: <summary> is already focusable and operable, so
+          // one on the <details> only added a preceding tab stop where Enter
+          // does nothing.
+          <details className="c2pa-org-section__collapsible">
             <summary className="c2pa-org-section__collapsible-summary">Organization Details</summary>
             <OrganizationDetails organization={section.organization} />
           </details>

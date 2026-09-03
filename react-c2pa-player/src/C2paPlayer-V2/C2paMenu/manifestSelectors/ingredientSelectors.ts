@@ -15,7 +15,7 @@
  */
 
 import { Ingredient, Manifest, ManifestStore } from '@contentauth/c2pa-web';
-import { getIngredientValidationStatus } from '../../../services/c2pa_functions';
+import { readIngredientEvidence } from '@/validation/evidence';
 import { IngredientDisplayItem } from '../models';
 
 /**
@@ -80,7 +80,12 @@ function extractIngredientDetails(
                 .join(', ');
         }
 
-        const validationStatus = getIngredientValidationStatus(parentManifest, manifestRef as string);
+        const ingredientEntry = parentManifest.ingredients?.find(
+            (candidate) => candidate.active_manifest === manifestRef
+        );
+        const validationStatus = ingredientEntry
+            ? readIngredientEvidence(ingredientEntry).state
+            : 'Unknown';
         if (validationStatus) {
             ingredient.validationStatus = validationStatus;
         }

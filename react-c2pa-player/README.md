@@ -1,274 +1,111 @@
 # React C2PA Player
 
-A reusable React component library for C2PA content verification with interactive UI elements that respond to manifest data extracted from videos.
+A React component library and pluggable validation-adapter framework for displaying [C2PA](https://c2pa.org/) Content Credentials during video playback, across three source kinds: monolithic (whole-file mp4/webm/mov), HLS (fragmented fMP4), and live DASH (fragmented fMP4).
 
-## ✨ Key Features
+## Architecture
 
-### 🎨 Interactive UI Components
+`src/validation/` is the adapter framework — nothing here is tied to one stream format:
 
-- **C2PA Status Badge** (top-right corner)
-  - Real-time validation state with dynamic colors
-  - Hover tooltip showing manifest details
-  - Automatically updates based on C2PA data
-  
-- **Timeline Segment Visualizer** (bottom-center)
-  - Pulsing status indicator with validation state
-  - Real-time playback progress display
-  - Color-coded validation states
+- `registry.ts` resolves a `MediaSourceDescriptor` to the right adapter, using `sourceDetection.ts` (MIME type / extension / manifest content-type sniffing).
+- Three adapters, one per source kind: `monolithicAdapter.ts`, `hlsAdapter.ts`, `dashAdapter.ts`. Each owns a **runtime** (`runtimes/`) that talks to the underlying validation library, and a **normalization** step (`normalization/`) that maps that library's adapter-specific output onto a shared shape (`types.ts`): `NormalizedValidationResult` and the `ManifestSource` union (`manifest-store` / `single-manifest` / `integrity-only` / `none`). The UI layer branches on `ManifestSource`, not on adapter kind.
+- `emitter.ts` is the one shared pub/sub primitive every adapter session and runtime uses to notify subscribers of new validation results.
+- `policy/localTrustMaterialProvider.ts` loads the local trust anchor/allow-list files and merges them with a remote community trust-anchor list, failing open to local-only if that fetch is unreachable (offline/air-gapped use).
 
-- **Friction Overlay**
-  - Warning modal for invalid/untrusted content
-  - User acknowledgment required before playback
+**Validation engines:**
+- Monolithic and HLS validate via the WebCrypto engine (`@nettrek/c2pa-web-crypto`) rather than the WASM engine (`@contentauth/c2pa-web`) that ships as those libraries' default. This sidesteps a bundler/WASM-integrity mismatch under this repo's dependency tree — see the comments in `runtimes/monolithicBridgeRuntime.ts` and `runtimes/hlsBridgeRuntime.ts`. HLS still falls back to WASM in browsers without `crypto.subtle`.
+- DASH validates via `@qualabs/c2pa-live-dashjs-plugin` (dash.js + `@svta/cml-c2pa`), which performs cryptographic/structural checks only — no trust-anchor evaluation — so DASH segments are capped at `'Valid'`, never `'Trusted'` (see `rules.ts#getDashSegmentValidationState`).
 
-### 🔧 Reusable Architecture
+**Player UI** (`src/C2paPlayer-V2/`): the timeline is a legacy imperative Video.js/DOM integration, not a React tree, bridged into a small React-rendered menu (`C2paMenu/`) and friction-warning modal (`C2paFrictionModal/`) via a hand-rolled external store (`C2PAPlayerRoot.types.ts` — `getState`/`setState`/`subscribe`, no context/hooks). Clicking a non-Valid/Trusted timeline segment opens the menu into that fragment's own manifest or integrity verdict instead of the live/current status.
 
-All components and hooks are exported and can be used independently in other projects:
+## Public API (`src/index.ts`)
 
-```typescript
-// Components
-import { 
-  C2PAPlayer,
-  C2PAStatusBadge,
-  TimelineSegmentVisualizer,
-  C2PAFrictionOverlay
-} from 'react-c2pa-player';
-
-// Hooks
-import {
-  useC2PAManifest,
-  useC2PATimeline,
-  useC2PAValidation,
-  useVideoPlayerInitializer
-} from 'react-c2pa-player';
+```ts
+import { VideoPlayerSection, useC2PAPlayer } from 'react-c2pa-player';
+import type { C2PAStatus } from 'react-c2pa-player';
 ```
 
-### 📊 Validation States & Colors
+This is deliberately small — trimmed to what's actually consumed. `VideoPlayerSection` (which internally uses `useC2PAPlayer`) is what `src/pages/StandalonePlayerPage.tsx` uses; that page, wired up via `App.tsx`/`main.tsx`, is the actual app entry point.
 
-| State | Color | Icon | Description |
-|-------|-------|------|-------------|
-| Trusted | Green (#28a745) | ✓ | Fully verified content |
-| Valid | Cyan (#17a2b8) | ✓ | Valid but not trusted |
-| Invalid | Red (#dc3545) | ✗ | Failed verification |
-| Unknown | Yellow (#ffc107) | ? | Status pending |
+## Development
 
-## 🚀 Quick Start
-
-### Option 1: HTML Integration (Current Setup)
-
-Load the pre-built React app in your HTML page:
-
-```html
-<!-- Load React C2PA Player -->
-<link href="../../react-c2pa-player/dist/assets/index.css" rel="stylesheet" />
-<script type="module" src="../../react-c2pa-player/dist/assets/index.js"></script>
-
-<!-- React root element -->
-<div id="c2pa-player-root"></div>
-
-<script type="module">
-  // Your video setup
-  function setupC2PAPlayer(url) {
-    const videoJsPlayer = videojs(video, options);
-    
-    // Initialize React C2PA UI
-    if (window.initReactC2PAPlayer) {
-      window.initReactC2PAPlayer(videoJsPlayer, video, true);
-    }
-  }
-  
-  // Update React UI with C2PA status
-  function playbackUpdate(e) {
-    if (window.c2paPlayerUpdate) {
-      window.c2paPlayerUpdate(e.c2pa_status);
-    }
-  }
-</script>
-```
-
-### Option 2: As React Component Library
-
-Use directly in React projects:
-
-```tsx
-import { C2PAPlayer } from 'react-c2pa-player';
-
-function MyVideoApp() {
-  const [player, setPlayer] = useState(null);
-  const [videoElement, setVideoElement] = useState(null);
-  
-  return (
-    <C2PAPlayer 
-      videoPlayer={player} 
-      videoElement={videoElement} 
-      isMonolithic={true} 
-    />
-  );
-}
-```
-
-## 📦 Installation & Development
-
-### Prerequisites
-
-- Node.js 18+ (recommended: `nvm use stable`)
-- pnpm package manager
-
-### Setup
+Run from the repository root (this package is an npm workspace member):
 
 ```bash
-# Install dependencies
-pnpm install
-
-# Build for production
-pnpm run build
-
-# Development mode with hot reload
-pnpm dev
-
-# Run tests
-pnpm test
+npm install
+npm run dev            # Vite dev server (react-c2pa-player workspace)
+npm run build           # tsc && vite build
+npm run build-deploy    # tsc && vite build --config vite.config.deploy.ts (GitHub Pages)
+npm run preview         # preview a production build
+npm start               # http-server on :9000, serving the public/mp4s test fixtures
 ```
 
-### Build Output
-
-The build creates optimized files in `dist/`:
-- `dist/assets/index.js` - Main JavaScript bundle (~205 KB)
-- `dist/assets/index.css` - Styles
-- `dist/index.html` - HTML template
-
-## 📂 Project Structure
-
-```
-react-c2pa-player/
-├── src/
-│   ├── components/
-│   │   ├── C2PAPlayer.tsx                 # Main orchestrator component
-│   │   ├── C2PAStatusBadge.tsx            # Status indicator (top-right)
-│   │   ├── TimelineSegmentVisualizer.tsx  # Timeline status (bottom)
-│   │   ├── C2PAFrictionOverlay.tsx        # Warning modal
-│   │   └── PlayerPage.tsx                 # Full page wrapper
-│   ├── hooks/
-│   │   ├── useC2PAManifest.ts            # Manifest data management
-│   │   ├── useC2PATimeline.ts            # Timeline segment logic
-│   │   ├── useC2PAValidation.ts          # Validation state handling
-│   │   ├── useC2PASeekHandler.ts         # Seek event coordination
-│   │   └── useVideoPlayerInitializer.ts  # Player initialization
-│   ├── types/
-│   │   └── c2pa.types.ts                 # TypeScript definitions
-│   ├── App.tsx                            # Root component
-│   ├── main.tsx                           # Entry point
-│   └── index.ts                           # Public API exports
-├── dist/                                  # Built assets (auto-generated)
-├── INTEGRATION.md                         # Integration guide
-├── COMPONENTS.md                          # Component documentation
-├── README.md                              # This file
-└── package.json
+```bash
+npm test                    # Vitest, the pure decision modules and sessions
+npm run test:browser        # the trust matrix: 10 source/policy cases end to end
+npm run test:keyboard       # the panel and the log without a mouse
+npm run test:source-switch  # shared state cleared between sources
+npm run test:friction       # the consent gate's legibility and focus handling
+npm run test:authenticity   # the authenticity label and per-run consent
+npm run test:seams          # the timeline bar, from screenshotted pixels
 ```
 
-## 🔌 Window API
+The browser checks drive a real Chromium against a running dev server, so start
+one first (`npm run dev`) and point them at it with `C2PA_TEST_URL` if it is not
+on the default port. They measure computed styles, hit-testing and focus rather
+than snapshotting markup, which is what lets them catch the video.js cascade
+beating our own rules.
 
-When loaded via script tag, these global functions are exposed:
+Beyond that, verification is manual against the fixtures in `public/mp4s/`
+(signed/unsigned/tampered variants), the HLS fixtures in `public/hls-fixtures/`,
+and real HLS/DASH streams.
 
-```typescript
-// Initialize the React C2PA player
-window.initReactC2PAPlayer(
-  videoPlayer: any,              // Video.js player instance
-  videoElement: HTMLVideoElement, // Native video element
-  isMonolithic: boolean          // Monolithic mode flag
-): void;
+## Runtime parameters
 
-// Update C2PA validation status during playback
-window.c2paPlayerUpdate(
-  c2paStatus: C2PAStatus  // Current validation status
-): void;
-```
+Query-string only, and each one defaults to the behaviour a deployment gets
+without it. There is no UI surface for any of them: they exist so the states can
+be demonstrated and tested against the same asset, rather than by hunting for
+content whose certificate happens to be in the right state.
 
-## 📖 Documentation
+| Parameter | Default | What it does |
+|---|---|---|
+| `?trust=<fixture>` | the shipped policy | Swaps the trust material for one of the fixtures in `policy/trustFixtures.ts` (`full`, `anchors-only`, `cawg-missing`, `empty`), so trusted / valid / untrusted outcomes can be shown on one file. Unrecognised values fall back to the shipped policy. |
+| `?window=<seconds>` | 300 | How much of a live stream the player remembers: the width of the timeline window, the retained validation history, and the failure retention in the validation log. Values under 60 are ignored. |
+| `?gate=off` | on | Turns off the validated-playback gate, which otherwise holds the picture rather than show live content whose verdict has not arrived. Only the exact value `off` disables it, since a switch that fails open on a typo is the wrong way round for a protection. |
+| `?label=on` | off | Shows the authenticity label in the top-right of the picture, stating the provenance of the moment on screen. Green "Authenticity established" and blue "Valid" collapse to a dot after five seconds; red "Invalid Authenticity" and grey "Unknown provenance" stay expanded and pulse. Clicking it pauses and opens the Content Credentials panel. |
+| `?consent=per-stream` | `whole-asset` | Asks once, the first time invalid content is actually played, and never again for that source. The overlay says outright that this is the only warning. |
+| `?consent=per-run` | `whole-asset` | Asks once per contiguous stretch of invalid content, so a second bad stretch stops the picture again. |
 
-- **[INTEGRATION.md](./INTEGRATION.md)** - Complete integration guide with examples
-- **[COMPONENTS.md](./COMPONENTS.md)** - Detailed component and hook reference
+### Choosing a consent mode
 
-## 🛠 Tech Stack
+| | `whole-asset` (default) | `per-stream` | `per-run` |
+|---|---|---|---|
+| When it is raised | From the `play` handler, only if the manifest is already known bad | The first time invalid content plays | On entering each invalid stretch |
+| Works on live DASH / HLS | No | Yes | Yes |
+| Works on a monolithic MP4 | Yes | Yes | Yes (one run) |
+| Times it can appear | Once per source | Once per source | Once per stretch |
+| Re-asks after returning to sound content | n/a | No | Yes |
 
-- **React 19** - UI framework
-- **TypeScript 5.9** - Type safety
-- **Vite 5.4** - Build tool
-- **Video.js 8.3** - Video player library
-- **C2PA Web SDK 0.5** - Content credentials verification
+`whole-asset` cannot fire mid-playback on a fragmented source, and in practice
+cannot fire on one at all: its verdict needs fragments, fragments need
+playback, and the first play marks playback as accepted. That gap is why the
+other two exist.
 
-## 🎯 Use Cases
+Both new modes share everything except how long the "already asked" memory
+lasts, the stretch or the source. On a live stream either one carries a
+countdown and withdraws itself if the pause would outlast what the origin
+retains, after which that stretch is never asked about again (otherwise
+withdrawing at a live edge still inside the bad content would ask and withdraw
+forever).
 
-- ✅ Embed C2PA verification in existing HTML pages
-- ✅ Build standalone React video players with C2PA
-- ✅ Create custom C2PA verification interfaces
-- ✅ Integrate C2PA status indicators in dashboards
-- ✅ Prototype C2PA validation workflows
+`?label=on` and `?consent=` are independent. A deployment may want to state
+provenance continuously without interrupting the viewer, or interrupt on bad
+content without leaving a permanent badge over live output; those are different
+editorial decisions and neither implies the other.
 
-## 🧩 Component Examples
+## Trust material
 
-### Using C2PAStatusBadge Independently
+`react-c2pa-player/trust/` holds the local trust-anchor/allow-list/config files that `LocalTrustMaterialProvider` loads. A second, byte-different `trust/` directory exists at the repository root — only `react-c2pa-player/trust/` is actually read by code; the root one should be reconciled or clarified with whoever owns trust-anchor provisioning.
 
-```tsx
-import { C2PAStatusBadge, useC2PAManifest } from 'react-c2pa-player';
+## License
 
-function VideoStatus() {
-  const { validationState, isVerified, validationDetails } = useC2PAManifest();
-  
-  return (
-    <C2PAStatusBadge
-      validationState={validationState}
-      isVerified={isVerified}
-      details={validationDetails}
-    />
-  );
-}
-```
-
-### Using Video Initializer Hook
-
-```tsx
-import { useVideoPlayerInitializer } from 'react-c2pa-player';
-
-function VideoLoader() {
-  const { initializePlayer, isLoading } = useVideoPlayerInitializer({
-    onPlayerCreated: (player) => console.log('Ready!'),
-    onError: (error) => console.error(error)
-  });
-  
-  return (
-    <button onClick={() => initializePlayer('/video.mp4', videoElement)}>
-      {isLoading ? 'Loading...' : 'Load Video'}
-    </button>
-  );
-}
-```
-
-## 🔄 Development Workflow
-
-1. **Make changes** to components in `src/`
-2. **Build**: `pnpm run build`
-3. **Test** in HTML page: Open `http://localhost:9000/dash-player-js/monolithic-v2/cawg_c2pa_player.html`
-4. **Refresh** browser to see changes
-
-## 🐛 Troubleshooting
-
-### Status badge not appearing
-- Ensure playback has started (badge only shows after playback begins)
-- Check browser console for `[React C2PA]` messages
-- Verify `window.initReactC2PAPlayer` was called
-
-### Timeline not updating
-- Confirm `window.c2paPlayerUpdate` is called during playback
-- Check that C2PA plugin is properly initialized
-
-### TypeScript errors
-- Run `pnpm install` to ensure dependencies are current
-- Check that Video.js types are available
-
-## 📝 License
-
-Part of the EBU C2PA Player project.
-
-## 🤝 Integration Example
-
-See [dash-player-js/monolithic-v2/cawg_c2pa_player.html](../dash-player-js/monolithic-v2/cawg_c2pa_player.html) for a complete working example of HTML integration.
+Apache License 2.0. Part of the EBU C2PA Player project.

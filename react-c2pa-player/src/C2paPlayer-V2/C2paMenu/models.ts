@@ -33,12 +33,16 @@ export interface ManifestCawgAssertion extends ManifestAssertion {
             sig_type: SigType;
         };
         role?: CawgRole | null;
-        signature_info: {
+        // Populated by @contentauth/c2pa-web's deeper COSE/certificate
+        // parsing (monolithic, HLS). Live DASH sources (@svta/cml-c2pa)
+        // only expose the raw signer_payload/signature bytes, with no
+        // certificate-derived signer info — this field is absent there.
+        signature_info?: {
             alg: string;
             issuer: string;
             cert_serial_number: string;
             revocation_status: boolean;
-        };
+        } | null;
     } | null;
 }
 
@@ -63,6 +67,14 @@ export interface CreativeWorkContentItem {
     datePublished: string | null;
     license: string | null;
     organization: OrganizationIdentityItem | null;
+}
+
+export interface DublinCoreMetadataItem {
+    title: string | null;
+    publisher: string | null;
+    rights: string | null;
+    creator: string | null;
+    description: string | null;
 }
 
 export interface ClaimGeneratorItem {
@@ -92,9 +104,10 @@ export interface HistorySectionItem {
 }
 
 export interface CawgOrganizationItem {
-    issuer: string;
+    issuer: string | null;
     role?: CawgRole | null;
     creativeWork: CreativeWorkContentItem | null;
+    dublinCore: DublinCoreMetadataItem | null;
     validationStatus: ValidationState;
 }
 
@@ -124,3 +137,4 @@ export interface AiOptOutAssertionItem {
 export interface AiOptOutSectionItem {
     assertion: AiOptOutAssertionItem;
 }
+

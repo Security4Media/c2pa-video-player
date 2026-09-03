@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-import { type ReactNode, useEffect, useState } from 'react';
+import { type ReactNode, useEffect, useId, useState } from 'react';
 import type {
   C2paMenuMode,
   C2paMenuSections,
@@ -22,6 +22,7 @@ import type {
 } from './menuViewModel';
 import {
   AiOptOutSection,
+  AlertItem,
   ClaimGeneratorSection,
   HistoryDetailView,
   HistorySection,
@@ -34,11 +35,54 @@ import {
   WorkSection,
 } from './components';
 
+/**
+ * The panel shell: the box, its header, and the list inside it.
+ *
+ * Extracted because the same three elements were written out five times, once
+ * per render mode, which is how `role="menu"` came to be on five lists whose
+ * children are not menu items. One wrapper means the semantics are stated once.
+ *
+ * `role="region"` rather than `dialog`. A dialog implies something modal, and
+ * this is not: the control bar deliberately stays above and clickable
+ * (menu-shell.css), and focus is moved into the panel but not trapped. Claiming
+ * `dialog` without `aria-modal` and a focus trap would tell a screen reader
+ * user something the panel does not do.
+ *
+ * `tabIndex={-1}` so the panel itself can take focus when it opens: it is the
+ * container that gets focused, not a control inside it, because the first
+ * control varies by mode and one of the modes has none at all.
+ */
+function MenuPanel({
+  title,
+  leadingAction,
+  children,
+}: {
+  title: string;
+  leadingAction?: ReactNode;
+  children?: ReactNode;
+}) {
+  const titleId = useId();
+
+  return (
+    <div
+      className="c2pa-menu-panel"
+      role="region"
+      aria-labelledby={titleId}
+      tabIndex={-1}
+    >
+      <MenuHeader title={title} leadingAction={leadingAction} titleId={titleId} />
+      <ul className="vjs-menu-content c2pa-menu-content-list">{children}</ul>
+    </div>
+  );
+}
+
 interface C2paMenuContentProps {
   sectionTitles: Record<C2paMenuSectionTitleKey, string>;
   sections: C2paMenuSections | null;
   mode: C2paMenuMode;
   resetKey: string;
+  isSegmentView: boolean;
+  onBackToLive: () => void;
 }
 
 /**
@@ -51,6 +95,8 @@ export function C2paMenuContent({
   sections,
   mode,
   resetKey,
+  isSegmentView,
+  onBackToLive,
 }: C2paMenuContentProps) {
   const [activeView, setActiveView] = useState<'default' | 'history'>('default');
   const [workExpanded, setWorkExpanded] = useState(false);
@@ -74,45 +120,38 @@ export function C2paMenuContent({
   let headerTitle = 'Content Credentials';
   let headerAction: ReactNode = null;
 
+  if (isSegmentView) {
+    headerAction = (
+      <button
+        className="c2pa-history-section__back-button c2pa-history-section__back-button--title"
+        type="button"
+        onClick={onBackToLive}
+        aria-label="Back to live status"
+      >
+        <span className="c2pa-history-section__back-icon">‹</span>
+      </button>
+    );
+  }
+
   if (mode === 'loading') {
     return (
-      <div className="c2pa-menu-panel">
-        <MenuHeader title={headerTitle} />
-        <ul className="vjs-menu-content c2pa-menu-content-list" role="menu">
-          <LoadingState />
-        </ul>
-      </div>
+      <MenuPanel title={headerTitle}>
+        <LoadingState />
+      </MenuPanel>
     );
   }
 
   if (mode === 'no-manifest') {
     return (
-      <div className="c2pa-menu-panel">
-        <MenuHeader title={headerTitle} />
-        <ul className="vjs-menu-content c2pa-menu-content-list" role="menu">
-          <NoManifestState />
-        </ul>
-      </div>
-    );
-  }
-
-  if (mode === 'invalid') {
-    return (
-      <div className="c2pa-menu-panel">
-        <MenuHeader title={headerTitle} />
-        <ul className="vjs-menu-content c2pa-menu-content-list" role="menu">
-          <InvalidState />
-        </ul>
-      </div>
+      <MenuPanel title={headerTitle}>
+        <NoManifestState />
+      </MenuPanel>
     );
   }
 
   if (!sections) {
     return (
-      <div className="c2pa-menu-panel">
-        <MenuHeader title={headerTitle} />
-        <ul className="vjs-menu-content c2pa-menu-content-list" role="menu" />
-      </div>
+      <MenuPanel title={headerTitle} />
     );
   }
 
@@ -130,23 +169,31 @@ export function C2paMenuContent({
     );
 
     return (
-      <div className="c2pa-menu-panel">
-        <MenuHeader title={headerTitle} leadingAction={headerAction} />
-        <ul className="vjs-menu-content c2pa-menu-content-list" role="menu">
-          <HistoryDetailView
-            section={sections.history}
-            ingredientsExpanded={ingredientsExpanded}
-            onToggleIngredient={handleToggleIngredient}
-          />
-        </ul>
-      </div>
+      <MenuPanel title={headerTitle} leadingAction={headerAction}>
+        <HistoryDetailView
+          section={sections.history}
+          ingredientsExpanded={ingredientsExpanded}
+          onToggleIngredient={handleToggleIngredient}
+        />
+      </MenuPanel>
     );
   }
 
   return (
-    <div className="c2pa-menu-panel">
-      <MenuHeader title={headerTitle} />
-      <ul className="vjs-menu-content c2pa-menu-content-list" role="menu">
+    <MenuPanel title={headerTitle} leadingAction={headerAction}>
+        {/* Whatever went wrong leads the menu. It used to trail the summary's
+            issuer and date, which buried the one line saying something is
+            wrong under provenance detail that only matters once nothing is.
+
+            One block, not two. In 'invalid' mode the headline carries the
+            message; the separate alert below is for the other case, where the
+            playhead is somewhere valid but part of the timeline is not. Both
+            used to render together, which said the same thing twice. */}
+        {mode === 'invalid' ? (
+          <InvalidState message={sections.summary.alert} />
+        ) : sections.summary.alert ? (
+          <AlertItem itemValue={sections.summary.alert} />
+        ) : null}
         <SummarySection section={sections.summary} sectionTitles={sectionTitles} />
         {sections.claimGenerator ? (
           <ClaimGeneratorSection
@@ -182,7 +229,6 @@ export function C2paMenuContent({
             onOpen={() => setActiveView('history')}
           />
         ) : null}
-      </ul>
-    </div>
+    </MenuPanel>
   );
 }

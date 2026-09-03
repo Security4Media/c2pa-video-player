@@ -15,7 +15,7 @@
  */
 
 import type { SummarySectionItem } from '../menuViewModel';
-import { AlertItem, MenuField, ValidationBadge } from './shared';
+import { MenuField, ValidationBadge } from './shared';
 
 export function SummarySection({
   section,
@@ -50,8 +50,6 @@ export function SummarySection({
           </div>
         </li>
       ) : null}
-
-      {section.alert ? <AlertItem itemValue={section.alert} /> : null}
     </>
   );
 }

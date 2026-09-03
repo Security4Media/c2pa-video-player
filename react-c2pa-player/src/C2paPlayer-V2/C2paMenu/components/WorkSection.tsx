@@ -14,7 +14,9 @@
  * limitations under the License.
  */
 
+import { useId } from 'react';
 import type { WorkSectionItem } from '../models';
+import { SectionToggle } from './shared';
 
 function normalizeSentenceValue(value: string | null | undefined) {
   return value?.toLowerCase().trim() ?? '';
@@ -65,14 +67,21 @@ export function WorkSection({
   isExpanded: boolean;
   onToggle: () => void;
 }) {
+  const panelId = useId();
+
   return (
     <li className="vjs-menu-item">
       <div className="c2pa-menu-section c2pa-work-section">
-        <div className="c2pa-menu-section__header c2pa-menu-section__header--collapsible" onClick={onToggle}>
-          <span className="itemName c2pa-menu-section__title">{title}</span>
-          <span className={`c2pa-menu-section__toggle ${isExpanded ? 'expanded' : ''}`}>›</span>
-        </div>
-        <div className={`c2pa-menu-section__content ${isExpanded ? 'expanded' : ''}`}>
+        <SectionToggle
+          title={title}
+          isExpanded={isExpanded}
+          controls={panelId}
+          onToggle={onToggle}
+        />
+        <div
+          id={panelId}
+          className={`c2pa-menu-section__content ${isExpanded ? 'expanded' : ''}`}
+        >
           <div className="c2pa-menu-section__content-inner c2pa-work-section__content">
             {section.authors.map((author, index) => (
               <div

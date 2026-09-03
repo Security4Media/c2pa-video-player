@@ -1,3 +1,5 @@
+@import './design-tokens.css';
+
 /*
  * Copyright 2026 European Broadcasting Union
  *
@@ -16,18 +18,27 @@
 
 /* Enhanced Video.js Control Bar Styling */
 
+/* The control bar's height, published so the overlays above it can clear it
+   instead of each guessing. They guessed 4.5rem (72px), 5.25em (60.5px) and
+   40px against a bar that is 54px, and the 40px one overlapped it by 14px.
+   Stated in px because that is what the em chain below resolves to: 4.5em at
+   `font-size: 1.2em` on video.js's 10px base. */
+.video-js {
+  --c2pa-control-bar-height: 54px;
+}
+
 /* Make control bar bigger and more prominent */
 .video-js .vjs-control-bar {
-  height: 4.5em !important;
+  height: var(--c2pa-control-bar-height);
   font-size: 1.2em;
-  background: linear-gradient(180deg, rgba(10, 46, 106, 0.92) 0%, rgba(14, 65, 148, 0.88) 100%) !important;
+  background: linear-gradient(180deg, rgba(10, 46, 106, 0.92) 0%, rgba(14, 65, 148, 0.88) 100%);
   backdrop-filter: blur(8px);
   border-top: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 /* Standard controls sizing */
 .video-js .vjs-control {
-  width: 4em !important;
+  width: 4em;
 }
 
 /* Button icons sizing - exclude C2PA button */
@@ -38,7 +49,7 @@
 
 /* Play button sizing */
 .video-js .vjs-play-control {
-  width: 4em !important;
+  width: 4em;
 }
 
 /* Time controls styling */
@@ -56,7 +67,7 @@
 
 /* C2PA Control Button - positioned BEFORE play button */
 .video-js .vjs-control-bar .vjs-control.vjs-button[title="Content Credentials"] {
-  width: 4.5em !important;
+  width: 4.5em;
   order: -1; /* Position before play button */
 }
 
@@ -67,44 +78,44 @@
 
 /* Volume panel adjustments - fixed layout */
 .video-js .vjs-volume-panel {
-  width: auto !important;
-  display: flex !important;
-  align-items: center !important;
+  width: auto;
+  display: flex;
+  align-items: center;
 }
 
 /* Always use horizontal layout */
 .video-js.vjs-has-started .vjs-volume-panel {
-  width: auto !important;
+  width: auto;
 }
 
 /* Volume control button */
 .video-js .vjs-volume-panel .vjs-mute-control {
-  width: 4em !important;
+  width: 4em;
 }
 
 /* Volume bar container - always visible and fixed position */
 .video-js .vjs-volume-panel .vjs-volume-control {
-  width: 5em !important;
-  display: flex !important;
-  align-items: center !important;
-  opacity: 1 !important;
-  visibility: visible !important;
-  position: relative !important;
-  transition: none !important;
-  pointer-events: auto !important;
+  width: 5em;
+  display: flex;
+  align-items: center;
+  opacity: 1;
+  visibility: visible;
+  position: relative;
+  transition: none;
+  pointer-events: auto;
 }
 
 /* Force horizontal volume control to always show with fixed dimensions */
 .video-js .vjs-volume-panel.vjs-volume-panel-horizontal .vjs-volume-control {
-  opacity: 1 !important;
-  width: 5em !important;
-  height: auto !important;
-  transition: none !important;
+  opacity: 1;
+  width: 5em;
+  height: auto;
+  transition: none;
 }
 
 /* Disable vertical volume control */
 .video-js .vjs-volume-panel.vjs-volume-panel-vertical {
-  display: none !important;
+  display: none;
 }
 
 /* Override all hover and active states to maintain fixed position */
@@ -115,42 +126,62 @@
 .video-js .vjs-volume-panel.vjs-hover .vjs-volume-control,
 .video-js .vjs-volume-panel .vjs-volume-control:hover,
 .video-js.vjs-user-inactive .vjs-volume-panel .vjs-volume-control {
-  opacity: 1 !important;
-  width: 5em !important;
-  transition: none !important;
+  opacity: 1;
+  width: 5em;
+  transition: none;
 }
 
-/* Volume slider - fixed dimensions */
-.video-js .vjs-volume-bar {
-  height: 0.5em !important;
-  margin: 0 0.5em !important;
+/* Volume slider - fixed dimensions.
+ *
+ * Qualified by .vjs-volume-panel rather than marked `!important`. The volume
+ * bar is also a `.vjs-slider`, so the 0.7em the seek bar wants (c2pa-player.css)
+ * matches it too and, loading later, would otherwise win. Three classes beat
+ * two whatever the order, which is the same outcome the `!important` bought and
+ * survives the next stylesheet someone adds. */
+.video-js .vjs-volume-panel .vjs-volume-bar {
+  height: 0.5em;
+  margin: 0 0.5em;
 }
 
 /* Volume level indicator */
-.video-js .vjs-volume-level {
-  height: 0.5em !important;
+.video-js .vjs-volume-panel .vjs-volume-level {
+  height: 0.5em;
 }
 
 /* Hide volume level handle/knob for cleaner display */
-.video-js .vjs-volume-level::before {
-  display: none !important;
+.video-js .vjs-volume-panel .vjs-volume-level::before {
+  display: none;
 }
 
-/* Make video player container larger */
+/* No `font-size` here on purpose.
+ *
+ * This rule used to declare `font-size: 16px`, and it never once applied:
+ * video.js's own `.video-js { font-size: 10px }` (video-js.css:468) is equally
+ * specific and, before the stylesheet order was fixed, loaded afterwards. So
+ * the whole control bar has always been sized from a 10px base, and every em
+ * value in this file was tuned against that. Restating the 16px now that the
+ * order is right would scale the entire player by 1.6x - a design change, not
+ * a refactor - so the declaration is dropped and video.js's base is used, which
+ * is what has been on screen all along. Setting a deliberate base size is a
+ * reasonable thing to want; it just needs to be decided rather than inherited
+ * from a rule nobody knew was dead. */
 .video-js {
-  font-size: 16px;
   min-height: 500px;
 }
 
 /* Responsive adjustments */
 @media (max-width: 768px) {
+  .video-js {
+    --c2pa-control-bar-height: 35px;
+  }
+
   .video-js .vjs-control-bar {
-    height: 3.5em !important;
+    height: var(--c2pa-control-bar-height);
     font-size: 1em;
   }
 
   .video-js .vjs-control {
-    width: 3em !important;
+    width: 3em;
   }
 
   .video-js .vjs-button:not(.c2pa-menu-button) > .vjs-icon-placeholder:before {
@@ -159,8 +190,8 @@
 
   /* Keep C2PA button size consistent on mobile */
   .video-js .vjs-chapters-button.c2pa-menu-button {
-    width: 4em !important;
-    min-width: 4em !important;
+    width: 4em;
+    min-width: 4em;
   }
 
   .video-js {
@@ -173,15 +204,383 @@
   color: var(--c2pa-unknown);
 }
 
+/* Grey means "no C2PA verdict yet". The whole seek bar starts grey and each
+   validated fragment paints its own colour over it (see .seekbar-play-c2pa),
+   so anything still grey is genuinely unvalidated rather than just unplayed.
+   Without overriding the holder, video.js's default slate-blue track read as
+   a validation colour.
+
+   Three classes, to outrank video.js's own `.video-js .vjs-slider`
+   (video-js.css:1152), which the holder also matches. */
+.video-js .vjs-progress-control .vjs-progress-holder {
+  background-color: var(--c2pa-unknown);
+}
+
 .video-js .vjs-progress-holder .vjs-play-progress {
   background-color: var(--c2pa-unknown);
 }
 
 /* C2PA Timeline Segments */
+
+/* The segments are layered on each other with descending z-indexes (earlier
+   segment on top), and that range grows with the number of segments. Making
+   their host its own stacking context keeps all of it contained at one level,
+   so the playhead handle below only has to outrank this single value rather
+   than the highest segment index. */
+.video-js .vjs-progress-control .c2pa-timeline-host {
+  position: relative;
+  z-index: 1;
+}
+
+/* Keep the playhead handle visible above the segments.
+
+   `.vjs-play-progress` itself is left at `z-index: auto` on purpose: it must
+   stay *behind* the segments, since its own background would otherwise hide
+   them. Only the handle is lifted. z-index 3 clears both the segment host and
+   `.vjs-mouse-display`, which video.js puts at 1.
+
+   The handle is drawn as a plain round box rather than reusing video.js's
+   icon-font glyph, whose `content` came out empty when two video.js
+   stylesheets were in play. Only one is now, but a self-contained circle still
+   sidesteps the icon-font and SVG-icon paths, so it cannot depend on which of
+   them a build enables. White, because it has to stay legible against all four
+   verdict colours as well as the grey track. */
+.video-js .vjs-progress-control .vjs-progress-holder .vjs-play-progress::before {
+  content: '';
+  display: block;
+  position: absolute;
+  right: -0.35em;
+  top: 50%;
+  width: 0.7em;
+  height: 0.7em;
+  margin-top: -0.35em;
+  border-radius: 50%;
+  background-color: #fff;
+  box-shadow: 0 0 2px rgba(0, 0, 0, 0.6);
+  z-index: 3;
+}
+
+/* Same handle, for builds where video.js renders it as an SVG element instead
+   of the pseudo-element above (it suppresses `::before` when SVG icons are
+   enabled - video-js.css:1067). */
+.video-js .vjs-progress-control .vjs-progress-holder .vjs-play-progress .vjs-svg-icon {
+  z-index: 3;
+}
+
+/* `left` and `width` are both set per segment (see positionTimelineSegment), so
+   each one covers only its own stretch of the bar and unread stretches show the
+   track's grey through. No `left: 0` here: that was what forced every segment
+   to start at the origin, making a grey gap impossible to express. */
 .seekbar-play-c2pa {
   position: absolute;
   height: 100%;
-  left: 0;
   top: 0;
   pointer-events: none;
+}
+
+/* Colour and opacity transition; `left` and `width` deliberately do not.
+ *
+ * The live roll rewrites geometry on every animation frame, and a transition
+ * on a property that is reassigned each frame never completes - it restarts
+ * from wherever it had reached, so the whole bar trails the playhead by the
+ * transition's own duration and the glide it was meant to smooth gets worse.
+ * The roll *is* the animation for geometry (see liveEdgeClock.ts). These two
+ * are for the things that change discretely: a verdict arriving, and a
+ * provisional segment settling once playback reaches it. */
+.video-js .vjs-progress-control .seekbar-play-c2pa {
+  transition:
+    background-color 240ms ease,
+    opacity 240ms ease;
+}
+
+/* The hover preview.
+ *
+ * Lives inside .vjs-progress-control (which is `overflow: visible`) and sits
+ * above it, clear of the bar. `pointer-events: none` is load-bearing rather
+ * than tidiness: the panel is positioned under the pointer, so anything else
+ * would put it between the pointer and the bar it describes, and the hover
+ * would fight itself. `left` is set per pointer position by the controller. */
+.video-js .vjs-progress-control .c2pa-timeline-preview {
+  position: absolute;
+  bottom: calc(100% + 0.4em);
+  z-index: 4;
+  display: none;
+  box-sizing: border-box;
+  width: max-content;
+  max-width: 22em;
+  padding: 0.6em 0.75em;
+  border: 1px solid var(--color-overlay-border);
+  border-radius: var(--radius-sm);
+  background: linear-gradient(135deg, rgba(14, 65, 148, 0.96) 0%, rgba(10, 46, 106, 0.98) 100%);
+  box-shadow: var(--shadow-lg);
+  pointer-events: none;
+  /* Reset from the control bar's 1.1em, so the panel does not inherit the
+     seek bar's scaling and end up sized against the wrong thing. */
+  font-size: 0.75rem;
+  line-height: 1.45;
+  color: #fff;
+  text-align: left;
+  white-space: normal;
+}
+
+.video-js .vjs-progress-control .c2pa-timeline-preview--visible {
+  display: block;
+}
+
+.video-js .c2pa-timeline-preview__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75em;
+  margin-bottom: 0.35em;
+}
+
+.video-js .c2pa-timeline-preview__time {
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--font-weight-semibold);
+}
+
+.video-js .c2pa-timeline-preview__state {
+  flex: 0 0 auto;
+  padding: 0.05em 0.45em;
+  border-radius: var(--radius-full);
+  background: rgba(255, 255, 255, 0.15);
+  font-weight: var(--font-weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: 0.85em;
+}
+
+/* The same four colours the bar uses, so the badge and the segment under the
+   pointer cannot appear to disagree. */
+.video-js .c2pa-timeline-preview__state--trusted {
+  background: var(--c2pa-trusted);
+  color: #06240f;
+}
+
+.video-js .c2pa-timeline-preview__state--valid {
+  background: var(--c2pa-passed);
+}
+
+.video-js .c2pa-timeline-preview__state--invalid,
+.video-js .c2pa-timeline-preview__state--false {
+  background: var(--c2pa-failed);
+}
+
+.video-js .c2pa-timeline-preview__state--unknown {
+  background: var(--c2pa-unknown);
+  color: #1c1c1c;
+}
+
+.video-js .c2pa-timeline-preview__reason {
+  margin: 0 0 0.4em;
+}
+
+.video-js .c2pa-timeline-preview__row {
+  display: flex;
+  gap: 0.5em;
+}
+
+.video-js .c2pa-timeline-preview__label {
+  flex: 0 0 4.5em;
+  opacity: 0.7;
+}
+
+.video-js .c2pa-timeline-preview__value {
+  flex: 1 1 auto;
+  /* A dc:title can be arbitrarily long; wrap rather than widen past max-width. */
+  overflow-wrap: anywhere;
+}
+
+.video-js .c2pa-timeline-preview__caveat {
+  margin: 0.4em 0 0;
+  opacity: 0.75;
+  font-style: italic;
+}
+
+/* The raw codes. Present but quiet: evidence for the sentence above, not the
+   headline. */
+/* The seconds readout video.js shows while hovering the bar.
+ *
+ * Removed on live, for two reasons. On an epoch-based live timeline it prints
+ * the raw offset - the same arithmetic that put "496762:21" in the control bar
+ * - and even where it reads sensibly it is a second scale on a bar that now has
+ * one, competing with the C2PA preview that appears in the same place and says
+ * considerably more. */
+.video-js.vjs-live .vjs-progress-control .vjs-mouse-display,
+.video-js.vjs-live .vjs-progress-control .vjs-time-tooltip {
+  display: none;
+}
+
+/* Validated, but playback has not reached it yet and still could.
+ *
+ * On a live bar the verdicts arrive in real time, so showing them as they come
+ * is the point of the thing - but "checked" and "checked and shown to a viewer"
+ * are different claims, and the bar has to be able to say which it means. The
+ * dimmed state says the first; full strength says the second.
+ *
+ * A segment leaves this state either because playback reached it, or because it
+ * fell out of the DVR window and can never be played, at which point the
+ * distinction has nothing left to express (see liveReadState.ts).
+ *
+ * Expressed as opacity plus a hatch rather than a lighter colour per verdict:
+ * the four verdict colours already carry meaning, and a fifth and sixth shade
+ * of each would be four more things to tell apart. The hatch also survives
+ * being printed, screenshotted in greyscale, or read by someone who cannot
+ * separate the greens from the reds. */
+.video-js .vjs-progress-control .seekbar-play-c2pa--provisional {
+  opacity: 0.45;
+  background-image: repeating-linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.45) 0,
+    rgba(255, 255, 255, 0.45) 1px,
+    transparent 1px,
+    transparent 4px
+  );
+  /*
+   * Anchors the hatch to the viewport instead of to each segment's own box,
+   * which is what stops a run of same-verdict fragments showing its seams.
+   *
+   * A gradient is positioned against the element it is painted on, so every
+   * segment restarted the pattern at phase zero on its own left edge. Measured
+   * on 40 contiguous fragments 16.3px wide: the phase at each segment's left
+   * edge was 0 or 1 for all 39 interior boundaries - a bright hatch crest
+   * landing on every single one - and boundary columns averaged 161.9 luma
+   * against the interior's 156.2. A visible light line every 16px, which is
+   * exactly the "edges of the segments" this was reported as.
+   *
+   * With `fixed` the phase spreads evenly (0,1,2,3,4,5 in near-equal numbers,
+   * a pattern drifting through the run as a continuous one does) and the
+   * boundary average falls to 154.5 against 155.3 - boundaries now measure
+   * like ordinary interior columns.
+   *
+   * Two things worth knowing, both checked rather than assumed. The pattern is
+   * viewport-relative, so it shifts if the page scrolls or the player enters
+   * fullscreen; that is invisible in a decorative texture and is the price of
+   * the fix. And `fixed` has a reputation for defeating paint optimisation, so
+   * the cost was measured on a full 78-segment window rewriting geometry every
+   * frame: 59.3fps with and without, median frame 16.7ms both, no frame over
+   * 20ms. These elements are a few pixels each, so there is nothing in it.
+   *
+   * The alternative was setting `background-position-x` per segment per frame
+   * from the roll's own arithmetic, which anchors to the bar rather than the
+   * viewport but adds a style write per segment per frame. Not worth it for a
+   * hatch, and it would put a presentational detail into the roll.
+   *
+   * Only the seams were the problem: settled segments abut with no seam at all
+   * (boundary columns measured a standard deviation of exactly 0), because
+   * Chromium snaps a positioned element's background paint rect to whole
+   * device pixels. The first theory here was sub-pixel bleed-through of the
+   * grey track, and pixels said otherwise.
+   */
+  background-attachment: fixed;
+}
+
+/* A newly appended segment spends one frame here so its fade-in has something
+   to transition from; the timeline removes the class on the next frame.
+   Without it a segment appears at full strength in a single frame, which on a
+   live bar is a small colour block popping into existence every few seconds.
+ *
+ * Placed after the provisional rule on purpose. The two are equally specific,
+ * so source order decides the `opacity` declaration - and a segment that
+ * arrives provisional (the usual case on live, since verdicts land before
+ * playback reaches them) would otherwise start at 0.45 with nothing to fade
+ * from. */
+.video-js .vjs-progress-control .seekbar-play-c2pa--entering {
+  opacity: 0;
+}
+
+/* Asked for less animation: the timeline also skips its frame loop, so the bar
+   steps on the render tick instead of gliding. */
+@media (prefers-reduced-motion: reduce) {
+  .video-js .vjs-progress-control .seekbar-play-c2pa {
+    transition: none;
+  }
+}
+
+/* Only non-Valid/Trusted segments are inspectable - re-enable pointer events
+   for just those so clicking one opens the menu on that fragment, while the
+   rest of the seekbar keeps click-to-seek working through the overlay. */
+.seekbar-play-c2pa--inspectable {
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+/* Video.js hides the progress control outright on a live stream
+   (`.video-js.vjs-live .vjs-progress-control { display: none }`), on the
+   reasonable assumption that there is nothing to seek. Here the bar is not a
+   seek control but a record of what has been validated, so it has to stay:
+   without this the C2PA segments are positioned correctly inside a container
+   that is never displayed, and the timeline appears simply not to work on live
+   sources.
+
+   One class more than video.js's own rule, which is otherwise equally
+   specific. */
+.video-js.vjs-live .vjs-control-bar .vjs-progress-control {
+  display: flex;
+}
+
+/* The LIVE control.
+ *
+ * This is video.js's `seekToLive`, a button, rather than `liveDisplay`, a
+ * label: clicking it returns to the live edge. Video.js hides it unless the
+ * player has `liveui` enabled, so nothing here decides when to show it.
+ *
+ * Video.js already gives its dot the distinction that matters - grey while
+ * playback is behind the edge, red once at it - so the colour is left to
+ * video.js and only the pulse is added, on the at-edge state alone. A pulsing
+ * dot means "this is running now"; a static grey one means "you are watching
+ * back". Pulsing both would say neither.
+ *
+ * Sized in em so the indicator tracks the bar, which is set in em throughout
+ * and drops to 3em at the mobile breakpoint. `flex: 0 0 auto` because video.js
+ * gives the control `flex: none` but this file's blanket
+ * `.video-js .vjs-control { width: 4em }` above would still pin it to a box
+ * narrower than "LIVE" plus a dot; four classes here against that rule's two
+ * settles it. */
+.video-js.vjs-live .vjs-control-bar .vjs-seek-to-live-control {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  width: auto;
+  padding: 0 0.6em;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.video-js .vjs-control-bar .vjs-seek-to-live-control .vjs-seek-to-live-text {
+  margin-left: 0.4em;
+}
+
+/* The pulse rides on video.js's own circle glyph rather than a `::before` of
+   ours, so there is one dot rather than two competing for the same 0.7em.
+   `currentColor` keeps video.js's grey/red distinction intact. */
+.video-js .vjs-control-bar .vjs-seek-to-live-control.vjs-at-live-edge .vjs-icon-placeholder,
+.video-js .vjs-control-bar .vjs-seek-to-live-control.vjs-at-live-edge .vjs-svg-icon {
+  border-radius: 50%;
+  animation: c2pa-live-pulse 1.6s ease-out infinite;
+}
+
+@keyframes c2pa-live-pulse {
+  0% {
+    opacity: 1;
+    box-shadow: 0 0 0 0 color-mix(in srgb, currentColor 75%, transparent);
+  }
+  70% {
+    opacity: 0.6;
+    /* Ring has travelled out and faded; the dot is at its dimmest. */
+    box-shadow: 0 0 0 0.6em color-mix(in srgb, currentColor 0%, transparent);
+  }
+  100% {
+    opacity: 1;
+    box-shadow: 0 0 0 0 color-mix(in srgb, currentColor 0%, transparent);
+  }
+}
+
+/* Honour a reader who has asked for less motion. */
+@media (prefers-reduced-motion: reduce) {
+  .video-js .vjs-control-bar .vjs-seek-to-live-control.vjs-at-live-edge .vjs-icon-placeholder,
+  .video-js .vjs-control-bar .vjs-seek-to-live-control.vjs-at-live-edge .vjs-svg-icon {
+    animation: none;
+  }
 }

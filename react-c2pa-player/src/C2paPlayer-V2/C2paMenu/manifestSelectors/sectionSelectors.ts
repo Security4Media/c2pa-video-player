@@ -15,6 +15,7 @@
  */
 
 import { Manifest, ManifestStore } from '@contentauth/c2pa-web';
+import type { AdapterKind } from '@/validation';
 import {
     ClaimGeneratorSectionItem,
     HistorySectionItem,
@@ -76,9 +77,10 @@ export function selectHistorySection(
 export function selectOrganizationSection(
     manifest: Manifest,
     manifestStore?: ManifestStore,
+    adapterKind?: AdapterKind | null,
 ): OrganizationSectionItem | null {
     const organization = selectCreativeWorkOrganization(manifest);
-    const cawg = selectOrganizationIdentity(manifest, manifestStore);
+    const cawg = selectOrganizationIdentity(manifest, manifestStore, adapterKind);
 
     if (!organization && !cawg) {
         return null;
@@ -101,10 +103,14 @@ export function selectOrganizationSection(
 export function selectWorkSection(
     manifest: Manifest,
     manifestStore?: ManifestStore,
+    adapterKind?: AdapterKind | null,
 ): WorkSectionItem | null {
     const authors = selectCreativeWorkAuthors(manifest);
     const organization = selectCreativeWorkOrganization(manifest);
-    const cawg = selectOrganizationIdentity(manifest, manifestStore);
+    // Only the role is read from here, which no engine verifies either way -
+    // but the argument is passed so the two selectors cannot answer the same
+    // question differently.
+    const cawg = selectOrganizationIdentity(manifest, manifestStore, adapterKind);
     const role = cawg?.role ?? null;
 
     if (authors.length === 0 && !role && !organization?.name) {
