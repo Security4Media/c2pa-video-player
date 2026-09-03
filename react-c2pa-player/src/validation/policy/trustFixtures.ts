@@ -16,7 +16,11 @@
 
 import emptyListUrl from '/trust/fixtures/empty.pem?url';
 import unrelatedAnchorUrl from '/trust/fixtures/unrelated-anchor.pem?url';
-import { defaultTrustResourceUrls, type TrustResourceUrls } from './localTrustMaterialProvider';
+import {
+  defaultTrustResourceUrls,
+  devTrustResourceUrls,
+  type TrustResourceUrls,
+} from './localTrustMaterialProvider';
 
 /**
  * Trust policies that make each validation outcome reachable by configuration.
@@ -32,8 +36,10 @@ import { defaultTrustResourceUrls, type TrustResourceUrls } from './localTrustMa
  * an empty list, and an anchor belonging to no one.
  */
 export type TrustFixtureName =
-  /** Everything the player normally trusts. */
-  | 'full'
+  /** The shipped policy: trust/prod/ only. Same as passing nothing. */
+  | 'full-prod'
+  /** trust/prod/ plus trust/dev/, so the bundled test assets can reach Trusted. */
+  | 'full-dev'
   /** Anchors only, so trust must come from chaining rather than the allow-list. */
   | 'anchors-only'
   /** Nothing trusted: a correctly signed asset should still validate, untrusted. */
@@ -43,39 +49,57 @@ export type TrustFixtureName =
   /** An anchor belonging to no one, as a negative control. */
   | 'wrong-anchor';
 
+// The four narrowing fixtures start from the development material rather than
+// the shipped policy. They exist to demonstrate a mechanism against the
+// bundled test assets, and several of those assets are signed by test roots
+// that only trust/dev/ carries: started from prod, 'anchors-only' would find
+// nothing to chain to and would stop distinguishing "this signer is
+// allow-listed, not chainable" from "there are no anchors at all".
+const base = devTrustResourceUrls;
+
 export const trustFixtures: Record<TrustFixtureName, TrustResourceUrls> = {
-  full: { ...defaultTrustResourceUrls },
+  'full-prod': { ...defaultTrustResourceUrls },
+  'full-dev': { ...devTrustResourceUrls },
   'anchors-only': {
-    ...defaultTrustResourceUrls,
-    c2paAllowed: emptyListUrl,
-    cawgAllowed: emptyListUrl,
+    ...base,
+    c2paAllowed: [emptyListUrl],
+    cawgAllowed: [emptyListUrl],
     // Without this the community allow-list refills the list this fixture
     // exists to empty, and it silently stops testing chaining at all.
     includeRemote: false,
   },
   empty: {
-    ...defaultTrustResourceUrls,
-    anchors: emptyListUrl,
-    c2paAllowed: emptyListUrl,
-    cawgAllowed: emptyListUrl,
+    ...base,
+    anchors: [emptyListUrl],
+    c2paAllowed: [emptyListUrl],
+    cawgAllowed: [emptyListUrl],
     // The community lists would put the anchors back.
     includeRemote: false,
   },
   // Emptying the CAWG list alone would change nothing, since the identity
   // policy is the C2PA one widened by it; the policy is stated outright.
   'cawg-missing': {
-    ...defaultTrustResourceUrls,
-    cawgOverride: { anchors: emptyListUrl, allowed: emptyListUrl },
+    ...base,
+    cawgOverride: { anchors: [emptyListUrl], allowed: [emptyListUrl] },
   },
   'wrong-anchor': {
-    ...defaultTrustResourceUrls,
-    anchors: unrelatedAnchorUrl,
-    c2paAllowed: emptyListUrl,
-    cawgAllowed: emptyListUrl,
+    ...base,
+    anchors: [unrelatedAnchorUrl],
+    c2paAllowed: [emptyListUrl],
+    cawgAllowed: [emptyListUrl],
     includeRemote: false,
   },
 };
 
+/**
+ * Own keys only, not `in`.
+ *
+ * `'toString' in trustFixtures` is true, and so is `'__proto__'`, so an `in`
+ * check let `?trust=toString` past the guard and then handed
+ * `Object.prototype.toString` to the provider as if it were a set of URLs. The
+ * fallback for an unrecognised value has to be the shipped policy, not a
+ * failed trust load.
+ */
 export function isTrustFixtureName(value: string): value is TrustFixtureName {
-  return value in trustFixtures;
+  return Object.prototype.hasOwnProperty.call(trustFixtures, value);
 }
