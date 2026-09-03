@@ -116,6 +116,19 @@ const readLabel = (page) =>
       transitionDuration: style.transitionDuration,
       markColour: getComputedStyle(mark).backgroundColor,
       markImage: getComputedStyle(mark).backgroundImage.replace(/.*\/([^/"]+)".*/, '$1'),
+      markBox: px(mark.getBoundingClientRect().width),
+      /*
+       * What is actually visible, which is not the box and not the
+       * background-size either. Both icons are a small shape inside a padded
+       * 36x24 viewBox, so the glyph is a fraction of the image: 16/36 for
+       * cr-icon, 18/36 for cr-invalid. Asserting on the box would have passed
+       * while the glyph rendered at 5.7px, which is exactly what happened.
+       */
+      markGlyph: (() => {
+        const image = parseFloat(getComputedStyle(mark).backgroundSize);
+        const shape = /cr-invalid/.test(getComputedStyle(mark).backgroundImage) ? 18 : 16;
+        return Math.round((image * shape) / 36 * 10) / 10;
+      })(),
       fontSize: px(style.fontSize),
       zIndex: style.zIndex,
       animationDuration: style.animationDuration,
@@ -124,6 +137,7 @@ const readLabel = (page) =>
       // The glow lives on a pseudo-element now, so the label's own animation
       // slot is free for the verdict swap.
       glowOnPseudo: getComputedStyle(el, '::after').animationName,
+      controlSize: px(Math.min(rect.width, rect.height)),
       insetTop: px(rect.top - playerRect.top),
       insetRight: px(playerRect.right - rect.right),
       withinPlayer:
@@ -277,6 +291,16 @@ console.log('=== 1. ?label=on: the label states the verdict on screen ===');
     collapsed.hitCentre,
   );
   check(
+    'the collapsed dot still shows a readable glyph',
+    collapsed.markGlyph >= 14,
+    `${collapsed.markGlyph}px`,
+  );
+  check(
+    'and the whole collapsed control meets the 24px minimum target',
+    collapsed.controlSize >= 24,
+    `${collapsed.controlSize}px`,
+  );
+  check(
     'the verdict is still in the accessible name while collapsed',
     /Authenticity established|Valid/.test(collapsed.ariaLabel ?? ''),
     collapsed.ariaLabel,
@@ -298,6 +322,17 @@ console.log('=== 1. ?label=on: the label states the verdict on screen ===');
     'the mark carries the invalid Content Credentials icon',
     bad.markImage === 'cr-invalid.svg',
     bad.markImage,
+  );
+  check(
+    'and the glyph is legible, not lost in its own padding',
+    bad.markGlyph >= 14,
+    `${bad.markGlyph}px glyph in a ${bad.markBox}px dot`,
+  );
+  check(
+    'without its corners trimmed by the circle',
+    // An inscribed square needs the diameter over root two.
+    bad.markGlyph <= bad.markBox / Math.SQRT2,
+    `${bad.markGlyph}px glyph, ${Math.round(bad.markBox / Math.SQRT2 * 10) / 10}px fits`,
   );
   check(
     'a warning is announced to a screen reader',

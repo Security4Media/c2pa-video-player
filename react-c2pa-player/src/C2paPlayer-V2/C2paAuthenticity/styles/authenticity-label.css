@@ -141,15 +141,38 @@
  * glyph for both, so the label and the button read as the same thing.
  */
 .c2pa-authenticity-label__mark {
+  /*
+   * Sized by the glyph, not by the image, and the difference is large.
+   *
+   * `cr-icon.svg` is a 16x16 shape inside a 36x24 viewBox - measured with
+   * `getBBox()` rather than read off the markup - so 56% of the image's width
+   * is empty padding. `background-size` sizes the image, so the previous
+   * `background-size: 0.8rem` put a 12.8px image on the dot and the visible
+   * glyph rendered at 12.8 x 16/36 = 5.7px inside an 18px circle. That is why
+   * it read as tiny: not a small dot, a mostly-empty picture.
+   *
+   * Stating the glyph size and converting to an image size keeps the intent
+   * where a maintainer will look: change the one number, leave the arithmetic.
+   * The empty padding overflows the circle and is clipped to it, which is
+   * harmless because the shape is centred in the viewBox at exactly (18,12).
+   *
+   * `cr-invalid.svg` carries a badge, so its shape is 18x18 centred at (19,13)
+   * and renders about an eighth larger and under a pixel off centre. Left
+   * alone deliberately: the extra is the part that says "invalid", and the
+   * circle is wide enough that its corners are not trimmed (an 18px square
+   * fits inside a 28px circle, which needs 19.8px).
+   */
+  --c2pa-mark-glyph: 1rem;
+
   flex: 0 0 auto;
-  width: 1.15rem;
-  height: 1.15rem;
+  width: 1.75rem;
+  height: 1.75rem;
   border-radius: 50%;
   background-color: var(--c2pa-label-colour);
   background-image: url('/src/assets/icons/cr-icon.svg');
   background-repeat: no-repeat;
   background-position: center;
-  background-size: 0.8rem;
+  background-size: calc(var(--c2pa-mark-glyph) * 36 / 16);
   /* So the dot's colour glides with the pill's border rather than snapping a
      quarter-second ahead of it. */
   transition: background-color 260ms ease;
@@ -169,6 +192,9 @@
 
 .video-js .c2pa-authenticity-label--collapsed {
   gap: 0;
+  /* Collapsed, the dot is the whole control, so this padding is the only thing
+     between the glyph and the edge of the click target. 0.3rem on a 1.75rem
+     mark gives 37.6px, comfortably past the 24px minimum. */
   padding: 0.3rem;
 }
 
