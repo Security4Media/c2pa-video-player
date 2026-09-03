@@ -3,7 +3,7 @@
 This is the only trust directory in the repository. A byte-different duplicate
 used to sit at the repository root; it was never read by any code and has been
 removed. Everything under here is loaded by
-`src/validation/policy/localTrustMaterialProvider.ts`.
+`src/lib/validation/policy/localTrustMaterialProvider.ts`.
 
 ```
 prod/       the pinned production bundle. The shipped policy.

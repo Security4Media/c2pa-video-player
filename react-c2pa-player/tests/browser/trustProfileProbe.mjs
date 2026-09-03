@@ -51,9 +51,9 @@ await page.goto(BASE, { waitUntil: 'domcontentloaded' });
 const result = await page.evaluate(
   async ({ leaf, chain }) => {
     const { LocalTrustMaterialProvider, defaultTrustResourceUrls, devTrustResourceUrls } =
-      await import('/server/src/validation/policy/localTrustMaterialProvider.ts');
+      await import('/server/src/lib/validation/policy/localTrustMaterialProvider.ts');
     const { pemToAllowedListDigests } = await import(
-      '/server/src/validation/policy/webCryptoAllowedList.ts'
+      '/server/src/lib/validation/policy/webCryptoAllowedList.ts'
     );
 
     const digest = async (hex) => {

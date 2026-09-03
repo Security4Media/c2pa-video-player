@@ -22,7 +22,7 @@ Merged and deduplicated (by SHA-256 fingerprint of the DER, 122 unique certs) fr
 
 ## How the player loads these
 
-`src/validation/policy/localTrustMaterialProvider.ts` reads all four files.
+`src/lib/validation/policy/localTrustMaterialProvider.ts` reads all four files.
 This directory *is* the shipped policy: `defaultTrustResourceUrls` names these
 files and nothing else, so a page with no `?trust=` parameter trusts exactly
 what is here. `../dev/` is layered on only by `?trust=full-dev`.

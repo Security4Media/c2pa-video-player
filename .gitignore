@@ -1,2 +1,3 @@
 .github/agents/
 node_modules/
+.debug/

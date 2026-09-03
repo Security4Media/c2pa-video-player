@@ -1,0 +1,15 @@
+**/node_modules
+**/dist
+**/dist-lib
+.git
+.github
+.claude
+.codex
+.debug
+NAB2026
+vendor
+
+# Test-only media fixtures: not needed in the container image, and large
+# enough (several hundred MB) to slow the build context down for no benefit.
+react-c2pa-player/public/mp4s
+react-c2pa-player/public/hls-fixtures
