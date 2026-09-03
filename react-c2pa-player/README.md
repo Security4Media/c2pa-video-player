@@ -39,7 +39,68 @@ npm run preview         # preview a production build
 npm start               # http-server on :9000, serving the public/mp4s test fixtures
 ```
 
-No automated test suite exists — verification is manual, against the fixtures in `public/mp4s/` (signed/unsigned/tampered variants) and real HLS/DASH streams.
+```bash
+npm test                    # Vitest, the pure decision modules and sessions
+npm run test:browser        # the trust matrix: 10 source/policy cases end to end
+npm run test:keyboard       # the panel and the log without a mouse
+npm run test:source-switch  # shared state cleared between sources
+npm run test:friction       # the consent gate's legibility and focus handling
+npm run test:authenticity   # the authenticity label and per-run consent
+npm run test:seams          # the timeline bar, from screenshotted pixels
+```
+
+The browser checks drive a real Chromium against a running dev server, so start
+one first (`npm run dev`) and point them at it with `C2PA_TEST_URL` if it is not
+on the default port. They measure computed styles, hit-testing and focus rather
+than snapshotting markup, which is what lets them catch the video.js cascade
+beating our own rules.
+
+Beyond that, verification is manual against the fixtures in `public/mp4s/`
+(signed/unsigned/tampered variants), the HLS fixtures in `public/hls-fixtures/`,
+and real HLS/DASH streams.
+
+## Runtime parameters
+
+Query-string only, and each one defaults to the behaviour a deployment gets
+without it. There is no UI surface for any of them: they exist so the states can
+be demonstrated and tested against the same asset, rather than by hunting for
+content whose certificate happens to be in the right state.
+
+| Parameter | Default | What it does |
+|---|---|---|
+| `?trust=<fixture>` | the shipped policy | Swaps the trust material for one of the fixtures in `policy/trustFixtures.ts` (`full`, `anchors-only`, `cawg-missing`, `empty`), so trusted / valid / untrusted outcomes can be shown on one file. Unrecognised values fall back to the shipped policy. |
+| `?window=<seconds>` | 300 | How much of a live stream the player remembers: the width of the timeline window, the retained validation history, and the failure retention in the validation log. Values under 60 are ignored. |
+| `?gate=off` | on | Turns off the validated-playback gate, which otherwise holds the picture rather than show live content whose verdict has not arrived. Only the exact value `off` disables it, since a switch that fails open on a typo is the wrong way round for a protection. |
+| `?label=on` | off | Shows the authenticity label in the top-right of the picture, stating the provenance of the moment on screen. Green "Authenticity established" and blue "Valid" collapse to a dot after five seconds; red "Invalid Authenticity" and grey "Unknown provenance" stay expanded and pulse. Clicking it pauses and opens the Content Credentials panel. |
+| `?consent=per-stream` | `whole-asset` | Asks once, the first time invalid content is actually played, and never again for that source. The overlay says outright that this is the only warning. |
+| `?consent=per-run` | `whole-asset` | Asks once per contiguous stretch of invalid content, so a second bad stretch stops the picture again. |
+
+### Choosing a consent mode
+
+| | `whole-asset` (default) | `per-stream` | `per-run` |
+|---|---|---|---|
+| When it is raised | From the `play` handler, only if the manifest is already known bad | The first time invalid content plays | On entering each invalid stretch |
+| Works on live DASH / HLS | No | Yes | Yes |
+| Works on a monolithic MP4 | Yes | Yes | Yes (one run) |
+| Times it can appear | Once per source | Once per source | Once per stretch |
+| Re-asks after returning to sound content | n/a | No | Yes |
+
+`whole-asset` cannot fire mid-playback on a fragmented source, and in practice
+cannot fire on one at all: its verdict needs fragments, fragments need
+playback, and the first play marks playback as accepted. That gap is why the
+other two exist.
+
+Both new modes share everything except how long the "already asked" memory
+lasts, the stretch or the source. On a live stream either one carries a
+countdown and withdraws itself if the pause would outlast what the origin
+retains, after which that stretch is never asked about again (otherwise
+withdrawing at a live edge still inside the bad content would ask and withdraw
+forever).
+
+`?label=on` and `?consent=` are independent. A deployment may want to state
+provenance continuously without interrupting the viewer, or interrupt on bad
+content without leaving a permanent badge over live output; those are different
+editorial decisions and neither implies the other.
 
 ## Trust material
 

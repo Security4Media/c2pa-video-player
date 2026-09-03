@@ -20,9 +20,37 @@ import {
 } from '@nettrek/c2pa-hls-bridge';
 import Hls from 'hls.js';
 import { Emitter, type EmitterListener } from '../emitter';
-import type { TimeInterval, ValidationAdapterContext } from '../types';
+import { toWebCryptoTrustSettings } from '../policy/webCryptoAllowedList';
+import { type FailureScope, readReaderEvidence, worstScope } from '../evidence';
+import { getHlsValidationState } from '../rules';
+import type { PlayerValidationState, TimeInterval, ValidationAdapterContext } from '../types';
 
 type RuntimeListener = EmitterListener<void>;
+
+/**
+ * How far a fragment's validation failure reaches.
+ *
+ * A BMFF hash assertion covers one fragment's media data, so a mismatch there
+ * condemns that fragment alone. Every other failure - claim signature, an
+ * assertion's hashed URI, the signing credential - is a property of the
+ * manifest itself and is therefore reported identically by every fragment,
+ * condemning the whole asset.
+ *
+ * Confirmed against tampered fixtures of the WDR test stream: altering an
+ * assertion in the init manifest store yields assertion.hashedURI.mismatch on
+ * all 16 fragments, while corrupting (or removing) individual fragments'
+ * Merkle proofs yields assertion.bmffHash.mismatch on exactly those fragments,
+ * the untouched ones staying Trusted with no errors at all.
+ */
+export interface FragmentVerdict {
+  /** 1-based position in playback order, for display. */
+  index: number;
+  startTime: number;
+  endTime: number;
+  validationState: PlayerValidationState;
+  /** `null` when the fragment did not fail validation. */
+  failureScope: FailureScope | null;
+}
 
 export class HlsBridgeRuntime {
   readonly #context: ValidationAdapterContext;
@@ -59,6 +87,16 @@ export class HlsBridgeRuntime {
       return;
     }
 
+    // This bridge runs the WebCrypto engine (enableExperimentalWebCrypto
+    // below), whose allow-list parser wants base64 SHA-256 digests rather than
+    // the PEM the trust material holds - see policy/webCryptoAllowedList.ts.
+    const [trustSettings, cawgTrustSettings] = this.#context.policy.enableTrustVerification
+      ? await Promise.all([
+          toWebCryptoTrustSettings(trustMaterial.trust),
+          toWebCryptoTrustSettings(trustMaterial.cawgTrust),
+        ])
+      : [undefined, undefined];
+
     const hls = new Hls({ enableWorker: true });
     const bridge = new C2paHlsBridge(
       {
@@ -76,8 +114,18 @@ export class HlsBridgeRuntime {
         // different, more specific status code than WASM does.
         enableExperimentalWebCrypto: true,
         wasmSrc: trustMaterial.wasmSrc,
-        trust: this.#context.policy.enableTrustVerification ? trustMaterial.trust : undefined,
-        cawgTrust: this.#context.policy.enableTrustVerification ? trustMaterial.cawgTrust : undefined,
+        trust: trustSettings,
+        // Supplied explicitly rather than relying on
+        // enableCawgIdentityTrustVerification alone: that flag reuses the
+        // resolved C2PA resources for the identity only when no cawgTrust is
+        // given (dist/C2paBridge.d.ts:38-47), whereas this list is the C2PA
+        // one unioned with the CAWG-only entries, and it carries
+        // `verifyTrustList`. Without either, per c2pa-rs the CAWG identity is
+        // checked against its own effectively-empty policy, so a signer we do
+        // trust for the claim still reports untrusted and the asset can never
+        // reach 'Trusted'.
+        cawgTrust: cawgTrustSettings,
+        enableCawgIdentityTrustVerification: this.#context.policy.enableTrustVerification,
       },
       hls as never,
     );
@@ -130,10 +178,64 @@ export class HlsBridgeRuntime {
     return this.#bridge?.getC2PAMetaByTimeCode(time) ?? null;
   }
 
-  getTamperedIntervals(): TimeInterval[] {
-    return (this.#bridge?.getTamperedWithIntervals() ?? [])
+  /**
+   * Every fragment the bridge has validated so far, with its real
+   * presentation bounds and its own verdict.
+   *
+   * `getTamperedWithIntervals()` is used purely as an *enumeration* of known
+   * fragments, not as a list of tampered ones. Its filter is
+   * `!item.value.manifestReader.valid`, but `C2paManifestHelper` exposes only
+   * an `isValid()` method and no `valid` property, so `!undefined` is always
+   * true and the bridge returns every validated fragment regardless of
+   * verdict (@nettrek/c2pa-hls-bridge 0.5.0, dist/index.js:5615 vs.
+   * dist/C2paManifestHelper.d.ts:132; the MP4 bridge does it correctly at
+   * :5795). The *bounds* are trustworthy - they come from `frag.start` and
+   * `frag.start + frag.duration`, captured once at fragment load - so we keep
+   * the bounds and determine each fragment's verdict ourselves via the same
+   * time-code lookup and the same `getHlsValidationState` rule used
+   * everywhere else.
+   *
+   * If the vendor ever fixes that typo, this list narrows to genuinely
+   * invalid fragments: the verdicts stay correct, and valid fragments simply
+   * stay unreported here until the playhead reaches them (the caller keeps a
+   * per-playhead observation as a floor). That's a graceful degradation, not
+   * a break.
+   *
+   * Note the list is keyed on `hls.currentLevel`, so it is empty until ABR
+   * settles on a level and starts over on a level switch - another reason
+   * the caller must not treat this as the complete picture.
+   */
+  getFragmentVerdicts(): FragmentVerdict[] {
+    const bridge = this.#bridge;
+
+    if (!bridge) {
+      return [];
+    }
+
+    return (bridge.getTamperedWithIntervals() ?? [])
       .map(readInterval)
-      .filter((interval): interval is TimeInterval => interval !== null);
+      .filter((interval): interval is TimeInterval => interval !== null)
+      .filter((interval) => interval.endTime > interval.startTime)
+      // Sorted so the display index below follows playback order rather than
+      // whatever order the bridge happens to enumerate in. Safe in place: the
+      // array is this chain's own, built by the map above.
+      .sort((left, right) => left.startTime - right.startTime)
+      .map((interval, position) => {
+        // Sample the middle of the fragment: the bounds are half-open, so an
+        // endpoint can resolve to the neighbouring fragment.
+        const midpoint = (interval.startTime + interval.endTime) / 2;
+        const reader = bridge.getC2PAMetaByTimeCode(midpoint);
+
+        return {
+          index: position + 1,
+          startTime: interval.startTime,
+          endTime: interval.endTime,
+          validationState: reader
+            ? getHlsValidationState(reader, reader.containsSignature())
+            : ('Unknown' as PlayerValidationState),
+          failureScope: worstScope(readReaderEvidence(reader).failures),
+        };
+      });
   }
 
   getMessage(): string {

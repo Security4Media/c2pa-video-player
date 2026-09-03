@@ -54,9 +54,12 @@ function LoadingSpinner() {
 export function MenuHeader({
   title = 'Content Credentials',
   leadingAction,
+  titleId,
 }: {
   title?: string;
   leadingAction?: ReactNode;
+  /** So the panel can point `aria-labelledby` at the title it already shows. */
+  titleId?: string;
 }) {
   return (
     <div className="c2pa-menu-header">
@@ -65,8 +68,54 @@ export function MenuHeader({
           {leadingAction}
         </span>
       ) : null}
-      <span className="c2pa-menu-title__text">{title}</span>
+      <span className="c2pa-menu-title__text" id={titleId}>{title}</span>
     </div>
+  );
+}
+
+/**
+ * The header that opens a section.
+ *
+ * A real `<button>`. All four of these were `<div onClick>` with no role, no
+ * tabindex, no key handler and no `aria-expanded`, so the only way into Work,
+ * AI opt-out, the provenance history and any nested ingredient was a mouse.
+ * Enter and Space come free from the element; the state announcement comes from
+ * `aria-expanded`.
+ *
+ * `isExpanded` is optional because one of the four navigates rather than
+ * expands (the History header opens a separate view), and a control that does
+ * not disclose anything must not claim `aria-expanded`.
+ *
+ * The chevron is `aria-hidden`: it repeats what `aria-expanded` already says,
+ * and "›" read aloud is noise.
+ */
+export function SectionToggle({
+  title,
+  isExpanded,
+  controls,
+  onToggle,
+}: {
+  title: string;
+  isExpanded?: boolean;
+  controls?: string;
+  onToggle: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      className="c2pa-menu-section__header c2pa-menu-section__header--collapsible"
+      onClick={onToggle}
+      aria-expanded={isExpanded}
+      aria-controls={controls}
+    >
+      <span className="itemName c2pa-menu-section__title">{title}</span>
+      <span
+        className={`c2pa-menu-section__toggle ${isExpanded ? 'expanded' : ''}`}
+        aria-hidden="true"
+      >
+        ›
+      </span>
+    </button>
   );
 }
 
@@ -101,16 +150,26 @@ export function NoManifestState() {
   );
 }
 
-export function InvalidState() {
+/**
+ * The failure headline.
+ *
+ * The message is passed in rather than fixed here. It used to be fixed, and
+ * the view model's own sentence was then rendered *underneath* it as a second
+ * alert - so a viewer got the same news twice, in two different wordings, one
+ * of which enumerated segment ranges. Which failure it is decides what the
+ * sentence should say (this moment, or the whole source), and only the view
+ * model knows that.
+ */
+export function InvalidState({ message }: { message?: string | null }) {
   return (
-    <li className="vjs-menu-item validation-padding">
-      <div className="alert-div">
+    <li className="vjs-menu-item validation-padding" data-testid="c2pa-invalid-state">
+      <div className="alert-div alert-div--failure">
+        <img className="alert-icon" alt="" />
         <div>
-          <strong>Content Credentials are Invalid</strong>
-          <br />
-          The content credentials for this video could not be verified
-          <br />
-          and may have been tampered with.
+          <strong className="alert-div__headline">Content Credentials are invalid</strong>
+          <span className="alert-div__body">
+            {message ?? 'The content may have been tampered with.'}
+          </span>
         </div>
       </div>
     </li>
@@ -150,14 +209,24 @@ export function WebsiteLink({ href }: { href: string }) {
 }
 
 export function ValidationBadge({ value }: { value: string }) {
-  return <span className={`validation-${value.toLowerCase()}`}>{value}</span>;
+  // `data-validation-state` carries the verdict itself so a test can read it
+  // without depending on the label's wording or its styling.
+  return (
+    <span
+      className={`validation-${value.toLowerCase()}`}
+      data-testid="c2pa-validation-status"
+      data-validation-state={value}
+    >
+      {value}
+    </span>
+  );
 }
 
 export function AlertItem({ itemValue }: { itemValue: string }) {
   return (
     <li className="vjs-menu-item">
       <div className="alert-div">
-        <img className="alert-icon" />
+        <img className="alert-icon" alt="" />
         <div>{itemValue}</div>
       </div>
     </li>

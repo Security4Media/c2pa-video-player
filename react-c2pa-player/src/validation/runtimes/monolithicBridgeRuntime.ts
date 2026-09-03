@@ -15,25 +15,25 @@
  */
 
 import type { ManifestStore } from '@contentauth/c2pa-web';
-// WebCrypto-based reader, not the @contentauth/c2pa-web WASM core: its own
-// createC2pa()/reader.fromBlob() fetch a bundled c2pa_bg.wasm whose SRI
-// integrity attribute doesn't match what gets served through this repo's
-// dependency tree (@nettrek/c2pa-hls-bridge pulls in a different
-// @contentauth/c2pa-web version than the one pinned at the workspace root),
-// so the browser blocks the resource. This package implements the same
-// `{ reader: { fromBlob, fromBlobFragment }, dispose }` surface with no WASM.
-import { createC2pa, type Settings } from '@nettrek/c2pa-web-crypto';
+import { C2paMp4Bridge, type C2paManifestHelper } from '@nettrek/c2pa-hls-bridge';
 import { Emitter, type EmitterListener } from '../emitter';
+import { toWebCryptoTrustSettings } from '../policy/webCryptoAllowedList';
 import type { ValidationAdapterContext } from '../types';
 
 type RuntimeListener = EmitterListener<void>;
 
-type C2paSdk = Awaited<ReturnType<typeof createC2pa>>;
+// The bridge exposes no readiness event, only `libReady()` - and that reports
+// the *library* being usable, not the asset being parsed, so a large file can
+// clear it while `getC2PAMetaByTimeCode` still returns null. Both are
+// therefore polled: the library first, then the asset's own reader.
+const READY_POLL_INTERVAL_MS = 100;
+const READY_TIMEOUT_MS = 30_000;
 
 export class MonolithicBridgeRuntime {
   readonly #context: ValidationAdapterContext;
   readonly #emitter = new Emitter();
-  #sdk: C2paSdk | null = null;
+  #bridge: C2paMp4Bridge | null = null;
+  #reader: C2paManifestHelper | null = null;
   #manifestStore: ManifestStore | null = null;
   #message = 'Monolithic C2PA validation pending';
   #errorReason: string | null = null;
@@ -51,61 +51,55 @@ export class MonolithicBridgeRuntime {
         return;
       }
 
-      // Cast at this boundary: TrustMaterial's `trust`/`cawgTrust` are typed
-      // against @contentauth/c2pa-web's TrustSettings, which has no index
-      // signature, while this package's Settings/TrustSettings require one -
-      // a TS strictness mismatch between two independently-typed packages,
-      // not an actual shape mismatch (both are plain { trustAnchors,
-      // allowedList, trustConfig } string records).
-      const settings: Settings | undefined = this.#context.policy.enableTrustVerification
-        ? ({
-            verify: {
-              verifyTrust: true,
-              verifyAfterReading: true,
-            },
-            trust: trustMaterial.trust,
-            cawgTrust: trustMaterial.cawgTrust,
-          } as Settings)
-        : undefined;
-
-      // wasmSrc is a @contentauth/c2pa-web-only config option; this reader
-      // has no WASM to point it at, so it's intentionally not passed here.
-      const sdk = await createC2pa({ settings });
+      // Digests rather than the PEM the trust material holds: this bridge runs
+      // the WebCrypto engine below, whose allow-list parser matches leaves
+      // against base64 SHA-256 lines (see policy/webCryptoAllowedList.ts).
+      const [trust, cawgTrust] = this.#context.policy.enableTrustVerification
+        ? await Promise.all([
+            toWebCryptoTrustSettings(trustMaterial.trust),
+            toWebCryptoTrustSettings(trustMaterial.cawgTrust),
+          ])
+        : [undefined, undefined];
 
       if (this.#disposed) {
-        // dispose() ran while createC2pa() was in flight and never saw this
-        // instance — clean it up ourselves instead of leaking it.
-        sdk.dispose?.();
         return;
       }
 
-      this.#sdk = sdk;
-
-      const response = await fetch(this.#context.source.url);
-
-      if (!response.ok) {
-        throw new Error(
-          `Failed to fetch media source (HTTP ${response.status} ${response.statusText})`,
-        );
-      }
-
-      const blob = await response.blob();
-      const reader = await this.#sdk.reader.fromBlob(
-        blob.type || this.#context.source.mimeType || 'video/mp4',
-        blob,
+      const bridge = new C2paMp4Bridge(
+        {
+          enableTrustListVerification: this.#context.policy.enableTrustVerification,
+          // Same engine choice as the HLS bridge, for the same reason: the WASM
+          // engine's internal wasm fetch carries an SRI integrity attribute
+          // that does not match what this repo's dependency tree serves (the
+          // bridge nests its own @contentauth/c2pa-web version alongside the
+          // one pinned at the workspace root), so the browser blocks it.
+          // `wasmSrc` remains the documented fallback where `crypto.subtle` is
+          // unavailable.
+          enableExperimentalWebCrypto: true,
+          wasmSrc: trustMaterial.wasmSrc,
+          trust,
+          cawgTrust,
+          // Without this the CAWG identity is checked against its own
+          // effectively-empty policy, so a signer trusted for the claim still
+          // reports untrusted and the asset can never reach 'Trusted'.
+          enableCawgIdentityTrustVerification: this.#context.policy.enableTrustVerification,
+        },
+        this.#context.source.url,
       );
 
-      const manifestStore = (await reader?.manifestStore()) ?? null;
+      this.#bridge = bridge;
+
+      const reader = await this.#waitForReader(bridge);
 
       if (this.#disposed) {
         return;
       }
 
-      // Same cross-package structural cast as above: this reader's
-      // ManifestStore is a separately-declared, data-compatible re-statement
-      // of the c2pa-types shape, not identical field-for-field in TS's eyes.
-      this.#manifestStore = manifestStore as ManifestStore | null;
-      this.#message = 'Monolithic C2PA validation active';
+      this.#reader = reader;
+      this.#manifestStore = (reader?.getManifestStore() as ManifestStore | null) ?? null;
+      this.#message = this.#manifestStore
+        ? 'Monolithic C2PA validation active'
+        : 'No C2PA manifest found in this asset';
       this.#errorReason = null;
       this.#emit();
     } catch (error) {
@@ -114,6 +108,7 @@ export class MonolithicBridgeRuntime {
       }
 
       console.error('[Monolithic C2PA] Initialization error:', error);
+      this.#reader = null;
       this.#manifestStore = null;
       this.#errorReason = error instanceof Error ? error.message : 'Monolithic validation failed';
       this.#message = this.#errorReason;
@@ -123,8 +118,9 @@ export class MonolithicBridgeRuntime {
 
   dispose(): void {
     this.#disposed = true;
-    this.#sdk?.dispose?.();
-    this.#sdk = null;
+    this.#bridge?.dispose();
+    this.#bridge = null;
+    this.#reader = null;
     this.#emitter.clear();
   }
 
@@ -136,12 +132,58 @@ export class MonolithicBridgeRuntime {
     return this.#manifestStore;
   }
 
+  /**
+   * The bridge's reader for the asset, which states the verdict directly
+   * (`getManifestStoreValidationState`) rather than leaving it to be inferred
+   * from the store.
+   */
+  getReader(): C2paManifestHelper | null {
+    return this.#reader;
+  }
+
   getMessage(): string {
     return this.#message;
   }
 
   getErrorReason(): string | null {
     return this.#errorReason;
+  }
+
+  /**
+   * Waits for the asset's reader to appear.
+   *
+   * A monolithic asset carries one manifest store covering the whole file, so
+   * any timecode resolves to it; 0 is simply the one always in range.
+   *
+   * Returning null is not an error: an asset with no C2PA data never produces
+   * a reader, and is reported as unsigned rather than as a failure. That is
+   * also why the wait runs to the timeout instead of giving up early - there
+   * is no signal distinguishing "not parsed yet" from "nothing to parse", and
+   * a 13MB asset really does clear `libReady()` well before its own manifest
+   * is available.
+   */
+  async #waitForReader(bridge: C2paMp4Bridge): Promise<C2paManifestHelper | null> {
+    const deadline = Date.now() + READY_TIMEOUT_MS;
+
+    while (Date.now() <= deadline) {
+      if (this.#disposed) {
+        return null;
+      }
+
+      if (bridge.libReady()) {
+        const reader = bridge.getC2PAMetaByTimeCode(0);
+
+        if (reader) {
+          return reader;
+        }
+      }
+
+      await new Promise((resolve) => {
+        setTimeout(resolve, READY_POLL_INTERVAL_MS);
+      });
+    }
+
+    return null;
   }
 
   #emit(): void {

@@ -14,16 +14,12 @@
  * limitations under the License.
  */
 
+import videojs from 'video.js';
 import { handleMenuClosed, handleMenuOpened, setMenuReference } from './C2paMenuBridge';
 import type {
     VideoJsMenuButtonComponentLike,
     VideoJsPlayerLike,
 } from './C2paMenu.types';
-
-declare const videojs: {
-    getComponent(name: string): new (...args: unknown[]) => VideoJsMenuButtonComponentLike;
-    registerComponent(name: string, component: unknown): void;
-};
 
 interface MenuItemConstructor {
     new (player: unknown, options: { label: string; id: string }): {
@@ -59,62 +55,105 @@ function createHiddenPlaceholderItem(
     return placeholderItem;
 }
 
+// Video.js types every component as `Component`, whose `el()` is declared to
+// return `Element`. The two local interfaces say `HTMLElement` and name only
+// the members this file uses, which is the more accurate description of what a
+// MenuButton is - so the cast goes through `unknown` rather than widening those
+// interfaces back to `Element` and pushing the same narrowing out to every call
+// site.
+const MenuButton = videojs.getComponent('MenuButton') as unknown as MenuButtonComponentClass;
+const MenuItem = videojs.getComponent('MenuItem') as unknown as MenuItemConstructor;
+
 /**
- * Register the Video.js C2PA menu button and attach it to the control
- * bar. The popup shell remains managed by Video.js while the popup
- * content is rendered through the React bridge.
+ * The Content Credentials button.
+ *
+ * Video.js keeps managing the popup shell - press state, focus, the menu
+ * element itself - while the panel's content is rendered through the React
+ * bridge, which is what `handleMenuOpened` and `handleMenuClosed` notify.
+ * Hover is deliberately inert: this menu opens on click only, unlike video.js's
+ * other menu buttons.
+ */
+class C2PAMenuButton extends MenuButton {
+    createItems() {
+        return [createHiddenPlaceholderItem(MenuItem, this.player_)];
+    }
+
+    handleClick() {
+        if (this.buttonPressed_) {
+            this.unpressButton?.();
+        } else {
+            handleMenuOpened();
+            this.pressButton?.();
+        }
+    }
+
+    handleMouseOver() {
+        return;
+    }
+
+    handleMouseOut() {
+        return;
+    }
+
+    /**
+     * Closes the React panel whenever video.js closes the popup, from wherever
+     * that came.
+     *
+     * This override used to return early unless a flag set by `handleClick`
+     * was present, which made clicking the button the *only* way to close the
+     * menu. Read against video.js 8.23.7, `unpressButton` is what sets
+     * `buttonPressed_ = false`, hides the menu and writes
+     * `aria-expanded="false"`, and it is called from `handleKeyDown` (Escape
+     * and Tab), `handleSubmenuKeyDown`, `Menu.handleBlur` (click outside),
+     * `Menu.handleTapClick` and `disable()`. Every one of those was discarded,
+     * so a keyboard user could open the panel and never dismiss it, and it sat
+     * over the video reporting `aria-expanded="true"` for the rest of the
+     * session.
+     *
+     * The guard the flag was reaching for is simply "was it open": that is what
+     * stops a redundant close from bumping the menu's reset token and
+     * collapsing a segment detail view the viewer is reading.
+     *
+     * `super` runs first so video.js has settled its own press state before
+     * React is told. Note `super.unpressButton()` is itself gated on
+     * `enabled_`, so a disabled button keeps `buttonPressed_` true while the
+     * panel closes; that is the right way round, since a panel belonging to a
+     * button nobody can press should not stay on screen.
+     */
+    unpressButton() {
+        const wasPressed = this.buttonPressed_;
+
+        super.unpressButton?.();
+
+        if (wasPressed) {
+            handleMenuClosed();
+        }
+    }
+
+    buildCSSClass() {
+        return `vjs-chapters-button c2pa-menu-button ${super.buildCSSClass?.() ?? ''}`.trim();
+    }
+}
+
+// Registered at module scope: the registry is global, while a player is not.
+// Doing this per player defined a fresh class each time and re-registered it
+// under the same name.
+//
+// Cast for the same reason as above - the class descends from a component
+// narrowed to a local interface, so it no longer carries `Component`'s static
+// side.
+videojs.registerComponent(
+    'C2PAMenuButton',
+    C2PAMenuButton as unknown as Parameters<typeof videojs.registerComponent>[1],
+);
+
+/**
+ * Add the Content Credentials button to a player's control bar, at the far
+ * left, and hand the component to the React bridge that fills its panel.
  *
  * @param videoPlayer - Video.js player instance
  */
 export const initializeC2PAMenu = function (videoPlayer: VideoJsPlayerLike) {
-    console.log('[C2PAMenu] Initializing C2PA menu, videoPlayer:', videoPlayer);
-    console.log('[C2PAMenu] videojs available:', typeof videojs !== 'undefined', (window as Window & { videojs?: unknown }).videojs);
-
-    const MenuButton = videojs.getComponent('MenuButton') as MenuButtonComponentClass;
-    const MenuItem = videojs.getComponent('MenuItem') as unknown as MenuItemConstructor;
-
-    class C2PAMenuButton extends MenuButton {
-        closeC2paMenu = false;
-
-        createItems() {
-            return [createHiddenPlaceholderItem(MenuItem, this.player_)];
-        }
-
-        handleClick() {
-            if (this.buttonPressed_) {
-                this.closeC2paMenu = true;
-                this.unpressButton?.();
-            } else {
-                console.log('[C2PA] Menu opened - marking as open and triggering update');
-                handleMenuOpened();
-                this.pressButton?.();
-            }
-        }
-
-        handleMouseOver() {
-            return;
-        }
-
-        handleMouseOut() {
-            return;
-        }
-
-        unpressButton() {
-            if (this.closeC2paMenu) {
-                this.closeC2paMenu = false;
-                console.log('[C2PA] Menu closed - marking as closed');
-                handleMenuClosed();
-                super.unpressButton?.();
-            }
-        }
-
-        buildCSSClass() {
-            return `vjs-chapters-button c2pa-menu-button ${super.buildCSSClass?.() ?? ''}`.trim();
-        }
-    }
-
-    videojs.registerComponent('C2PAMenuButton', C2PAMenuButton);
-
     videoPlayer.controlBar.addChild(
         'C2PAMenuButton',
         {
@@ -126,7 +165,4 @@ export const initializeC2PAMenu = function (videoPlayer: VideoJsPlayerLike) {
     );
 
     setMenuReference(videoPlayer.controlBar.getChild('C2PAMenuButton'));
-
-    console.log('[C2PAMenu] C2PA menu button added to control bar');
-    console.log('[C2PAMenu] Control bar children:', videoPlayer.controlBar.children());
 };

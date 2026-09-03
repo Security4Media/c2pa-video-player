@@ -15,7 +15,7 @@
  */
 
 import type { HistorySectionItem, IngredientDisplayItem } from '../models';
-import { ValidationBadge } from './shared';
+import { SectionToggle, ValidationBadge } from './shared';
 
 function IngredientNode({
   ingredient,
@@ -32,23 +32,44 @@ function IngredientNode({
   const isTopLevelIngredient = parentId === undefined;
   const isExpanded = isTopLevelIngredient ? true : (ingredientsExpanded[ingredientId] || false);
 
+  const label = (
+    <>
+      <span className="itemName">Ingredient {ingredient.index}</span>
+      {ingredient.ingredientCount && ingredient.ingredientCount > 0 ? (
+        <span className="c2pa-history-section__ingredient-count">
+          ({ingredient.ingredientCount} ingredient{ingredient.ingredientCount > 1 ? 's' : ''})
+        </span>
+      ) : null}
+    </>
+  );
+
   return (
     <div className="c2pa-history-section__ingredient">
-        <div
+      {/* A button only when it actually toggles something. A top-level
+          ingredient is forced expanded and shows no chevron, so making its
+          header focusable would add a tab stop where Enter does nothing. */}
+      {isTopLevelIngredient ? (
+        <div className="c2pa-history-section__ingredient-header" data-id={ingredientId}>
+          {label}
+        </div>
+      ) : (
+        <button
+          type="button"
           className="c2pa-history-section__ingredient-header"
           data-id={ingredientId}
+          aria-expanded={isExpanded}
+          aria-controls={ingredientId}
           onClick={() => onToggleIngredient(ingredientId)}
         >
-        <span className="itemName">Ingredient {ingredient.index}</span>
-        {ingredient.ingredientCount && ingredient.ingredientCount > 0 ? (
-          <span className="c2pa-history-section__ingredient-count">
-            ({ingredient.ingredientCount} ingredient{ingredient.ingredientCount > 1 ? 's' : ''})
+          {label}
+          <span
+            className={`c2pa-history-section__ingredient-toggle ${isExpanded ? 'expanded' : ''}`}
+            aria-hidden="true"
+          >
+            ›
           </span>
-        ) : null}
-        {!isTopLevelIngredient ? (
-          <span className={`c2pa-history-section__ingredient-toggle ${isExpanded ? 'expanded' : ''}`}>›</span>
-        ) : null}
-      </div>
+        </button>
+      )}
 
       <div id={ingredientId} className={`c2pa-history-section__ingredient-panel ${isExpanded ? 'expanded' : ''}`}>
         <div className="c2pa-history-section__ingredient-panel-inner">
@@ -112,10 +133,10 @@ export function HistorySection({
   return (
     <li className="vjs-menu-item">
       <div className="c2pa-menu-section c2pa-history-section">
-        <div className="c2pa-menu-section__header c2pa-menu-section__header--collapsible" onClick={onOpen}>
-          <span className="itemName c2pa-menu-section__title">{title}</span>
-          <span className="c2pa-menu-section__toggle">›</span>
-        </div>
+        {/* No `isExpanded`: this one opens a separate view rather than
+            disclosing anything in place, so it must not claim to be a
+            disclosure. */}
+        <SectionToggle title={title} onToggle={onOpen} />
       </div>
     </li>
   );

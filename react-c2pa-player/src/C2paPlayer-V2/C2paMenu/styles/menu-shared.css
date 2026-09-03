@@ -19,7 +19,7 @@
 .vjs-menu li.vjs-menu-item .itemName {
   font-weight: 600;
   padding-bottom: 0.4rem;
-  color: #ff9800 !important;
+  color: #ff9800;
   font-size: 1rem;
   letter-spacing: -0.01em;
 }
@@ -64,15 +64,39 @@
   min-width: 0;
   max-width: 100%;
   background-color: rgba(211, 53, 16, 0.15);
-  border: 0.15rem solid var(--c2pa-failed);
-  padding: 1rem;
-  border-radius: 0.5rem;
+  /* A hairline all round with a heavy left edge, rather than the 0.15rem box
+     it used to be. Same colour and the same weight of warning, but a boxed
+     red outline around the first thing in the panel read as an error the
+     player had hit rather than a statement about the content. */
+  border: 1px solid rgba(211, 53, 16, 0.55);
+  border-left: 0.2rem solid var(--c2pa-failed);
+  padding: 0.85rem;
+  border-radius: 0.4rem;
   display: flex;
   align-items: flex-start;
+  gap: 0.1rem;
   overflow-wrap: anywhere;
   word-break: break-word;
   backdrop-filter: blur(0.25rem);
   box-shadow: 0 0.25rem 0.75rem rgba(211, 53, 16, 0.2);
+}
+
+/* The headline and the sentence under it.
+ *
+ * Two weights and a line of space, because they do different jobs: the
+ * headline is what someone reads at a glance, the sentence is what they act
+ * on. Run together at one weight - which is what happened when the block held
+ * three hardcoded lines - neither stood out. */
+.vjs-menu li.vjs-menu-item .alert-div__headline {
+  display: block;
+  margin-bottom: 0.2rem;
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.01em;
+}
+
+.vjs-menu li.vjs-menu-item .alert-div__body {
+  display: block;
+  opacity: 0.92;
 }
 
 .vjs-menu li.vjs-menu-item .alert-div--loading,
@@ -104,8 +128,10 @@
   will-change: transform;
 }
 
-.validation-padding {
-  padding-bottom: 0 !important;
+/* Qualified to match the `.vjs-menu li.vjs-menu-item` padding it overrides, one
+   class further, rather than marked `!important` to beat it from a bare class. */
+.vjs-menu li.vjs-menu-item.validation-padding {
+  padding-bottom: 0;
 }
 
 @media (max-width: 768px) {

@@ -17,6 +17,7 @@
 import type { C2PAStatus, ValidationState } from '@/types/c2pa.types';
 import type { ValidationTimelineSegment } from '@/validation';
 import type { Root } from 'react-dom/client';
+import type { AuthenticityLabelView } from './C2paAuthenticity/authenticityGate';
 
 export interface C2PATimelineSegmentState {
     startTime: number;
@@ -33,7 +34,37 @@ export interface C2PATimelineState {
 
 export interface C2PAPlayerRootState {
     isFrictionOverlayVisible: boolean;
+    /**
+     * Which question the consent overlay is asking.
+     *
+     * The overlay is one component with three sentences, because the claims
+     * differ: a whole-asset failure means the file's own credentials cannot be
+     * relied on; an invalid run means this stretch of an otherwise sound stream
+     * cannot, and another question will follow if there is another stretch; an
+     * invalid stream says the same about this stretch but adds that this is the
+     * only warning the viewer will get. Accepting also means different things -
+     * only the whole-asset case latches `playbackStarted`.
+     */
+    consentScope: 'whole-asset' | 'invalid-run' | 'invalid-stream';
+    /**
+     * Seconds before the question withdraws itself, or null when it will not.
+     *
+     * Live only. A position in a file does not expire, so there is nothing to
+     * count down to and no honest deadline to show.
+     */
+    consentCountdownSeconds: number | null;
+    /**
+     * What the authenticity label should say, or null for no label. Decided by
+     * C2paAuthenticity/authenticityGate.ts, not here.
+     */
+    authenticityLabel: AuthenticityLabelView | null;
     isMenuOpen: boolean;
+    /**
+     * Whether the validation log is showing. Separate from the menu: the two
+     * answer different questions and are opened from different buttons, so
+     * they are not two views of one panel.
+     */
+    isDebugOpen: boolean;
     c2paStatus: C2PAStatus | null;
     timeline: C2PATimelineState;
     menuResetKey: string;
@@ -50,6 +81,8 @@ export interface C2PAPlayerRootController {
     container: HTMLDivElement;
     root: Root;
     onWatchAnyway: () => void;
+    /** Pauses and opens the panel. Supplied by main.ts, which owns both. */
+    onAuthenticityLabelClick: () => void;
     getState: () => C2PAPlayerRootState;
     setState: (partialState: Partial<C2PAPlayerRootState>) => void;
     subscribe: (listener: () => void) => () => void;

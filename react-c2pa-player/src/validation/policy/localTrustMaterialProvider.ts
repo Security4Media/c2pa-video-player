@@ -20,6 +20,7 @@ import c2paAllowedListUrl from '/trust/c2pa_allowed_extended.pem?url';
 import c2paTrustAnchorsUrl from '/trust/c2pa_anchors_extended.pem?url';
 import c2paTrustConfigUrl from '/trust/c2pa_store.cfg?url';
 import type { TrustMaterial, TrustMaterialProvider } from '../types';
+import { buildTrustMaterial } from './trustMaterial';
 
 // Pre-adapter code (removed in commit b01ef3f) merged this community list on
 // top of the bundled local files. It's explicitly marked "frozen" by
@@ -33,40 +34,89 @@ const REMOTE_TRUST_ANCHORS_URL =
 const REMOTE_ALLOWED_LIST_URL =
   'https://raw.githubusercontent.com/contentauth/verify-site/refs/heads/main/static/trust/allowed.pem';
 
-let trustMaterialPromise: Promise<TrustMaterial> | null = null;
-
-export class LocalTrustMaterialProvider implements TrustMaterialProvider {
-  load(): Promise<TrustMaterial> {
-    trustMaterialPromise ??= Promise.all([
-      fetchText(c2paTrustAnchorsUrl),
-      fetchText(cawgAllowedListUrl),
-      fetchText(c2paAllowedListUrl),
-      fetchText(c2paTrustConfigUrl),
-      fetchTextOrNull(REMOTE_TRUST_ANCHORS_URL),
-      fetchTextOrNull(REMOTE_ALLOWED_LIST_URL),
-    ]).then(([trustAnchors, cawgAllowed, c2paAllowed, trustConfig, remoteAnchors, remoteAllowed]) => ({
-      wasmSrc: c2paWasmSrc,
-      // Matches the pre-adapter code's own asymmetry: the community allow-list
-      // is unioned into both trust and cawgTrust, but the community anchors
-      // list was only ever unioned into the main trust list, not cawgTrust.
-      cawgTrust: {
-        trustAnchors,
-        allowedList: unionPem(cawgAllowed, remoteAllowed),
-        trustConfig,
-      },
-      trust: {
-        trustAnchors: unionPem(trustAnchors, remoteAnchors),
-        allowedList: unionPem(c2paAllowed, remoteAllowed),
-        trustConfig,
-      },
-    }));
-
-    return trustMaterialPromise;
-  }
+/**
+ * Where each list is read from.
+ *
+ * Overridable so a test can point the player at a trust fixture and drive the
+ * trusted / valid / untrusted outcomes by configuration. Otherwise reaching a
+ * given outcome depends on finding an asset whose certificate happens to be in
+ * the right state, which does not survive those certificates expiring.
+ */
+export interface TrustResourceUrls {
+  anchors: string;
+  c2paAllowed: string;
+  cawgAllowed: string;
+  trustConfig: string;
+  /** Community lists are skipped when false, e.g. to keep a test offline. */
+  includeRemote?: boolean;
+  /**
+   * States the CAWG identity policy outright instead of deriving it from the
+   * C2PA one. See TrustMaterialSources.cawgOverride.
+   */
+  cawgOverride?: { anchors: string; allowed: string };
 }
 
-function unionPem(local: string, remote: string | null): string {
-  return remote ? `${local}\n${remote}` : local;
+export const defaultTrustResourceUrls: TrustResourceUrls = {
+  anchors: c2paTrustAnchorsUrl,
+  c2paAllowed: c2paAllowedListUrl,
+  cawgAllowed: cawgAllowedListUrl,
+  trustConfig: c2paTrustConfigUrl,
+  includeRemote: true,
+};
+
+export class LocalTrustMaterialProvider implements TrustMaterialProvider {
+  readonly #urls: TrustResourceUrls;
+  // Per instance, not per module: a module-level cache is shared mutable state
+  // that outlives whichever provider populated it, so a second provider
+  // configured differently would silently receive the first one's material.
+  #cached: Promise<TrustMaterial> | null = null;
+
+  constructor(urls: TrustResourceUrls = defaultTrustResourceUrls) {
+    this.#urls = urls;
+  }
+
+  load(): Promise<TrustMaterial> {
+    this.#cached ??= this.#load();
+
+    return this.#cached;
+  }
+
+  async #load(): Promise<TrustMaterial> {
+    const includeRemote = this.#urls.includeRemote ?? true;
+    const override = this.#urls.cawgOverride;
+    const [
+      anchors,
+      cawgAllowed,
+      c2paAllowed,
+      trustConfig,
+      remoteAnchors,
+      remoteAllowed,
+      cawgOverrideAnchors,
+      cawgOverrideAllowed,
+    ] = await Promise.all([
+      fetchText(this.#urls.anchors),
+      fetchText(this.#urls.cawgAllowed),
+      fetchText(this.#urls.c2paAllowed),
+      fetchText(this.#urls.trustConfig),
+      includeRemote ? fetchTextOrNull(REMOTE_TRUST_ANCHORS_URL) : null,
+      includeRemote ? fetchTextOrNull(REMOTE_ALLOWED_LIST_URL) : null,
+      override ? fetchText(override.anchors) : null,
+      override ? fetchText(override.allowed) : null,
+    ]);
+
+    return buildTrustMaterial({
+      anchors,
+      c2paAllowed,
+      cawgAllowed,
+      trustConfig,
+      remoteAnchors,
+      remoteAllowed,
+      ...(cawgOverrideAnchors !== null && cawgOverrideAllowed !== null
+        ? { cawgOverride: { anchors: cawgOverrideAnchors, allowedList: cawgOverrideAllowed } }
+        : {}),
+      wasmSrc: c2paWasmSrc,
+    });
+  }
 }
 
 async function fetchText(url: string): Promise<string> {
@@ -84,13 +134,18 @@ async function fetchTextOrNull(url: string): Promise<string | null> {
     const response = await fetch(url);
 
     if (!response.ok) {
-      console.warn(`[LocalTrustMaterialProvider] Remote trust resource ${url} returned ${response.status}; continuing with local trust material only.`);
+      console.warn(
+        `[LocalTrustMaterialProvider] Remote trust resource ${url} returned ${response.status}; continuing with local trust material only.`,
+      );
       return null;
     }
 
     return await response.text();
   } catch (error) {
-    console.warn(`[LocalTrustMaterialProvider] Failed to fetch remote trust resource ${url}; continuing with local trust material only.`, error);
+    console.warn(
+      `[LocalTrustMaterialProvider] Failed to fetch remote trust resource ${url}; continuing with local trust material only.`,
+      error,
+    );
     return null;
   }
 }

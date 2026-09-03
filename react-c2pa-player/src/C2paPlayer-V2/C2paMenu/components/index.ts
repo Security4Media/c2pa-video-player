@@ -17,7 +17,6 @@
 export { AiOptOutSection } from './AiOptOutSection';
 export { ClaimGeneratorSection } from './ClaimGeneratorSection';
 export { HistoryDetailView, HistorySection } from './HistorySection';
-export { LiveSegmentDiagnosticsSection } from './LiveSegmentDiagnosticsSection';
 export { OrganizationSection } from './OrganizationSection';
 export { SummarySection } from './SummarySection';
 export { WorkSection } from './WorkSection';
@@ -28,6 +27,7 @@ export {
   MenuField,
   MenuHeader,
   NoManifestState,
+  SectionToggle,
   ValidationBadge,
   WebsiteLink,
 } from './shared';

@@ -18,24 +18,13 @@ import type { Manifest } from '@contentauth/c2pa-web';
 import type { C2paManifestHelper } from '@nettrek/c2pa-hls-bridge';
 import { getHlsValidationState } from '../rules';
 import type { ManifestSource, NormalizedValidationResult } from '../types';
-import { createCompatibilityManifestStore } from './shared';
 
 export function normalizeHlsManifestHelper(reader: C2paManifestHelper): NormalizedValidationResult {
   const containsSignature = reader.containsSignature();
   const validationErrors = reader.getValidationErrors();
   const validationState = getHlsValidationState(reader, containsSignature);
   const manifests = reader.getManifestMap() as Record<string, Manifest>;
-  const activeManifest = reader.getActiveManifest() as Manifest | null;
-  // Still built and returned as `manifestStore` below: menuViewModel.ts's top-level
-  // validation-status computation reads it via getActiveManifestValidationStatus(),
-  // so this can't be dropped in favor of `manifestSource` alone yet (see Phase 2's
-  // report for why the migration stops short of full removal here).
-  const manifestStore = createCompatibilityManifestStore(
-    activeManifest,
-    manifests,
-    validationState,
-    validationErrors,
-  );
+  const activeManifest = withResolvedId(reader.getActiveManifest() as Manifest | null, manifests);
   const manifestSource: ManifestSource = activeManifest
     ? {
         kind: 'single-manifest',
@@ -47,9 +36,41 @@ export function normalizeHlsManifestHelper(reader: C2paManifestHelper): Normaliz
     : { kind: 'none' };
 
   return {
-    manifestStore,
+    // Deliberately left null, like DASH's normalizeDashSegmentRecord: now that
+    // getHlsValidationState returns the reader's own three-state result
+    // directly, fabricating a ManifestStore-shaped compatibility object here
+    // would have to fake a success/failure list that reproduces that same
+    // Valid/Trusted distinction anyway - simpler and safer to let
+    // menuViewModel.ts's existing manifestStore-less fallback path use
+    // `validationState` as-is (it already does this for DASH).
+    manifestStore: null,
     validationState,
     activeManifest,
     manifestSource,
   };
+}
+
+/**
+ * `id` isn't part of the formal `Manifest` schema, and the real
+ * @contentauth/c2pa-web/@nettrek/c2pa-web-crypto readers don't reliably set
+ * it - but menuViewModel.ts's manifestStore-less fallback path
+ * (`getManifestId`) reads `activeManifest.id` to key menu re-renders and to
+ * resolve a manifest ID for `resolveManifestStoreFromSource` (needed for the
+ * Organization/Work/History sections). Resolve it by reverse-lookup in the
+ * manifest map (keyed by ID) when the reader didn't set it directly, mirroring
+ * what DASH's own compatibility manifest already does by setting `id` to a
+ * known-good value up front.
+ */
+function withResolvedId(manifest: Manifest | null, manifests: Record<string, Manifest>): Manifest | null {
+  if (!manifest) {
+    return null;
+  }
+
+  if (typeof (manifest as { id?: unknown }).id === 'string') {
+    return manifest;
+  }
+
+  const resolvedId = Object.entries(manifests).find(([, candidate]) => candidate === manifest)?.[0];
+
+  return resolvedId ? ({ ...manifest, id: resolvedId } as Manifest) : manifest;
 }

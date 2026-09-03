@@ -24,20 +24,48 @@
   min-width: 0;
 }
 
+/* The row layout lives on the base header rather than on `--collapsible`, so a
+   header with no disclosure gets it too. The organization section has one: it
+   carries a validation badge where the others carry a chevron, and that badge
+   is pushed right with `margin-left: auto`, which needs a flex parent. Every
+   collapsible header also carries this class, so nothing moves for them. */
 .vjs-menu li.vjs-menu-item .c2pa-menu-section__header {
-  margin-bottom: 0.25rem;
-}
-
-.vjs-menu li.vjs-menu-item .c2pa-menu-section__header--collapsible {
   display: flex;
   align-items: center;
   gap: 0.75rem;
+  margin-bottom: 0.25rem;
+}
+
+/* These headers are `<button>` elements (see SectionToggle), so the browser's
+   own button styling has to be undone: a button does not inherit font or
+   colour, and it brings its own background, border, padding and centred text.
+   `width: 100%` because the row's chevron is pushed right with `margin-left:
+   auto`, which needs the full width to push against. */
+.vjs-menu li.vjs-menu-item .c2pa-menu-section__header--collapsible {
   cursor: pointer;
+  appearance: none;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+}
+
+/* The first custom focus indicator in the panel: nothing here had one, so
+   keyboard users got the browser default over a dark blue gradient, where it is
+   barely visible. White rather than the panel's `#7db4ff` accent, which does
+   not clear 3:1 against the lighter end of that gradient. */
+.vjs-menu li.vjs-menu-item .c2pa-menu-section__header--collapsible:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 3px;
+  border-radius: 0.2rem;
 }
 
 .vjs-menu li.vjs-menu-item .c2pa-menu-section__title {
   padding-bottom: 0;
-  color: #7db4ff !important;
+  color: #7db4ff;
 }
 
 .vjs-menu li.vjs-menu-item .c2pa-menu-section__toggle {
@@ -53,18 +81,31 @@
   transform: rotate(90deg);
 }
 
+/* `visibility: hidden` matters as much as the height here. Collapsing with
+   `grid-template-rows: 0fr` plus `opacity: 0` hides the content from sight but
+   leaves it in the accessibility tree, so a screen reader read every collapsed
+   section's body unconditionally, with no expanded/collapsed cue and no way to
+   tell where one section ended.
+
+   The delay is what keeps the animation: on collapse, visibility flips only
+   after the height has finished shrinking; on expand, the `.expanded` rule
+   zeroes the delay so it appears at once. */
 .vjs-menu li.vjs-menu-item .c2pa-menu-section__content {
   display: grid;
   grid-template-rows: 0fr;
   opacity: 0;
+  visibility: hidden;
   transition:
     grid-template-rows 0.24s ease,
-    opacity 0.2s ease;
+    opacity 0.2s ease,
+    visibility 0s linear 0.24s;
 }
 
 .vjs-menu li.vjs-menu-item .c2pa-menu-section__content.expanded {
   grid-template-rows: 1fr;
   opacity: 1;
+  visibility: visible;
+  transition-delay: 0s;
 }
 
 .vjs-menu li.vjs-menu-item .c2pa-menu-section__content-inner {

@@ -18,7 +18,7 @@ import type { C2PAStatus } from '@/types/c2pa.types';
 import type { C2PAPlayerRootController } from '../C2PAPlayerRoot.types';
 import type {
     C2paMenuBridgeState,
-    VideoJsMenuComponentLike,
+    VideoJsMenuButtonComponentLike,
     VideoJsPlayerLike,
 } from './C2paMenu.types';
 
@@ -102,7 +102,7 @@ function getStatusValidationState(c2paStatus: C2PAStatus | null) {
  *
  * @param c2paMenu - Video.js C2PA menu component instance
  */
-export function setMenuReference(c2paMenu: VideoJsMenuComponentLike | null) {
+export function setMenuReference(c2paMenu: VideoJsMenuButtonComponentLike | null) {
     if (!c2paMenu) {
         return;
     }
@@ -142,6 +142,43 @@ export function handleMenuOpened() {
 }
 
 /**
+ * Closes the menu from outside video.js, but through video.js.
+ *
+ * Routed through `unpressButton` rather than writing `isMenuOpen: false`
+ * directly, because video.js owns `buttonPressed_` and the button's
+ * `aria-expanded`. Setting only the React half is exactly how the button would
+ * come to report an open panel that is no longer on screen. The shell's
+ * override notifies React on the way back, so this is the whole close.
+ *
+ * Idempotent: the override's `wasPressed` guard means calling it on an already
+ * closed menu does nothing, which is what lets both video.js's own Escape
+ * handling and the overlay's fire without fighting.
+ *
+ * This is also what `menuState.menuReference` is for. It was previously stored
+ * and read only to guard a redundant call to the function that stored it.
+ */
+export function closeC2PAMenu() {
+    menuState.menuReference?.unpressButton?.();
+}
+
+/**
+ * Show or hide the validation log.
+ *
+ * Lives here rather than in the button because this is where the player
+ * root's controller reference is held; the button is a video.js component and
+ * knows nothing about React.
+ */
+export function toggleDebugConsole() {
+    const isOpen = playerRootController?.getState().isDebugOpen ?? false;
+
+    playerRootController?.setState({ isDebugOpen: !isOpen });
+}
+
+export function closeDebugConsole() {
+    playerRootController?.setState({ isDebugOpen: false });
+}
+
+/**
  * Mark the menu as closed and bump the reset token so React-only UI
  * state is reset the next time the popup opens.
  */
@@ -164,8 +201,9 @@ export function handleMenuClosed() {
  * @param videoPlayer - Video.js player instance
  */
 export function updateC2PAMenu(
-    c2paMenu: VideoJsMenuComponentLike | null,
+    c2paMenu: VideoJsMenuButtonComponentLike | null,
     videoPlayer: VideoJsPlayerLike,
+    hasInvalidSegments = false,
 ) {
     if (!menuState.menuReference && c2paMenu) {
         setMenuReference(c2paMenu);
@@ -174,18 +212,6 @@ export function updateC2PAMenu(
     const c2paStatus = playerRootController?.getState().c2paStatus ?? null;
     const currentManifestId = getStatusManifestId(c2paStatus);
     const manifestChanged = currentManifestId !== menuState.lastManifestId;
-
-    if (menuState.isInvalid) {
-        console.log('[C2PA] Maintaining invalid button state (persists across all video states)');
-        updateButtonValidationState(videoPlayer, true);
-    }
-
-    console.log('[C2PA] Rendering menu', {
-        manifestId: currentManifestId,
-        previousManifestId: menuState.lastManifestId,
-        manifestChanged,
-        menuOpen: menuState.isMenuOpen,
-    });
 
     if (manifestChanged) {
         menuState.lastManifestId = currentManifestId;
@@ -197,7 +223,17 @@ export function updateC2PAMenu(
         playerRootController?.setState({ selectedSegment: null });
     }
 
-    menuState.isInvalid = getStatusValidationState(c2paStatus) === 'Invalid';
+    // Latched, not sampled. `hasInvalidSegments` covers anything invalid found
+    // anywhere in the timeline, not just under the playhead, and once a bad
+    // fragment has been seen the warning stays for the rest of the source:
+    // moving the playhead into a clean fragment doesn't un-tamper the ones
+    // already detected. Previously this was reassigned from the instantaneous
+    // playhead verdict on every tick, so the badge cleared itself as soon as
+    // playback moved past the problem.
+    menuState.isInvalid =
+        menuState.isInvalid ||
+        hasInvalidSegments ||
+        getStatusValidationState(c2paStatus) === 'Invalid';
     updateButtonValidationState(videoPlayer, menuState.isInvalid);
     syncMenuStateToPlayerRoot(c2paStatus);
 }

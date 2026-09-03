@@ -1,0 +1,98 @@
+/*
+ * Copyright 2026 European Broadcasting Union
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+/**
+ * How much of a live stream the player remembers.
+ *
+ * One value, because these are one question wearing several hats: how far back
+ * the bar reaches, how much validated history the session keeps, how long the
+ * runtime holds segments for point lookups, and how many per-segment manifests
+ * are cached. They were four separate constants at three different values (600s
+ * in two places, 900s in two others, and a count of 300), so the bar could show
+ * a stretch whose verdicts had already been evicted.
+ *
+ * Five minutes rather than fifteen so the bar has usable resolution. The same
+ * window scales the playhead, and a delay only reads as a delay if it moves the
+ * cursor: twelve seconds behind the live edge is 4% of five minutes but 1.3% of
+ * fifteen, which is indistinguishable from being at the edge. It also puts the
+ * seekable DVR window - 30 seconds on the streams tested - at a tenth of the
+ * bar rather than a thirtieth.
+ */
+export const DEFAULT_LIVE_RETENTION_SECONDS = 5 * 60;
+
+/**
+ * The narrowest retention `?window=` will accept.
+ *
+ * A sanity floor on the configurable value, nothing more. It used to be a floor
+ * on the *rendered* window, back when that grew with the history behind it -
+ * without one, the first segment became the whole bar and implied a stream had
+ * been checked end to end when four seconds of it had. The window no longer
+ * grows, so that job is gone; rejecting an unusably small configured value is
+ * still worth doing.
+ */
+export const MIN_LIVE_WINDOW_SECONDS = 60;
+
+/**
+ * Shortest segment worth planning for, used to turn a retention time into a
+ * cache size. Deliberately pessimistic: a stream of unusually short segments
+ * should still keep a full window of them rather than silently forget the
+ * older half.
+ */
+const SHORTEST_EXPECTED_SEGMENT_SECONDS = 2;
+
+/** How many segments a retention window could hold at worst. */
+export function retainedSegmentCount(retentionSeconds: number): number {
+  return Math.ceil(retentionSeconds / SHORTEST_EXPECTED_SEGMENT_SECONDS);
+}
+
+/**
+ * Reads `?window=<seconds>`, for demonstrating and testing retention without a
+ * rebuild, in the same spirit as `?trust=`. Out-of-range or unparseable values
+ * fall back to the default rather than failing, since this is a diagnostic.
+ */
+export function resolveLiveRetentionSeconds(
+  search: string | undefined = typeof window === 'undefined' ? undefined : window.location.search,
+): number {
+  if (!search) {
+    return DEFAULT_LIVE_RETENTION_SECONDS;
+  }
+
+  const requested = Number(new URLSearchParams(search).get('window'));
+
+  if (!Number.isFinite(requested) || requested < MIN_LIVE_WINDOW_SECONDS) {
+    return DEFAULT_LIVE_RETENTION_SECONDS;
+  }
+
+  return requested;
+}
+
+/**
+ * Reads `?gate=off`, for demonstrating what the player looks like without the
+ * validated-playback gate - and as an escape hatch if a validator that has
+ * stopped is holding the picture.
+ *
+ * Only `off` turns it off; anything else, including a typo, leaves it on. A
+ * switch that fails open on a mistake is the wrong way round for this one.
+ */
+export function resolveEnforceValidatedPlayback(
+  search: string | undefined = typeof window === 'undefined' ? undefined : window.location.search,
+): boolean {
+  if (!search) {
+    return true;
+  }
+
+  return new URLSearchParams(search).get('gate') !== 'off';
+}

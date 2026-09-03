@@ -34,6 +34,20 @@ export interface C2PAStatus {
   normalizedResult?: C2PANormalizedResult;
   timelineSegments?: C2PATimelineSegmentUpdate[];
   message?: string;
+  /**
+   * The manifest (or, for fragmented sources, the init segment) failed
+   * validation, so the whole asset is condemned rather than any one region.
+   * Distinct from a single fragment failing its own integrity check.
+   */
+  wholeAssetInvalid?: boolean;
+  /**
+   * Whether the source has no fixed end.
+   *
+   * Read by the menu for one reason: what to call the thing in a sentence a
+   * viewer reads. "Some earlier parts of this livestream" is right for a
+   * broadcast and wrong for a file, and vice versa.
+   */
+  isLive?: boolean;
 }
 
 export interface C2PAPlayerProps {

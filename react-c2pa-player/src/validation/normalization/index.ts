@@ -17,4 +17,4 @@
 export { normalizeDashSegmentRecord } from './dash';
 export { normalizeHlsManifestHelper } from './hls';
 export { normalizeMonolithicManifestStore } from './monolithic';
-export { createCompatibilityManifestStore, createUnknownResult } from './shared';
+export { createUnknownResult } from './shared';

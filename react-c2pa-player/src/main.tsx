@@ -16,19 +16,17 @@
 
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-import videojs from 'video.js';
+// Video.js's own stylesheet is imported here, first, rather than beside the
+// component that creates the player. Vite emits CSS in module-graph order, so
+// importing it from a component two levels down put the vendor base *after*
+// our overrides, and every rule of ours at equal specificity lost. That is
+// what the `!important` declarations in the sheets below were compensating
+// for. Vendor base first, our overrides after, in one place that can be read.
+import 'video.js/dist/video-js.css';
 import './index.css';
 import './styles/videojs-enhancements.css';
 import './styles/c2pa-player.css';
 import App from './App';
-
-// Expose videojs globally for C2paPlayer-V2 modules
-// This must be done before any Video.js players are created
-// Matches the pattern from cawg_c2pa_player.html where videojs is loaded via <script> tag
-if (typeof window !== 'undefined') {
-  (window as any).videojs = videojs;
-  console.log('[Main] Exposed videojs globally for C2PA Player V2');
-}
 
 const rootElement = document.getElementById('root');
 if (!rootElement) throw new Error('Failed to find the root element');
