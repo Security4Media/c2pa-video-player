@@ -110,19 +110,19 @@ export const initializeFrictionOverlay = function (
     const playerRootContainer = document.createElement('div');
     const root = createRoot(playerRootContainer);
     const handleWatchAnyway = function () {
-        // Only the whole-asset question latches the legacy gate. A per-run
-        // acceptance must not: `playbackStarted` is a once-per-source latch,
-        // so latching it on the first invalid stretch would shut the legacy
-        // gate for good and, worse, is simply not what the viewer agreed to -
-        // they consented to this stretch, not to the rest of the stream.
-        const isPerRun = playerRoot.getState().consentScope === 'invalid-run';
+        // Only the whole-asset question latches the legacy gate. Neither of
+        // the mid-playback questions may: `playbackStarted` is a once-per-source
+        // latch, so latching it on the first invalid stretch would shut the
+        // legacy gate for good. The per-stream mode has its own latch inside
+        // the gate, which is where a decision about consent belongs.
+        const isMidPlayback = playerRoot.getState().consentScope !== 'whole-asset';
 
         playerRoot.setState({
             isFrictionOverlayVisible: false,
             consentCountdownSeconds: null,
         });
 
-        if (!isPerRun) {
+        if (!isMidPlayback) {
             setPlaybackStarted();
         }
 
@@ -184,15 +184,17 @@ export const displayFrictionOverlay = function (
  * Safe to call on every tick: it is a level, not an edge.
  *
  * @param playerRoot - Player overlay controller created during initialization
+ * @param scope - Which claim to make, and whether to say it is the last warning
  * @param countdownSeconds - Seconds until withdrawal, or null when it will not
  */
 export const requestConsent = function (
     playerRoot: C2PAPlayerRootController | null,
+    scope: 'invalid-run' | 'invalid-stream',
     countdownSeconds: number | null,
 ): void {
     playerRoot?.setState({
         isFrictionOverlayVisible: true,
-        consentScope: 'invalid-run',
+        consentScope: scope,
         consentCountdownSeconds: countdownSeconds,
     });
 };

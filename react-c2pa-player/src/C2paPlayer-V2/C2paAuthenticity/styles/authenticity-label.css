@@ -76,13 +76,35 @@
   background: rgb(20 20 22 / 82%);
   cursor: pointer;
 
-  /* The enter fade, and the morph between states. `max-width` and `padding`
-     carry the expand/collapse; `opacity` and `transform` carry appearing. */
-  animation: c2pa-authenticity-enter 240ms ease-out;
+  /*
+   * Two mechanisms, doing two different jobs.
+   *
+   * The transition carries what is continuous: the pill's width as the words
+   * collapse away, and its border colour as the verdict changes. Those have a
+   * from-value and a to-value, so a transition is the right tool and the pill
+   * appears to morph rather than to be replaced.
+   *
+   * The animation carries what is not continuous: the words themselves, which
+   * change instantly and cannot be interpolated. Its timing is shared here and
+   * its *name* comes from the verdict rules below, because that is the trick
+   * that makes this work at all - a CSS animation only replays when
+   * `animation-name` changes, and going from `--trusted` to `--invalid` changes
+   * exactly that. So the swap needs no JS phase, no timers, and no second copy
+   * of the reduced-motion check: the global rule in design-tokens.css zeroes
+   * animation-duration, and this is a CSS animation.
+   */
+  animation-duration: 300ms;
+  animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+  /* `backwards`, not `both`. A forwards fill keeps applying the animation's
+     last frame after it ends, and a filling animation outranks normal author
+     declarations - so it would have held `opacity: 1` over the `--leaving`
+     rule and swallowed the exit fade. Backwards gives what is actually needed:
+     the first frame at t=0, and nothing held afterwards. */
+  animation-fill-mode: backwards;
   transition:
     max-width 220ms ease,
     padding 220ms ease,
-    border-color 220ms ease,
+    border-color 260ms ease,
     opacity 240ms ease,
     transform 240ms ease;
 }
@@ -128,6 +150,9 @@
   background-repeat: no-repeat;
   background-position: center;
   background-size: 0.8rem;
+  /* So the dot's colour glides with the pill's border rather than snapping a
+     quarter-second ahead of it. */
+  transition: background-color 260ms ease;
 }
 
 .c2pa-authenticity-label__text {
@@ -154,20 +179,31 @@
 
 /* --- the four verdicts ---------------------------------------------------- */
 
+/*
+ * Each carries its own animation name. The four keyframes below are identical
+ * by necessity: it is the *name* that is the signal, not its content, and two
+ * names cannot share one definition. Four near-empty blocks is the price of
+ * doing the swap without a JS state machine and its timers.
+ */
+
 .video-js .c2pa-authenticity-label--trusted {
   --c2pa-label-colour: var(--c2pa-trusted);
+  animation-name: c2pa-authenticity-swap-trusted;
 }
 
 .video-js .c2pa-authenticity-label--valid {
   --c2pa-label-colour: var(--c2pa-passed);
+  animation-name: c2pa-authenticity-swap-valid;
 }
 
 .video-js .c2pa-authenticity-label--invalid {
   --c2pa-label-colour: var(--c2pa-failed);
+  animation-name: c2pa-authenticity-swap-invalid;
 }
 
 .video-js .c2pa-authenticity-label--unknown {
   --c2pa-label-colour: var(--c2pa-unknown);
+  animation-name: c2pa-authenticity-swap-unknown;
 }
 
 /* The invalid mark gets the invalid glyph, as the menu button does. */
@@ -178,22 +214,52 @@
 /*
  * Glowing: Invalid and Unknown only, and they never collapse. A warning that
  * shrinks itself after five seconds is a warning the viewer can miss.
+ *
+ * On a pseudo-element rather than on the label, because the label's own
+ * animation slot belongs to the verdict swap above and one element can only
+ * carry one `animation-name` per slot. Separating them keeps each rule owning
+ * exactly one animation, and means the glow is not restarted every time the
+ * verdict changes.
  */
-.video-js .c2pa-authenticity-label--glowing {
-  animation:
-    c2pa-authenticity-enter 240ms ease-out,
-    c2pa-authenticity-glow 2s ease-in-out 240ms infinite;
+.video-js .c2pa-authenticity-label--glowing::after {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  pointer-events: none;
+  animation: c2pa-authenticity-glow 2s ease-in-out infinite;
 }
 
-@keyframes c2pa-authenticity-enter {
+/*
+ * The swap. Slides and fades the pill's contents in over the morphing pill,
+ * which is what makes a verdict change read as a change rather than as a
+ * repaint. Repeated once per verdict; see the note above the verdict rules.
+ */
+@keyframes c2pa-authenticity-swap-trusted {
   from {
     opacity: 0;
-    transform: translateY(-0.35rem) scale(0.96);
+    transform: translateY(-0.3rem) scale(0.95);
   }
+}
 
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
+@keyframes c2pa-authenticity-swap-valid {
+  from {
+    opacity: 0;
+    transform: translateY(-0.3rem) scale(0.95);
+  }
+}
+
+@keyframes c2pa-authenticity-swap-invalid {
+  from {
+    opacity: 0;
+    transform: translateY(-0.3rem) scale(0.95);
+  }
+}
+
+@keyframes c2pa-authenticity-swap-unknown {
+  from {
+    opacity: 0;
+    transform: translateY(-0.3rem) scale(0.95);
   }
 }
 

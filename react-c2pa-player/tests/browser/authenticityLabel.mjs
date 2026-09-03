@@ -26,7 +26,7 @@
  * runs are 8-40s, 56-88s and 96-128s, with clean stretches between them, so a
  * seek can put the playhead inside or outside a run on purpose.
  *
- * Six phases, and the fourth is the one that matters most: with neither
+ * Seven phases, and the fifth is the one that matters most: with neither
  * parameter set the player must behave exactly as it does today.
  */
 import { chromium } from 'playwright-core';
@@ -119,6 +119,11 @@ const readLabel = (page) =>
       fontSize: px(style.fontSize),
       zIndex: style.zIndex,
       animationDuration: style.animationDuration,
+      animationName: style.animationName,
+      animationFillMode: style.animationFillMode,
+      // The glow lives on a pseudo-element now, so the label's own animation
+      // slot is free for the verdict swap.
+      glowOnPseudo: getComputedStyle(el, '::after').animationName,
       insetTop: px(rect.top - playerRect.top),
       insetRight: px(playerRect.right - rect.right),
       withinPlayer:
@@ -149,6 +154,31 @@ const readConsent = (page) =>
       currentTime: Math.round(document.querySelector('video').currentTime * 10) / 10,
     };
   });
+
+/**
+ * Starts recording animation starts on the label.
+ *
+ * Listening on the document with capture, so it survives React replacing the
+ * element. This is the point of the whole CSS approach and is worth measuring
+ * rather than deriving: an animation replays only when `animation-name`
+ * changes, so if the four verdicts did not each have their own name, a verdict
+ * change would produce no animation at all and the label would just repaint.
+ */
+const recordSwaps = (page) =>
+  page.evaluate(() => {
+    window.__c2paSwaps = [];
+    document.addEventListener(
+      'animationstart',
+      (event) => {
+        if (event.target?.classList?.contains('c2pa-authenticity-label')) {
+          window.__c2paSwaps.push(event.animationName);
+        }
+      },
+      true,
+    );
+  });
+
+const readSwaps = (page) => page.evaluate(() => window.__c2paSwaps ?? []);
 
 /** Waits for the consent question, returning whether it appeared. */
 async function waitForConsent(page, timeoutMs = 12000) {
@@ -252,10 +282,13 @@ console.log('=== 1. ?label=on: the label states the verdict on screen ===');
     collapsed.ariaLabel,
   );
 
-  // Into the tampered run.
+  // Into the tampered run, watching for the swap animation on the way.
+  await recordSwaps(page);
   await playAt(page, INSIDE_RUN_1, 5000);
   const bad = await readLabel(page);
+  const swaps = await readSwaps(page);
   console.log(`   invalid: ${JSON.stringify(bad)}`);
+  console.log(`   animations fired on the change: ${JSON.stringify(swaps)}`);
 
   check('a tampered fragment turns the label red', /--invalid/.test(bad.classes ?? ''), bad.classes);
   check('with the wording asked for', bad.text === 'Invalid Authenticity', bad.text);
@@ -270,6 +303,58 @@ console.log('=== 1. ?label=on: the label states the verdict on screen ===');
     'a warning is announced to a screen reader',
     bad.liveRegion === 'Invalid Authenticity',
     bad.liveRegion,
+  );
+
+  // The transition. Measured, not derived: this is exactly the kind of "it
+  // follows from the spec" claim that has been wrong twice in this session.
+  check(
+    'changing verdict actually replays an animation',
+    swaps.some((name) => name.startsWith('c2pa-authenticity-swap')),
+    swaps.join(' / ') || 'nothing fired',
+  );
+  check(
+    'and it is the new verdict’s own animation',
+    swaps.includes('c2pa-authenticity-swap-invalid'),
+    swaps.join(' / '),
+  );
+  check(
+    'each verdict names a different one, which is what makes it replay',
+    bad.animationName === 'c2pa-authenticity-swap-invalid' &&
+      clean.animationName !== bad.animationName,
+    `${clean.animationName} -> ${bad.animationName}`,
+  );
+  check(
+    'the swap starts from its own first frame, not from wherever it was',
+    bad.animationFillMode === 'backwards',
+    bad.animationFillMode,
+  );
+  check(
+    'the glow is on a pseudo-element, so it does not restart on every change',
+    bad.glowOnPseudo === 'c2pa-authenticity-glow',
+    bad.glowOnPseudo,
+  );
+  const transitions = await page.evaluate(
+    () => getComputedStyle(document.querySelector('.c2pa-authenticity-label')).transitionProperty,
+  );
+  check('the pill morphs its colour rather than snapping', /border-color/.test(transitions), transitions);
+
+  // The exit fade, which no fixture produces on its own: the label only goes
+  // when nothing covers the playhead at all. Driven directly, because a
+  // forwards animation fill would outrank this rule and swallow it, and that
+  // is not a thing to find out from a bug report.
+  const exit = await page.evaluate(async () => {
+    const el = document.querySelector('.c2pa-authenticity-label');
+    const before = getComputedStyle(el).opacity;
+    el.classList.add('c2pa-authenticity-label--leaving');
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    const after = getComputedStyle(el).opacity;
+    el.classList.remove('c2pa-authenticity-label--leaving');
+    return { before, after };
+  });
+  check(
+    'and it can actually fade out when nothing covers the playhead',
+    Number(exit.before) > 0.9 && Number(exit.after) < 0.05,
+    `${exit.before} -> ${exit.after}`,
   );
 
   // It must not collapse, however long it is left.
@@ -397,7 +482,51 @@ console.log('=== 3. ?consent=per-run: one question per invalid stretch ===');
 }
 
 // ---------------------------------------------------------------------------
-console.log('=== 4. neither parameter: today’s behaviour, unchanged ===');
+console.log('=== 4. ?consent=per-stream: one question for the whole source ===');
+// ---------------------------------------------------------------------------
+{
+  const page = await open('?consent=per-stream&label=on');
+
+  await playAt(page, INSIDE_RUN_1, 2000);
+  const raised = await waitForConsent(page);
+  const first = await readConsent(page);
+  console.log(`   first: ${JSON.stringify(first)}`);
+
+  check('the question is raised on the first invalid content', raised);
+  check('playback is held', first.paused);
+  check(
+    'it says this is the only warning, which per-run does not',
+    /only time you will be asked/i.test(first.message),
+    first.message.slice(0, 110),
+  );
+
+  if (raised) {
+    await page.click('.friction-button', { timeout: 5000 });
+    await page.waitForTimeout(1500);
+    check('accepting resumes', !(await readConsent(page)).paused);
+
+    // The defining difference. Leave the stretch and enter a different one:
+    // per-run asks again here, per-stream must not.
+    await playAt(page, CLEAN_BETWEEN, 4000);
+    await playAt(page, INSIDE_RUN_2, 3000);
+    const askedAgain = await waitForConsent(page, 5000);
+    check('a second bad stretch does not ask again', !askedAgain);
+
+    // And the label still tracks the verdict, since it is the other parameter.
+    const label = await readLabel(page);
+    check(
+      'while the label still reports the second stretch',
+      /--invalid/.test(label.classes ?? ''),
+      label.classes,
+    );
+    check('and playback was not held for it', !(await readConsent(page)).paused);
+  }
+
+  await page.close();
+}
+
+// ---------------------------------------------------------------------------
+console.log('=== 5. neither parameter: today’s behaviour, unchanged ===');
 // ---------------------------------------------------------------------------
 {
   const page = await open('');
@@ -425,7 +554,7 @@ console.log('=== 4. neither parameter: today’s behaviour, unchanged ===');
 }
 
 // ---------------------------------------------------------------------------
-console.log('=== 5. reduced motion: shown, but not animated ===');
+console.log('=== 6. reduced motion: shown, but not animated ===');
 // ---------------------------------------------------------------------------
 {
   const page = await open('?label=on', { reducedMotion: 'reduce' });
@@ -453,7 +582,7 @@ console.log('=== 5. reduced motion: shown, but not animated ===');
 }
 
 // ---------------------------------------------------------------------------
-console.log('=== 6. the live countdown, driven directly ===');
+console.log('=== 7. the live countdown, and both modes on live, driven directly ===');
 // ---------------------------------------------------------------------------
 {
   // On demand the budget is null by design, so this is the one behaviour a VOD
@@ -475,7 +604,7 @@ console.log('=== 6. the live countdown, driven directly ===');
       event: 'tick',
       verdict,
       labelEnabled: true,
-      consentPerRun: true,
+      consentMode: 'per-run',
       isLive: true,
       dvrDepthSeconds: 30,
       alreadyPausedSeconds: 0,
@@ -489,6 +618,29 @@ console.log('=== 6. the live countdown, driven directly ===');
     const expired = gate.advanceAuthenticityGate(midway.state, { ...base, nowMs: 24_000 });
     const after = gate.advanceAuthenticityGate(expired.state, { ...base, nowMs: 24_500 });
 
+    // The same three ticks under per-stream, plus a later, different stretch,
+    // which is the one behaviour the two modes disagree about.
+    const stream = { ...base, consentMode: 'per-stream' };
+    const sRaised = gate.advanceAuthenticityGate(
+      gate.initialAuthenticityGateState(0),
+      { ...stream, nowMs: 0 },
+    );
+    const sAccepted = gate.advanceAuthenticityGate(sRaised.state, {
+      ...stream,
+      event: 'consent-accepted',
+      nowMs: 100,
+    });
+    const sGood = gate.advanceAuthenticityGate(sAccepted.state, {
+      ...stream,
+      verdict: { state: 'Trusted', segment: null, invalidRunStart: null, reason: 'covering' },
+      nowMs: 200,
+    });
+    const sSecondRun = gate.advanceAuthenticityGate(sGood.state, {
+      ...stream,
+      verdict: { ...verdict, invalidRunStart: 400 },
+      nowMs: 300,
+    });
+
     return {
       raised: raised.consentSecondsRemaining,
       deadline: raised.nextDeadlineMs,
@@ -497,6 +649,10 @@ console.log('=== 6. the live countdown, driven directly ===');
       expiredReason: expired.reason,
       afterReason: after.reason,
       afterShown: after.showConsent,
+      streamRaised: sRaised.showConsent,
+      streamCountdown: sRaised.consentSecondsRemaining,
+      streamSecondRunShown: sSecondRun.showConsent,
+      streamSecondRunReason: sSecondRun.reason,
     };
   });
   console.log(`   ${JSON.stringify(result)}`);
@@ -509,6 +665,18 @@ console.log('=== 6. the live countdown, driven directly ===');
     'and is never raised for that stretch again',
     result.afterShown === false && result.afterReason === 'run-withdrawn',
     result.afterReason,
+  );
+  check('per-stream asks once on live too', result.streamRaised === true);
+  check(
+    'with the same countdown, since the budget is the stream’s not the mode’s',
+    result.streamCountdown === 24,
+    String(result.streamCountdown),
+  );
+  check(
+    'and never asks about a later stretch',
+    result.streamSecondRunShown === false &&
+      result.streamSecondRunReason === 'stream-already-asked',
+    result.streamSecondRunReason,
   );
 
   await page.close();

@@ -18,7 +18,7 @@ import { useEffect, useId, useRef } from 'react';
 
 interface C2paFrictionOverlayProps {
     isVisible: boolean;
-    scope: 'whole-asset' | 'invalid-run';
+    scope: 'whole-asset' | 'invalid-run' | 'invalid-stream';
     /** Seconds before the question withdraws itself, or null when it will not. */
     countdownSeconds: number | null;
     onWatchAnyway: () => void;
@@ -27,15 +27,23 @@ interface C2paFrictionOverlayProps {
 /**
  * What each question actually claims.
  *
- * Two sentences rather than one, because the two are different claims and a
+ * Three sentences rather than one, because these are different claims and a
  * viewer acts on them differently. The whole-asset wording is unchanged from
  * before this file learned about runs.
+ *
+ * The `invalid-stream` wording says outright that no further question will
+ * come. That is the honest thing to tell someone whose one chance to decide
+ * this is now, and it is the only visible difference between the two per-\u2011
+ * playback modes - without it, a viewer would reasonably assume the next bad
+ * stretch would stop the picture too.
  */
 const CONSENT_MESSAGE = {
     'whole-asset':
         "The information in this video's Content Credentials is no longer trustworthy and the video's history cannot be confirmed.",
     'invalid-run':
         'The Content Credentials for the part now playing are invalid. This part of the stream may have been tampered with.',
+    'invalid-stream':
+        'The Content Credentials for the part now playing are invalid. Parts of this stream may have been tampered with. This is the only time you will be asked.',
 } as const;
 
 /**

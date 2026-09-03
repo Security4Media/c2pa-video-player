@@ -56,14 +56,18 @@ export function resolveShowAuthenticityLabel(
 }
 
 /**
- * Reads `?consent=per-run`.
+ * Reads `?consent=per-stream` and `?consent=per-run`.
  *
- * `whole-asset` is today's behaviour and the default: the question is raised at
- * most once per source, and only when the source's own credentials are already
- * known bad. `per-run` raises it once per contiguous stretch of invalid
- * content, which is the only setting under which it can appear mid-playback on
- * a fragmented source at all.
+ * `whole-asset` is the default and is what the player has always done: the
+ * question is raised at most once per source, and only when the source's own
+ * credentials are already known bad. Either new value is needed for it to
+ * appear mid-playback on a fragmented source at all.
+ *
+ * Listed rather than pattern-matched, so a typo leaves the player as it is
+ * today rather than falling into whichever mode happens to match loosely.
  */
+const CONSENT_MODES: readonly ConsentMode[] = ['whole-asset', 'per-stream', 'per-run'];
+
 export function resolveConsentMode(
   search: string | undefined = currentSearch(),
 ): ConsentMode {
@@ -71,7 +75,9 @@ export function resolveConsentMode(
     return 'whole-asset';
   }
 
-  return new URLSearchParams(search).get('consent') === 'per-run'
-    ? 'per-run'
+  const requested = new URLSearchParams(search).get('consent');
+
+  return CONSENT_MODES.includes(requested as ConsentMode)
+    ? (requested as ConsentMode)
     : 'whole-asset';
 }

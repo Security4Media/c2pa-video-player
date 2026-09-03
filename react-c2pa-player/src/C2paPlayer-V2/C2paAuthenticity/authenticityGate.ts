@@ -23,7 +23,7 @@
  * store write and a class name; every rule worth arguing about is in this file
  * and is covered by its own test.
  *
- * The two are independently switchable (`?label=on`, `?consent=per-run`),
+ * The two are independently switchable (`?label=on`, `?consent=`),
  * because a deployment may want to tell viewers what they are watching without
  * interrupting them, or interrupt without a permanent badge on the picture. So
  * each half must work with the other off, which is why `askConsent` is computed
@@ -35,7 +35,11 @@
  * timer firing in between.
  */
 
-import type { PlayerValidationState, ValidationTimelineSegment } from '@/validation';
+import type {
+  ConsentMode,
+  PlayerValidationState,
+  ValidationTimelineSegment,
+} from '@/validation';
 import { pauseBudgetSeconds } from '../C2paTimeline/liveResume';
 import type { PlayheadVerdict } from '../C2paTimeline/playheadVerdict';
 
@@ -108,6 +112,15 @@ export interface AuthenticityGateState {
    */
   answeredRunStart: number | null;
   /**
+   * Whether this source has had its one question, under `per-stream`.
+   *
+   * Never cleared while the source is loaded, which is the whole difference
+   * between the two modes: `answeredRunStart` forgets on returning to sound
+   * content, this does not. Reset only when the player is disposed, so "per
+   * stream" means per source and a source switch asks again.
+   */
+  askedForStream: boolean;
+  /**
    * Runs whose question expired unanswered. Never asked about again.
    *
    * The narrow exception to "ask again every time the stretch is entered", and
@@ -132,8 +145,8 @@ export interface AuthenticityGateInputs {
   verdict: PlayheadVerdict;
   /** `?label=on`. */
   labelEnabled: boolean;
-  /** `?consent=per-run`. */
-  consentPerRun: boolean;
+  /** `?consent=`. `whole-asset` leaves this gate doing nothing. */
+  consentMode: ConsentMode;
   isLive: boolean;
   /** What the origin retains, or null when unknown. */
   dvrDepthSeconds: number | null;
@@ -178,6 +191,7 @@ export interface AuthenticityGateDecision {
     | 'consent-withdrawn'
     | 'run-already-asked'
     | 'run-withdrawn'
+    | 'stream-already-asked'
     | 'consent-off'
     | 'label-clicked';
 }
@@ -188,6 +202,7 @@ export function initialAuthenticityGateState(nowMs: number): AuthenticityGateSta
     labelSinceMs: nowMs,
     lastVerdictAtMs: Number.NEGATIVE_INFINITY,
     answeredRunStart: null,
+    askedForStream: false,
     withdrawnRunStarts: [],
     consent: null,
   };
@@ -234,7 +249,8 @@ export function advanceAuthenticityGate(
   previous: AuthenticityGateState,
   inputs: AuthenticityGateInputs,
 ): AuthenticityGateDecision {
-  const { event, verdict, labelEnabled, consentPerRun, nowMs } = inputs;
+  const { event, verdict, labelEnabled, consentMode, nowMs } = inputs;
+  const gateActive = consentMode === 'per-run' || consentMode === 'per-stream';
   let state: AuthenticityGateState = { ...previous };
 
   // --- the label ---------------------------------------------------------
@@ -285,12 +301,11 @@ export function advanceAuthenticityGate(
   const runStart = verdict.invalidRunStart;
 
   if (verdict.state === 'Invalid' && runStart !== null) {
-    if (!consentPerRun) {
-      reason = 'consent-off';
-    } else if (state.withdrawnRunStarts.includes(runStart)) {
-      reason = 'run-withdrawn';
-    } else if (state.consent !== null && state.consent.runStart === runStart) {
-      // Already up for this run. Withdraw if the budget has run out.
+    if (state.consent !== null && state.consent.runStart === runStart) {
+      // Already up for this run, and this has to be tested before any
+      // "already asked" memory: both are written at the moment the question
+      // goes up, so checking them first would take the question straight back
+      // down on the very next tick.
       if (state.consent.deadlineMs !== null && nowMs >= state.consent.deadlineMs) {
         state.withdrawnRunStarts = remember(state.withdrawnRunStarts, runStart);
         state.consent = null;
@@ -298,10 +313,18 @@ export function advanceAuthenticityGate(
       } else {
         reason = 'awaiting-consent';
       }
+    } else if (!gateActive) {
+      reason = 'consent-off';
+    } else if (consentMode === 'per-stream' && state.askedForStream) {
+      // One question for the whole source, however many bad stretches follow.
+      reason = 'stream-already-asked';
+    } else if (state.withdrawnRunStarts.includes(runStart)) {
+      reason = 'run-withdrawn';
     } else if (state.answeredRunStart === runStart) {
       reason = 'run-already-asked';
     } else if (event !== 'consent-accepted') {
       state.answeredRunStart = runStart;
+      state.askedForStream = true;
       state.consent = {
         runStart,
         askedAtMs: nowMs,
@@ -311,7 +334,8 @@ export function advanceAuthenticityGate(
     }
   } else if (verdict.state !== null) {
     // A verdict that is positively not invalid re-arms the gate. `null` does
-    // not: see AuthenticityGateState.answeredRunStart.
+    // not: see AuthenticityGateState.answeredRunStart. `askedForStream` is
+    // deliberately untouched - under `per-stream` there is nothing to re-arm.
     state.answeredRunStart = null;
 
     if (state.consent !== null) {

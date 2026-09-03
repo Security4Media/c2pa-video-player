@@ -52,6 +52,7 @@ export { UnsupportedValidationAdapter } from './unsupportedAdapter';
 export type {
   AdapterCapabilities,
   AdapterKind,
+  ConsentMode,
   ManifestSource,
   MediaSourceDescriptor,
   MediaSourceOrigin,

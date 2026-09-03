@@ -37,13 +37,15 @@ export interface C2PAPlayerRootState {
     /**
      * Which question the consent overlay is asking.
      *
-     * The overlay is one component with two sentences, because the two claims
+     * The overlay is one component with three sentences, because the claims
      * differ: a whole-asset failure means the file's own credentials cannot be
-     * relied on, and an invalid run means this stretch of an otherwise sound
-     * stream cannot. Accepting also means different things - only the
-     * whole-asset case latches `playbackStarted`.
+     * relied on; an invalid run means this stretch of an otherwise sound stream
+     * cannot, and another question will follow if there is another stretch; an
+     * invalid stream says the same about this stretch but adds that this is the
+     * only warning the viewer will get. Accepting also means different things -
+     * only the whole-asset case latches `playbackStarted`.
      */
-    consentScope: 'whole-asset' | 'invalid-run';
+    consentScope: 'whole-asset' | 'invalid-run' | 'invalid-stream';
     /**
      * Seconds before the question withdraws itself, or null when it will not.
      *

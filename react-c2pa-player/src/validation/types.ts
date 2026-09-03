@@ -99,8 +99,21 @@ export interface ValidationPolicy {
   consentMode: ConsentMode;
 }
 
-/** Where the consent question is raised, if anywhere. */
-export type ConsentMode = 'whole-asset' | 'per-run';
+/**
+ * Where the consent question is raised, if anywhere.
+ *
+ * - `whole-asset` is the behaviour the player has always had: raised from
+ *   video.js's `play` handler, and only when the source's own credentials are
+ *   already known bad. On a fragmented source that never happens, because its
+ *   verdict needs fragments, which need playback.
+ * - `per-stream` raises it the first time invalid content is actually played,
+ *   once, and never again for that source. Works on any source type.
+ * - `per-run` raises it once per contiguous stretch of invalid content.
+ *
+ * The two new modes differ only in how long the "already asked" memory lasts:
+ * the stretch, or the source.
+ */
+export type ConsentMode = 'whole-asset' | 'per-stream' | 'per-run';
 
 /**
  * The part of the policy the player layer reads off the snapshot.

@@ -19,6 +19,7 @@ import type { C2PAPlayerRootController } from './C2PAPlayerRoot.types';
 import type { VideoJsMenuButtonComponentLike, VideoJsPlayerLike } from './C2paMenu/C2paMenu.types';
 import type {
     AdapterCapabilities,
+    ConsentMode,
     ValidationStatusSnapshot,
     ValidationTimelineSegment,
 } from '../validation';
@@ -164,10 +165,10 @@ export const C2PAPlayer = function (
         | Omit<AuthenticityGateInputs, 'event' | 'nowMs' | 'alreadyPausedSeconds'>
         | null = null;
     let authenticityTimerId: ReturnType<typeof setInterval> | null = null;
-    // Whether the per-run question is in force, which suppresses the legacy
-    // once-per-source one. Read off the snapshot rather than the URL so the
-    // policy has one path into the player layer.
-    let consentIsPerRun = false;
+    // Which consent question is in force. Either mid-playback mode suppresses
+    // the legacy once-per-source one. Read off the snapshot rather than the URL
+    // so the policy has one path into the player layer.
+    let consentMode: ConsentMode = 'whole-asset';
 
     // Referenced by name (not called) before playerRoot is assigned below -
     // by the time a user can actually click a segment, initialize() has
@@ -315,7 +316,13 @@ export const C2PAPlayer = function (
         if (decision.showConsent) {
             // A level, so reasserting it every tick is what keeps the countdown
             // moving; the overlay is already showing by the second call.
-            requestConsent(playerRoot, decision.consentSecondsRemaining);
+            requestConsent(
+                playerRoot,
+                // The wording is the one visible difference between the modes:
+                // per-stream has to say that this is the only warning.
+                consentMode === 'per-stream' ? 'invalid-stream' : 'invalid-run',
+                decision.consentSecondsRemaining,
+            );
         } else if (heldForConsent) {
             // Was up and is not any more: either accepted or withdrawn, and the
             // state machine has already decided which. Taking it down here
@@ -426,12 +433,15 @@ export const C2PAPlayer = function (
             videoPlayer.on('play', function () {
                 rejoinLiveIfPositionIsGone();
 
-                // The per-run question subsumes this one and is strictly more
-                // capable, so it is not asked twice. No ordering hazard in
-                // reading the mode off a snapshot: `isManifestInvalid` is only
-                // ever set inside playbackUpdate, so if no snapshot has
-                // arrived this branch cannot be reached anyway.
-                if (isManifestInvalid && !playbackStarted && playerRoot && !consentIsPerRun) {
+                // Either mid-playback question subsumes this one and is
+                // strictly more capable, so it is not asked twice. No ordering
+                // hazard in reading the mode off a snapshot:
+                // `isManifestInvalid` is only ever set inside playbackUpdate,
+                // so if no snapshot has arrived this branch cannot be reached
+                // anyway.
+                const legacyConsent = consentMode === 'whole-asset';
+
+                if (isManifestInvalid && !playbackStarted && playerRoot && legacyConsent) {
                     displayFrictionOverlay(playbackStarted, videoPlayer, playerRoot);
                 } else {
                     setPlaybackStarted();
@@ -516,7 +526,7 @@ export const C2PAPlayer = function (
             heldForValidation = false;
             heldForConsent = false;
             holdingPlayback = false;
-            consentIsPerRun = false;
+            consentMode = 'whole-asset';
             pausedAtEpochMs = null;
             authenticityInputs = null;
             authenticityGate = initialAuthenticityGateState(Date.now());
@@ -622,9 +632,10 @@ export const C2PAPlayer = function (
             // and the question would not be raised for a stretch the viewer
             // seeked into.
             const showLabel = snapshot?.showAuthenticityLabel === true;
-            consentIsPerRun = snapshot?.consentMode === 'per-run';
+            consentMode = snapshot?.consentMode ?? 'whole-asset';
+            const consentMidPlayback = consentMode !== 'whole-asset';
 
-            if (showLabel || consentIsPerRun) {
+            if (showLabel || consentMidPlayback) {
                 authenticityInputs = {
                     verdict: selectPlayheadVerdict({
                         segments: snapshot?.timelineSegments,
@@ -634,7 +645,7 @@ export const C2PAPlayer = function (
                         fallbackState: snapshot?.result?.validationState ?? null,
                     }),
                     labelEnabled: showLabel,
-                    consentPerRun: consentIsPerRun,
+                    consentMode,
                     isLive,
                     dvrDepthSeconds: dvrWindowSeconds,
                 };

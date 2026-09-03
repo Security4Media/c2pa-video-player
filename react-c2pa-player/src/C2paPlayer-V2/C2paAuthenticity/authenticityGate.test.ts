@@ -36,13 +36,13 @@ const verdict = (
   reason: 'covering',
 });
 
-/** Both switches on, on demand, unless a case says otherwise. */
+/** Both switches on, per-run, on demand, unless a case says otherwise. */
 const inputs = (
   overrides: Partial<AuthenticityGateInputs> & Pick<AuthenticityGateInputs, 'verdict' | 'nowMs'>,
 ): AuthenticityGateInputs => ({
   event: 'tick',
   labelEnabled: true,
-  consentPerRun: true,
+  consentMode: 'per-run',
   isLive: false,
   dvrDepthSeconds: null,
   alreadyPausedSeconds: 0,
@@ -250,9 +250,22 @@ describe('asking once per invalid run', () => {
     expect(decisions[3].showConsent).toBe(false);
   });
 
+  it('re-arms across stretches, which per-stream does not', () => {
+    // The contrast, stated in one place so the two modes cannot drift into
+    // meaning the same thing.
+    const decisions = play([
+      { verdict: verdict('Invalid', 8), nowMs: 0 },
+      { verdict: verdict('Invalid', 8), nowMs: 100, event: 'consent-accepted' },
+      { verdict: verdict('Trusted'), nowMs: 200 },
+      { verdict: verdict('Invalid', 40), nowMs: 300 },
+    ]);
+
+    expect(decisions[3].showConsent).toBe(true);
+  });
+
   it('does nothing when consent is switched off', () => {
     const [decision] = play([
-      { verdict: verdict('Invalid', 8), nowMs: 0, consentPerRun: false },
+      { verdict: verdict('Invalid', 8), nowMs: 0, consentMode: 'whole-asset' },
     ]);
 
     expect(decision.showConsent).toBe(false);
@@ -278,6 +291,96 @@ describe('asking once per invalid run', () => {
 
     expect(decisions[0].showConsent).toBe(true);
     expect(decisions[2].showConsent).toBe(false);
+  });
+});
+
+describe('asking once for the whole stream', () => {
+  const perStream = { consentMode: 'per-stream' } as const;
+
+  it('asks the first time invalid content is played', () => {
+    const [decision] = play([{ verdict: verdict('Invalid', 8), nowMs: 0, ...perStream }]);
+
+    expect(decision.showConsent).toBe(true);
+    expect(decision.reason).toBe('entered-invalid-run');
+  });
+
+  it('never asks again, however many bad stretches follow', () => {
+    // The whole difference from per-run: returning to sound content re-arms
+    // that mode and does not re-arm this one.
+    const decisions = play([
+      { verdict: verdict('Invalid', 8), nowMs: 0, ...perStream },
+      { verdict: verdict('Invalid', 8), nowMs: 100, event: 'consent-accepted', ...perStream },
+      { verdict: verdict('Trusted'), nowMs: 200, ...perStream },
+      { verdict: verdict('Invalid', 40), nowMs: 300, ...perStream },
+      { verdict: verdict('Trusted'), nowMs: 400, ...perStream },
+      { verdict: verdict('Invalid', 900), nowMs: 500, ...perStream },
+    ]);
+
+    expect(decisions[3].reason).toBe('stream-already-asked');
+    expect(decisions[3].showConsent).toBe(false);
+    expect(decisions[5].reason).toBe('stream-already-asked');
+    expect(decisions[5].showConsent).toBe(false);
+  });
+
+  it('does not ask again after it withdrew unanswered either', () => {
+    const decisions = play([
+      { verdict: verdict('Invalid', 8), nowMs: 0, ...perStream, isLive: true, dvrDepthSeconds: 30 },
+      { verdict: verdict('Invalid', 8), nowMs: 24_000, ...perStream, isLive: true, dvrDepthSeconds: 30 },
+      { verdict: verdict('Trusted'), nowMs: 25_000, ...perStream },
+      { verdict: verdict('Invalid', 100), nowMs: 26_000, ...perStream },
+    ]);
+
+    expect(decisions[1].reason).toBe('consent-withdrawn');
+    expect(decisions[3].reason).toBe('stream-already-asked');
+  });
+
+  it('keeps the question up while it is unanswered', () => {
+    // The ordering trap: the stream latch is written the moment the question
+    // goes up, so testing it before "a question is already up for this run"
+    // would take the question down on the very next tick.
+    const decisions = play([
+      { verdict: verdict('Invalid', 8), nowMs: 0, ...perStream },
+      { verdict: verdict('Invalid', 8), nowMs: 250, ...perStream },
+      { verdict: verdict('Invalid', 8), nowMs: 4000, ...perStream },
+    ]);
+
+    expect(decisions[1].reason).toBe('awaiting-consent');
+    expect(decisions[1].showConsent).toBe(true);
+    expect(decisions[2].showConsent).toBe(true);
+    expect(decisions[2].holdForConsent).toBe(true);
+  });
+
+  it('still counts down and still withdraws on live', () => {
+    const decisions = play([
+      { verdict: verdict('Invalid', 8), nowMs: 0, ...perStream, isLive: true, dvrDepthSeconds: 30 },
+      { verdict: verdict('Invalid', 8), nowMs: 10_000, ...perStream, isLive: true, dvrDepthSeconds: 30 },
+    ]);
+
+    expect(decisions[0].consentSecondsRemaining).toBe(24);
+    expect(decisions[1].consentSecondsRemaining).toBe(14);
+  });
+
+  it('asks about a condemned asset once, as the other modes do', () => {
+    const condemned = {
+      state: 'Invalid' as const,
+      segment: null,
+      invalidRunStart: Number.NEGATIVE_INFINITY,
+      reason: 'whole-asset-invalid' as const,
+    };
+    const decisions = play([
+      { verdict: condemned, nowMs: 0, ...perStream },
+      { verdict: condemned, nowMs: 100, event: 'consent-accepted', ...perStream },
+      { verdict: condemned, nowMs: 30_000, ...perStream },
+    ]);
+
+    expect(decisions[0].showConsent).toBe(true);
+    expect(decisions[2].showConsent).toBe(false);
+  });
+
+  it('leaves the label alone, which is the other parameter', () => {
+    const [decision] = play([{ verdict: verdict('Invalid', 8), nowMs: 0, ...perStream }]);
+
+    expect(decision.label?.state).toBe('Invalid');
   });
 });
 

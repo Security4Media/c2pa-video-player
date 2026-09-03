@@ -54,10 +54,20 @@ describe('?consent=per-run', () => {
     expect(resolveConsentMode('?consent=per-run')).toBe('per-run');
   });
 
+  it('switches to per-stream when asked', () => {
+    expect(resolveConsentMode('?consent=per-stream')).toBe('per-stream');
+  });
+
+  it('accepts the default named explicitly', () => {
+    expect(resolveConsentMode('?consent=whole-asset')).toBe('whole-asset');
+  });
+
   it('keeps today’s behaviour on anything else', () => {
     expect(resolveConsentMode('?consent=perrun')).toBe('whole-asset');
+    expect(resolveConsentMode('?consent=per_stream')).toBe('whole-asset');
+    expect(resolveConsentMode('?consent=stream')).toBe('whole-asset');
     expect(resolveConsentMode('?consent=on')).toBe('whole-asset');
-    expect(resolveConsentMode('?consent=whole-asset')).toBe('whole-asset');
+    expect(resolveConsentMode('?consent=')).toBe('whole-asset');
   });
 
   it('is independent of the label', () => {
