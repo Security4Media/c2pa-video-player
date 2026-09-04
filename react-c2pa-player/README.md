@@ -20,6 +20,13 @@ serves as the source for a standalone Docker image (see the root `Dockerfile`).
 - `emitter.ts` is the one shared pub/sub primitive every adapter session and runtime uses to notify subscribers of new validation results.
 - `policy/localTrustMaterialProvider.ts` loads the local trust anchor/allow-list files and merges them with a remote community trust-anchor list, failing open to local-only if that fetch is unreachable (offline/air-gapped use).
 
+**`hls.js` is pinned below 1.7** (`~1.6.18`, not `^1.6.16`): `@nettrek/c2pa-hls-bridge@0.5.0`
+is not compatible with 1.7.x's parallelised init-segment loading. Confirmed by bisecting the
+exact dependency version, nothing else: with 1.7.2 installed, `C2paHlsBridge.onFragLoading`
+throws (`Cannot read properties of null (reading 'callbacks')`) and every fragment thereafter
+fails with "Missing initSegment for fragment", on otherwise-identical code. Re-widening this
+range needs the bridge to actually be verified against 1.7.x first.
+
 **Validation engines:**
 - Monolithic and HLS validate, by default, via the WebCrypto engine (`@nettrek/c2pa-web-crypto`) rather than the WASM engine (`@contentauth/c2pa-web`) that ships as those libraries' default. This sidesteps a bundler/WASM-integrity mismatch under this repo's dependency tree — see the comments in `runtimes/monolithicBridgeRuntime.ts` and `runtimes/hlsBridgeRuntime.ts`. HLS still falls back to WASM in browsers without `crypto.subtle`.
 - Monolithic MP4 has a second, independent runtime, `runtimes/monolithicC2paWebRuntime.ts`, selectable via `?monolithicEngine=c2pa-web`. It calls this repo's own root-pinned `@contentauth/c2pa-web` directly rather than through `@nettrek/c2pa-hls-bridge`, so it never touches that bridge's nested copy of the package and isn't subject to the SRI mismatch above.
