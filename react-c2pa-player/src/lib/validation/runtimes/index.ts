@@ -17,3 +17,4 @@
 export { DashBridgeRuntime } from './dashBridgeRuntime';
 export { HlsBridgeRuntime } from './hlsBridgeRuntime';
 export { MonolithicBridgeRuntime } from './monolithicBridgeRuntime';
+export { MonolithicC2paWebRuntime } from './monolithicC2paWebRuntime';

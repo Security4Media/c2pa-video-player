@@ -1,0 +1,116 @@
+/*
+ * Copyright 2026 European Broadcasting Union
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+.player-config-panel {
+  background: var(--color-background);
+  border-radius: var(--radius-lg);
+  padding: var(--space-xl);
+  margin-bottom: var(--space-2xl);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-sm);
+}
+
+.player-config-panel h3 {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-foreground);
+  margin-bottom: var(--space-xs);
+}
+
+.player-config-panel__hint {
+  font-size: var(--font-size-sm);
+  color: var(--color-foreground-muted);
+  margin-bottom: var(--space-lg);
+}
+
+.player-config-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-lg);
+}
+
+.player-config-control {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-foreground);
+  min-width: 180px;
+}
+
+.player-config-control select,
+.player-config-control input[type='number'] {
+  padding: var(--space-sm) var(--space-md);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-background);
+  color: var(--color-foreground);
+  font-size: var(--font-size-base);
+  font-family: var(--font-family-base);
+  min-height: var(--touch-target-min);
+}
+
+.player-config-control select:focus,
+.player-config-control input[type='number']:focus {
+  outline: none;
+  border-color: var(--ring-color);
+  box-shadow: 0 0 0 var(--ring-width) var(--ring-color);
+}
+
+.player-config-control select:disabled,
+.player-config-control input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.player-config-control--checkbox {
+  flex-direction: row;
+  align-items: center;
+  min-width: unset;
+}
+
+.player-config-control--checkbox input[type='checkbox'] {
+  width: 20px;
+  height: 20px;
+  cursor: pointer;
+}
+
+.player-config-control--checkbox input[type='checkbox']:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.player-config-subsection {
+  margin: var(--space-lg) 0 0;
+  padding: var(--space-lg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+.player-config-subsection legend {
+  padding: 0 var(--space-sm);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-foreground-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.player-config-subsection .player-config-grid {
+  margin-top: var(--space-xs);
+}

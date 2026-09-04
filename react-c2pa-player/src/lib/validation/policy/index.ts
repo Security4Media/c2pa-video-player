@@ -14,20 +14,44 @@
  * limitations under the License.
  */
 
-import type { CarriedSessionPolicy, ValidationPolicy } from '../types';
+import type { CarriedSessionPolicy, MonolithicEngine, ValidationPolicy } from '../types';
 import { resolveConsentMode, resolveShowAuthenticityLabel } from './authenticity';
 import { LocalTrustMaterialProvider } from './localTrustMaterialProvider';
 import {
   resolveEnforceValidatedPlayback,
   resolveLiveRetentionSeconds,
 } from './liveRetention';
-import { isTrustFixtureName, trustFixtures } from './trustFixtures';
+import { isTrustFixtureName, trustFixtures, type TrustFixtureName } from './trustFixtures';
 
 const defaultTrustMaterialProvider = new LocalTrustMaterialProvider();
 
 // Providers are cached per fixture so repeated loads reuse one fetch, and so a
 // fixture's material can never be served to a differently configured provider.
 const fixtureProviders = new Map<string, LocalTrustMaterialProvider>();
+
+const currentSearch = () => (typeof window === 'undefined' ? undefined : window.location.search);
+
+/**
+ * What `?trust=` currently resolves to, or `null` for the shipped policy
+ * (either because it's absent, unrecognised, or explicitly `full-prod`).
+ *
+ * Split out of `selectedTrustProvider` below so a caller that only wants to
+ * know *which* fixture is selected - e.g. to reflect it in a UI control -
+ * doesn't have to construct a `LocalTrustMaterialProvider` to find out.
+ */
+export function resolveTrustFixtureName(
+  search: string | undefined = currentSearch(),
+): TrustFixtureName | null {
+  if (!search) {
+    return null;
+  }
+
+  const requested = new URLSearchParams(search).get('trust');
+
+  return requested && isTrustFixtureName(requested) && requested !== 'full-prod'
+    ? requested
+    : null;
+}
 
 /**
  * `?trust=<fixture>` selects a trust policy other than the shipped one.
@@ -40,13 +64,9 @@ const fixtureProviders = new Map<string, LocalTrustMaterialProvider>();
  * typo loses the diagnostic, never the trust policy.
  */
 function selectedTrustProvider(): LocalTrustMaterialProvider {
-  if (typeof window === 'undefined') {
-    return defaultTrustMaterialProvider;
-  }
+  const requested = resolveTrustFixtureName();
 
-  const requested = new URLSearchParams(window.location.search).get('trust');
-
-  if (!requested || !isTrustFixtureName(requested) || requested === 'full-prod') {
+  if (!requested) {
     return defaultTrustMaterialProvider;
   }
 
@@ -65,10 +85,31 @@ function selectedTrustProvider(): LocalTrustMaterialProvider {
   return provider;
 }
 
+/**
+ * `?monolithicEngine=c2pa-web` swaps the monolithic MP4 validation runtime
+ * from the shipped one (`nettrek`) to an independent one that calls
+ * `@contentauth/c2pa-web` directly - see `MonolithicEngine` in `../types`.
+ *
+ * Only the exact value `c2pa-web` selects it; anything else, including a
+ * typo, keeps the shipped runtime, the same fallback direction `?trust=` uses.
+ */
+export function resolveMonolithicEngine(
+  search: string | undefined = currentSearch(),
+): MonolithicEngine {
+  if (!search) {
+    return 'nettrek';
+  }
+
+  return new URLSearchParams(search).get('monolithicEngine') === 'c2pa-web'
+    ? 'c2pa-web'
+    : 'nettrek';
+}
+
 export function createDefaultValidationPolicy(): ValidationPolicy {
   return {
     enableTrustVerification: true,
     trustMaterialProvider: selectedTrustProvider(),
+    monolithicEngine: resolveMonolithicEngine(),
     liveRetentionSeconds: resolveLiveRetentionSeconds(),
     enforceValidatedPlayback: resolveEnforceValidatedPlayback(),
     showAuthenticityLabel: resolveShowAuthenticityLabel(),
@@ -99,3 +140,4 @@ export {
   resolveEnforceValidatedPlayback,
   resolveLiveRetentionSeconds,
 } from './liveRetention';
+export { isTrustFixtureName, trustFixtures, type TrustFixtureName } from './trustFixtures';

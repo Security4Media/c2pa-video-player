@@ -16,9 +16,10 @@
 
 import { MonolithicC2PASession } from './monolithicSession';
 import { carriedSessionPolicy } from './policy';
-// Imported straight from its module rather than through the runtimes barrel,
-// which would pull hls.js and dash.js in alongside it.
+// Imported straight from their modules rather than through the runtimes
+// barrel, which would pull hls.js and dash.js in alongside them.
 import { MonolithicBridgeRuntime } from './runtimes/monolithicBridgeRuntime';
+import { MonolithicC2paWebRuntime } from './runtimes/monolithicC2paWebRuntime';
 import { detectAdapterKind } from './sourceDetection';
 import type {
   MediaSourceDescriptor,
@@ -51,9 +52,11 @@ export class MonolithicC2PAAdapter implements MediaValidationAdapter {
   }
 
   createSession(context: ValidationAdapterContext): ValidationSession {
-    return new MonolithicC2PASession(
-      new MonolithicBridgeRuntime(context),
-      carriedSessionPolicy(context.policy),
-    );
+    const runtime =
+      context.policy.monolithicEngine === 'c2pa-web'
+        ? new MonolithicC2paWebRuntime(context)
+        : new MonolithicBridgeRuntime(context);
+
+    return new MonolithicC2PASession(runtime, carriedSessionPolicy(context.policy));
   }
 }

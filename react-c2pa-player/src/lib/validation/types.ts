@@ -67,9 +67,26 @@ export interface TrustMaterialProvider {
   load(): Promise<TrustMaterial>;
 }
 
+/**
+ * Which validation runtime handles a monolithic MP4 source.
+ *
+ * `nettrek` (default) is the existing bridge-based runtime, shared with the
+ * HLS path, forced onto its WebCrypto engine because its own nested copy of
+ * `@contentauth/c2pa-web` hits an SRI mismatch under this repo's dependency
+ * tree. `c2pa-web` is an independent runtime that calls this repo's own
+ * root-pinned `@contentauth/c2pa-web` directly, sidestepping that mismatch
+ * entirely - see `runtimes/monolithicC2paWebRuntime.ts`.
+ */
+export type MonolithicEngine = 'nettrek' | 'c2pa-web';
+
 export interface ValidationPolicy {
   enableTrustVerification: boolean;
   trustMaterialProvider: TrustMaterialProvider;
+  /**
+   * Which runtime validates a monolithic MP4 source. HLS/DASH are unaffected
+   * - see `MonolithicEngine`.
+   */
+  monolithicEngine: MonolithicEngine;
   /**
    * How much of a live stream to remember, in seconds. Governs the timeline
    * window, the retained validation history and the per-segment metadata
