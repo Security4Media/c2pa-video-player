@@ -93,3 +93,24 @@
   cursor: not-allowed;
   opacity: 0.5;
 }
+
+.player-config-subsection {
+  margin: var(--space-lg) 0 0;
+  padding: var(--space-lg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+.player-config-subsection legend {
+  padding: 0 var(--space-sm);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-foreground-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.player-config-subsection .player-config-grid {
+  margin-top: var(--space-xs);
+}

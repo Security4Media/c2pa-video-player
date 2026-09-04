@@ -211,33 +211,6 @@ export function PlayerConfigPanel({ mediaSource, onApply }: PlayerConfigPanelPro
 
         <label
           className="player-config-control"
-          title={`How much of a live stream the player remembers: the timeline window, retained validation history, and failure log retention, in seconds. Values under ${MIN_LIVE_WINDOW_SECONDS} are ignored. Only applies to a live HLS/DASH source. (?window=)`}
-        >
-          Live retention window (s)
-          <input
-            type="number"
-            min={MIN_LIVE_WINDOW_SECONDS}
-            value={windowSeconds}
-            disabled={!isLiveCapableFormat}
-            onChange={(event) => handleWindowChange(Number(event.target.value))}
-          />
-        </label>
-
-        <label
-          className="player-config-control player-config-control--checkbox"
-          title="Holds the picture rather than show live content whose verdict hasn't arrived yet. On by default; unchecking is an escape hatch if validation stalls. Only applies to a live HLS/DASH source. (?gate=off when unchecked)"
-        >
-          <input
-            type="checkbox"
-            checked={gateEnabled}
-            disabled={!isLiveCapableFormat}
-            onChange={(event) => handleGateChange(event.target.checked)}
-          />
-          Validated-playback gate
-        </label>
-
-        <label
-          className="player-config-control"
           title="Which runtime validates a monolithic MP4 file. 'nettrek' (default) is the shipped bridge-based runtime, also used for HLS. 'c2pa-web' is an independent runtime that calls @contentauth/c2pa-web directly. Only applies to a monolithic (MP4) source. (?monolithicEngine=)"
         >
           Monolithic engine
@@ -251,6 +224,40 @@ export function PlayerConfigPanel({ mediaSource, onApply }: PlayerConfigPanelPro
           </select>
         </label>
       </div>
+
+      <fieldset className="player-config-subsection" disabled={!isLiveCapableFormat}>
+        <legend title="These only take effect on a live HLS/DASH source. Enabled here by format, not by confirmed liveness: whether a loaded HLS/DASH file actually is live is only known once its manifest is parsed.">
+          Live-only settings
+        </legend>
+        <div className="player-config-grid">
+          <label
+            className="player-config-control"
+            title={`How much of a live stream the player remembers: the timeline window, retained validation history, and failure log retention, in seconds. Values under ${MIN_LIVE_WINDOW_SECONDS} are ignored. Only applies to a live HLS/DASH source. (?window=)`}
+          >
+            Live retention window (s)
+            <input
+              type="number"
+              min={MIN_LIVE_WINDOW_SECONDS}
+              value={windowSeconds}
+              disabled={!isLiveCapableFormat}
+              onChange={(event) => handleWindowChange(Number(event.target.value))}
+            />
+          </label>
+
+          <label
+            className="player-config-control player-config-control--checkbox"
+            title="Holds the picture rather than show live content whose verdict hasn't arrived yet. On by default; unchecking is an escape hatch if validation stalls. Only applies to a live HLS/DASH source. (?gate=off when unchecked)"
+          >
+            <input
+              type="checkbox"
+              checked={gateEnabled}
+              disabled={!isLiveCapableFormat}
+              onChange={(event) => handleGateChange(event.target.checked)}
+            />
+            Validated-playback gate
+          </label>
+        </div>
+      </fieldset>
     </div>
   );
 }

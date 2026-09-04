@@ -20,9 +20,16 @@ the same change — a new `resolve*`/param is not complete without these:
    `README.md`. Update both together, in the same commit — not just the code
    comment, not just one of the two docs.
 3. **If the parameter only takes effect during live playback** (like
-   `?window=` and `?gate=`), disable the control unless
-   `detectAdapterKind(mediaSource)` is `'hls-fragmented-fmp4'` or
-   `'dash-fragmented-fmp4'`. This is a format-capability approximation, not
+   `?window=` and `?gate=`), put its control inside the panel's "Live-only
+   settings" `<fieldset>` (not among the general controls), and disable it
+   unless `detectAdapterKind(mediaSource)` is `'hls-fragmented-fmp4'` or
+   `'dash-fragmented-fmp4'`. Disable both the individual control's own
+   `disabled` prop *and* the fieldset — a fieldset's `disabled` attribute
+   does not propagate to a descendant control's `.disabled` IDL property
+   (verified: it affects interactivity and the `:disabled` CSS pseudo-class,
+   but `input.disabled` reads back `false` regardless), so the fieldset
+   alone is not enough for anything that reads the property, including this
+   panel's own browser test. This is a format-capability approximation, not
    true per-manifest liveness — whether a specific loaded HLS/DASH file
    actually *is* live is only known after its manifest is parsed, deep
    inside the player, and isn't exposed outside it as of this writing. Don't
