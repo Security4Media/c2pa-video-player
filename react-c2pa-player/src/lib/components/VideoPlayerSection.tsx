@@ -42,6 +42,15 @@ interface VideoPlayerSectionProps {
   onStatusUpdate: (type: PlayerStatus, message: string) => void;
   onStreamInfo: (message: string) => void;
   children?: ReactNode;
+  /**
+   * Bump this (e.g. `n => n + 1`) to force the player to remount and
+   * re-initialize C2PA validation even though `mediaSource` hasn't changed -
+   * e.g. after a player-config control changes something
+   * `createDefaultValidationPolicy()` reads from the URL, which is otherwise
+   * only re-read on the next source change. Defaults to `0`, so a host that
+   * never passes it sees no behaviour change.
+   */
+  reloadToken?: number;
 }
 
 export const VideoPlayerSection = memo(function VideoPlayerSection({
@@ -52,9 +61,11 @@ export const VideoPlayerSection = memo(function VideoPlayerSection({
   onStatusUpdate,
   onStreamInfo,
   children,
+  reloadToken = 0,
 }: VideoPlayerSectionProps) {
   // Track current video source to detect changes and force remount
   const currentSourceRef = useRef<string>('');
+  const reloadTokenRef = useRef(reloadToken);
   const playerReadyRef = useRef(false);
   const [videoKey, setVideoKey] = useState(0);
   const adapterRegistry = useMemo(() => createDefaultValidationAdapterRegistry(), []);
@@ -91,21 +102,26 @@ export const VideoPlayerSection = memo(function VideoPlayerSection({
     },
   });
   
-  // Detect source changes and update key to force VideoJS remount
+  // Detect source changes (or an explicit reload request) and update key to
+  // force VideoJS remount
   useEffect(() => {
-    if (currentSource && currentSource !== currentSourceRef.current) {
-      console.log('[VideoPlayerSection] Source changed, will remount player:', currentSourceRef.current, '->', currentSource);
+    const sourceChanged = currentSource && currentSource !== currentSourceRef.current;
+    const reloadRequested = reloadToken !== reloadTokenRef.current;
+
+    if (sourceChanged || reloadRequested) {
+      console.log('[VideoPlayerSection] Remounting player:', { sourceChanged, reloadRequested });
       currentSourceRef.current = currentSource;
+      reloadTokenRef.current = reloadToken;
       setVideoKey(prev => prev + 1);
       playerReadyRef.current = false;
-      
+
       // Reset C2PA immediately when source changes
       if (c2paInitialized) {
         console.log('[VideoPlayerSection] Resetting C2PA for new video source');
         resetC2PA();
       }
     }
-  }, [currentSource, c2paInitialized, resetC2PA]);
+  }, [currentSource, reloadToken, c2paInitialized, resetC2PA]);
 
   // Store C2PA functions in refs to avoid recreating callback
   const c2paFunctionsRef = useRef({ initializeC2PA, resetC2PA, c2paInitialized });

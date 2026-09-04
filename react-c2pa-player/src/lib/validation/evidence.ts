@@ -143,22 +143,36 @@ function identityFromFailures(
   return state === 'Trusted' ? 'Trusted' : 'Valid';
 }
 
-/** Evidence from the WASM engine's per-code lists. */
+/**
+ * Evidence from the WASM engine's per-code lists.
+ *
+ * `declaredOverallState` is the store's own top-level `validation_state`,
+ * when it declared one alongside the coded lists. Preferred over re-deriving
+ * from `success`/`failure` when present: this engine's `signingCredential.trusted`
+ * fires for a signer found on the allow-list alone, not only for one that
+ * chains to an anchor, so "no failures and at least one success" is not
+ * enough to tell 'Trusted' (anchored) from 'Valid' (merely allow-listed) -
+ * the store's own verdict already makes that distinction correctly. Only
+ * falls back to the old success/failure-based guess when the store declares
+ * nothing, which is what every synthetic/mocked store below still exercises.
+ */
 function fromCodedResults(
   success: readonly RawStatus[],
   failure: readonly RawStatus[],
   manifest: Manifest | null,
+  declaredOverallState: PlayerValidationState | null = null,
 ): ValidationEvidence {
   const failures = toFailures(failure);
   const nonIdentityFailures = failures.filter((entry) => entry.scope !== 'identity');
 
   const state: PlayerValidationState = nonIdentityFailures.length > 0
     ? 'Invalid'
-    : success.length > 0
-      ? 'Trusted'
-      : failures.length > 0
-        ? 'Valid'
-        : 'Invalid';
+    : declaredOverallState
+      ?? (success.length > 0
+        ? 'Trusted'
+        : failures.length > 0
+          ? 'Valid'
+          : 'Invalid');
 
   if (!hasIdentityAssertion(manifest)) {
     return { state, failures, identity: 'Absent' };
@@ -222,7 +236,7 @@ export function readStoreEvidence(manifestStore: ManifestStore | null | undefine
   const failure = (coded?.failure ?? []) as RawStatus[];
 
   if (coded && hasCodedResults(success, failure)) {
-    return fromCodedResults(success, failure, activeManifest);
+    return fromCodedResults(success, failure, activeManifest, declaredState(manifestStore.validation_state));
   }
 
   const statuses = (manifestStore.validation_status ?? []) as RawStatus[];

@@ -21,6 +21,7 @@ import { PlayerStats } from '../../lib/components/PlayerStats';
 import { VideoPlayerSection } from '../../lib/components/VideoPlayerSection';
 import { VideoNavigationControls } from '../../lib/components/VideoNavigationControls';
 import { VideoModeSwitcher } from '../../lib/components/VideoModeSwitcher';
+import { PlayerConfigPanel } from '../components/PlayerConfigPanel';
 import '@/lib/styles/design-tokens.css';
 import './StandalonePlayerPage.css';
 import ebuLogo from '../assets/logos/ebu-logo-dark.svg';
@@ -104,6 +105,14 @@ export function StandalonePlayerPage() {
   const [navigateToVideo, setNavigateToVideo] = useState<((videoKey: string) => void) | null>(
     null
   );
+
+  // Bumped by PlayerConfigPanel after it updates the URL, to force the
+  // currently loaded video to remount and pick up the new policy without a
+  // full page reload.
+  const [reloadToken, setReloadToken] = useState(0);
+  const handleConfigApplied = useCallback(() => {
+    setReloadToken((token) => token + 1);
+  }, []);
 
   const updateStatus = useCallback((type: PlayerStatus, message: string) => {
     setPlayerStatus(type);
@@ -316,6 +325,8 @@ export function StandalonePlayerPage() {
           <h2>NAB SHOW 2026</h2>
         </div>
 
+        <PlayerConfigPanel mediaSource={mediaSource} onApply={handleConfigApplied} />
+
         <VideoLoader
           mp4Url={mp4Url}
           selectedVideo={selectedVideo}
@@ -344,6 +355,7 @@ export function StandalonePlayerPage() {
           onDurationChange={handleDurationChange}
           onStatusUpdate={updateStatus}
           onStreamInfo={updateStreamInfo}
+          reloadToken={reloadToken}
         >
           <VideoNavigationControls
             availableVideos={filteredVideos}

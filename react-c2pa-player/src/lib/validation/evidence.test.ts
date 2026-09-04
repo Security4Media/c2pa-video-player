@@ -52,11 +52,13 @@ function wasmStore(
   success: { code: string; url?: string }[],
   failure: { code: string; url?: string }[] = [],
   manifest: unknown = withIdentity,
+  declaredState?: string,
 ): ManifestStore {
   return {
     active_manifest: 'm',
     manifests: { m: manifest },
     validation_results: { activeManifest: { success, failure } },
+    ...(declaredState ? { validation_state: declaredState } : {}),
   } as unknown as ManifestStore;
 }
 
@@ -171,6 +173,56 @@ describe('readStoreEvidence, WASM shape', () => {
   it('condemns the asset on a non-identity failure', () => {
     const evidence = readStoreEvidence(
       wasmStore([{ code: 'claimSignature.validated' }], [{ code: 'assertion.hashedURI.mismatch' }]),
+    );
+
+    expect(evidence.state).toBe('Invalid');
+  });
+
+  it(
+    "prefers the store's own declared state over success.length, since this engine's " +
+      'signingCredential.trusted fires for a signer found on the allow-list alone, not only ' +
+      'one that chains to an anchor',
+    () => {
+      // Reproduces a real asset (PTS_TRUSTED_premiere_wmk_cawg_c2pa.mp4 under the
+      // shipped trust profile): the claim signature itself is trusted, no
+      // non-identity failure exists, yet the store's own verdict is 'Valid'
+      // because the signer only chains via the allow-list, not an anchor.
+      // Reading success.length > 0 as 'Trusted' here was wrong - measured
+      // against the real engine, not invented.
+      const evidence = readStoreEvidence(
+        wasmStore(
+          [{ code: 'signingCredential.trusted', url: 'self#jumbf=/c2pa/urn:c2pa:x/c2pa.signature' }],
+          [],
+          withIdentity,
+          'Valid',
+        ),
+      );
+
+      expect(evidence.state).toBe('Valid');
+    },
+  );
+
+  it('still reaches Trusted when the store declares it and nothing failed', () => {
+    const evidence = readStoreEvidence(
+      wasmStore(
+        [{ code: 'signingCredential.trusted', url: 'self#jumbf=/c2pa/urn:c2pa:x/c2pa.signature' }],
+        [],
+        withIdentity,
+        'Trusted',
+      ),
+    );
+
+    expect(evidence.state).toBe('Trusted');
+  });
+
+  it('lets a non-identity failure override even a declared Trusted state', () => {
+    const evidence = readStoreEvidence(
+      wasmStore(
+        [{ code: 'claimSignature.validated' }],
+        [{ code: 'assertion.hashedURI.mismatch' }],
+        withIdentity,
+        'Trusted',
+      ),
     );
 
     expect(evidence.state).toBe('Invalid');

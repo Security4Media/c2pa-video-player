@@ -47,7 +47,8 @@
         "test:authenticity": "node tests/browser/authenticityLabel.mjs",
         "test:seams": "node tests/browser/timelineSeams.mjs",
         "test:trust": "python3 scripts/verify_trust_bundles.py",
-        "test:trust-profiles": "node tests/browser/trustProfileProbe.mjs"
+        "test:trust-profiles": "node tests/browser/trustProfileProbe.mjs",
+        "test:config-panel": "node tests/browser/playerConfigPanel.mjs"
     },
     "dependencies": {
         "@contentauth/c2pa-web": "^0.7.1",

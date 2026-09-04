@@ -34,7 +34,21 @@ export {
   normalizeHlsManifestHelper,
   normalizeMonolithicManifestStore,
 } from './normalization';
-export { createDefaultValidationPolicy, LocalTrustMaterialProvider } from './policy';
+export {
+  createDefaultValidationPolicy,
+  isTrustFixtureName,
+  LocalTrustMaterialProvider,
+  resolveConsentMode,
+  resolveEnforceValidatedPlayback,
+  resolveLiveRetentionSeconds,
+  resolveMonolithicEngine,
+  resolveShowAuthenticityLabel,
+  resolveTrustFixtureName,
+  trustFixtures,
+  DEFAULT_LIVE_RETENTION_SECONDS,
+  MIN_LIVE_WINDOW_SECONDS,
+  type TrustFixtureName,
+} from './policy';
 export {
   getActiveManifest,
   getDashSegmentValidationState,
@@ -57,6 +71,7 @@ export type {
   MediaSourceDescriptor,
   MediaSourceOrigin,
   MediaValidationAdapter,
+  MonolithicEngine,
   NormalizedC2PAResult,
   PlayerValidationState,
   SegmentIntegrityStatus,

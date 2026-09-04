@@ -21,7 +21,8 @@ serves as the source for a standalone Docker image (see the root `Dockerfile`).
 - `policy/localTrustMaterialProvider.ts` loads the local trust anchor/allow-list files and merges them with a remote community trust-anchor list, failing open to local-only if that fetch is unreachable (offline/air-gapped use).
 
 **Validation engines:**
-- Monolithic and HLS validate via the WebCrypto engine (`@nettrek/c2pa-web-crypto`) rather than the WASM engine (`@contentauth/c2pa-web`) that ships as those libraries' default. This sidesteps a bundler/WASM-integrity mismatch under this repo's dependency tree — see the comments in `runtimes/monolithicBridgeRuntime.ts` and `runtimes/hlsBridgeRuntime.ts`. HLS still falls back to WASM in browsers without `crypto.subtle`.
+- Monolithic and HLS validate, by default, via the WebCrypto engine (`@nettrek/c2pa-web-crypto`) rather than the WASM engine (`@contentauth/c2pa-web`) that ships as those libraries' default. This sidesteps a bundler/WASM-integrity mismatch under this repo's dependency tree — see the comments in `runtimes/monolithicBridgeRuntime.ts` and `runtimes/hlsBridgeRuntime.ts`. HLS still falls back to WASM in browsers without `crypto.subtle`.
+- Monolithic MP4 has a second, independent runtime, `runtimes/monolithicC2paWebRuntime.ts`, selectable via `?monolithicEngine=c2pa-web`. It calls this repo's own root-pinned `@contentauth/c2pa-web` directly rather than through `@nettrek/c2pa-hls-bridge`, so it never touches that bridge's nested copy of the package and isn't subject to the SRI mismatch above.
 - DASH validates via `@qualabs/c2pa-live-dashjs-plugin` (dash.js + `@svta/cml-c2pa`), which performs cryptographic/structural checks only — no trust-anchor evaluation — so DASH segments are capped at `'Valid'`, never `'Trusted'` (see `rules.ts#getDashSegmentValidationState`).
 
 **Player UI** (`src/lib/C2paPlayer-V2/`): the timeline is a legacy imperative Video.js/DOM integration, not a React tree, bridged into a small React-rendered menu (`C2paMenu/`) and friction-warning modal (`C2paFrictionModal/`) via a hand-rolled external store (`C2PAPlayerRoot.types.ts` — `getState`/`setState`/`subscribe`, no context/hooks). Clicking a non-Valid/Trusted timeline segment opens the menu into that fragment's own manifest or integrity verdict instead of the live/current status.
@@ -100,19 +101,41 @@ and real HLS/DASH streams.
 
 ## Runtime parameters
 
-Query-string only, and each one defaults to the behaviour a deployment gets
-without it. There is no UI surface for any of them: they exist so the states can
-be demonstrated and tested against the same asset, rather than by hunting for
-content whose certificate happens to be in the right state.
+Query-string switches, each defaulting to the behaviour a deployment gets
+without it. They exist so the states below can be demonstrated and tested
+against the same asset, rather than by hunting for content whose certificate
+happens to be in the right state. The demo app's Player Config panel
+(`src/demo/components/PlayerConfigPanel.tsx`) gives all of them a visual
+control with a hover tooltip — the URL is still the source of truth, the
+panel just reads and writes it.
 
 | Parameter | Default | What it does |
 |---|---|---|
 | `?trust=<profile>` | `full-prod` | Swaps the trust material for one of the profiles in `policy/trustFixtures.ts`, so trusted / valid / untrusted outcomes can be shown on one file. Unrecognised values fall back to the shipped policy, which is the safe direction: a typo loses the diagnostic, never the trust policy. See the table below. |
-| `?window=<seconds>` | 300 | How much of a live stream the player remembers: the width of the timeline window, the retained validation history, and the failure retention in the validation log. Values under 60 are ignored. |
-| `?gate=off` | on | Turns off the validated-playback gate, which otherwise holds the picture rather than show live content whose verdict has not arrived. Only the exact value `off` disables it, since a switch that fails open on a typo is the wrong way round for a protection. |
+| `?window=<seconds>` | 300 | How much of a live stream the player remembers: the width of the timeline window, the retained validation history, and the failure retention in the validation log. Values under 60 are ignored. Live only — see note below. |
+| `?gate=off` | on | Turns off the validated-playback gate, which otherwise holds the picture rather than show live content whose verdict has not arrived. Only the exact value `off` disables it, since a switch that fails open on a typo is the wrong way round for a protection. Live only — see note below. |
 | `?label=on` | off | Shows the authenticity label in the top-right of the picture, stating the provenance of the moment on screen. Green "Authenticity established" and blue "Valid" collapse to a dot after five seconds; red "Invalid Authenticity" and grey "Unknown provenance" stay expanded and pulse. Clicking it pauses and opens the Content Credentials panel. |
 | `?consent=per-stream` | `whole-asset` | Asks once, the first time invalid content is actually played, and never again for that source. The overlay says outright that this is the only warning. |
 | `?consent=per-run` | `whole-asset` | Asks once per contiguous stretch of invalid content, so a second bad stretch stops the picture again. |
+| `?monolithicEngine=c2pa-web` | `nettrek` | Swaps the monolithic MP4 validation runtime from the shipped bridge-based one to an independent runtime that calls `@contentauth/c2pa-web` directly (see `runtimes/monolithicC2paWebRuntime.ts`). Has no effect on HLS/DASH. |
+
+`?window=` and `?gate=` only ever affect a live source — both are no-ops on
+VOD (`validatedPlaybackGate.ts`, `liveResume.ts`). The demo panel disables
+both unless the loaded source's *format* can be live (HLS/DASH); it can't
+know a specific HLS/DASH file actually *is* live before its manifest is
+parsed, so that's an approximation, not a guarantee the control does
+something. Likewise the panel disables `?monolithicEngine=` unless the
+loaded source is a monolithic MP4, since that's the only format it affects.
+
+`?monolithicEngine=c2pa-web` can reach a different verdict than the shipped
+engine on the same asset with the same trust material — measured on
+`PTS_TRUSTED_premiere_wmk_cawg_c2pa.mp4` with `?trust=full-dev`: the shipped
+bridge reaches `Trusted`, this runtime stays at `Valid`, even with identical
+trust anchors confirmed fed to both. That is the two engines' own
+certificate-chain logic disagreeing, not a bug in how this repo wires trust
+material to either of them — part of the point of exposing the switch is
+making that kind of disagreement visible rather than hiding it behind one
+shipped engine.
 
 ### Choosing a trust profile
 
