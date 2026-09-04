@@ -1,6 +1,6 @@
 {
     "name": "@security4media/c2pa-player",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "private": false,
     "type": "module",
     "description": "EBU C2PA video player: a React component and pluggable validation-adapter framework for Content Credentials playback",
