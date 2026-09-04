@@ -27,6 +27,7 @@ export { selectClaimGenerator } from './claimGeneratorSelectors';
 export { selectAiOptOutSection } from './aiOptOutSelectors';
 export {
     selectClaimGeneratorSection,
+    selectCopyrightSection,
     selectHistorySection,
     selectOrganizationSection,
     selectWorkSection,

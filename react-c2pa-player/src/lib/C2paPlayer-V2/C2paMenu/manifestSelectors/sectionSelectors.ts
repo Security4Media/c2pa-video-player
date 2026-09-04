@@ -18,6 +18,7 @@ import { Manifest, ManifestStore } from '@contentauth/c2pa-web';
 import type { AdapterKind } from '@/lib/validation';
 import {
     ClaimGeneratorSectionItem,
+    CopyrightSectionItem,
     HistorySectionItem,
     OrganizationSectionItem,
     WorkSectionItem,
@@ -100,6 +101,31 @@ export function selectOrganizationSection(
  * @param manifestStore - Optional manifest store used to compute CAWG status
  * @returns Structured work section data, or null when no author or role data exists
  */
+/**
+ * Select the copyright/credit section model, derived from the schema.org
+ * shape of `cawg.metadata` (copyrightHolder, publisher, creditText,
+ * copyrightNotice). `selectOrganizationIdentity` only populates this field
+ * when the referencing `cawg.identity` is Trusted, so this section is null
+ * (and hidden) for any lesser verdict.
+ *
+ * @param manifest - The manifest containing CAWG assertions
+ * @param manifestStore - Optional manifest store used to compute CAWG validation status
+ * @returns Structured copyright section data, or null when absent or not Trusted
+ */
+export function selectCopyrightSection(
+    manifest: Manifest,
+    manifestStore?: ManifestStore,
+    adapterKind?: AdapterKind | null,
+): CopyrightSectionItem | null {
+    const cawg = selectOrganizationIdentity(manifest, manifestStore, adapterKind);
+
+    if (!cawg?.copyright) {
+        return null;
+    }
+
+    return { copyright: cawg.copyright };
+}
+
 export function selectWorkSection(
     manifest: Manifest,
     manifestStore?: ManifestStore,

@@ -25,6 +25,7 @@ import {
     resolveManifestStoreFromSource,
     selectAiOptOutSection,
     selectClaimGeneratorSection,
+    selectCopyrightSection,
     selectHistorySection,
     selectOrganizationSection,
     selectSignatureIssuer,
@@ -34,6 +35,7 @@ import {
 import type {
     AiOptOutSectionItem,
     ClaimGeneratorSectionItem,
+    CopyrightSectionItem,
     HistorySectionItem,
     OrganizationSectionItem,
     WorkSectionItem,
@@ -44,6 +46,7 @@ export const c2paMenuSectionTitles = {
     summaryDate: 'Issued on',
     claimGenerator: 'App or device used',
     organization: 'Organization Identity',
+    copyright: 'Copyright',
     work: 'About the Producer',
     aiOptOut: 'About Training and Data mining',
     history: 'History of provenance',
@@ -65,6 +68,7 @@ export interface C2paMenuSections {
     summary: SummarySectionItem;
     claimGenerator: ClaimGeneratorSectionItem | null;
     organization: OrganizationSectionItem | null;
+    copyright: CopyrightSectionItem | null;
     work: WorkSectionItem | null;
     aiOptOut: AiOptOutSectionItem | null;
     history: HistorySectionItem | null;
@@ -273,6 +277,11 @@ export function buildMenuRenderState(
                 selectorManifestStore ?? undefined,
                 c2paStatus?.adapterKind,
             ),
+            copyright: selectCopyrightSection(
+                activeManifest,
+                selectorManifestStore ?? undefined,
+                c2paStatus?.adapterKind,
+            ),
             work: selectWorkSection(
                 activeManifest,
                 selectorManifestStore ?? undefined,
@@ -303,6 +312,7 @@ function buildInvalidOnlySections(alert: string | null): C2paMenuSections {
         },
         claimGenerator: null,
         organization: null,
+        copyright: null,
         work: null,
         aiOptOut: null,
         history: null,
@@ -354,6 +364,7 @@ function buildSegmentMenuRenderState(
                 },
                 claimGenerator: null,
                 organization: null,
+                copyright: null,
                 work: null,
                 aiOptOut: null,
                 history: null,
@@ -388,6 +399,11 @@ function buildSegmentMenuRenderState(
             },
             claimGenerator: selectClaimGeneratorSection(activeManifest),
             organization: selectOrganizationSection(
+                activeManifest,
+                selectorManifestStore ?? undefined,
+                adapterKind,
+            ),
+            copyright: selectCopyrightSection(
                 activeManifest,
                 selectorManifestStore ?? undefined,
                 adapterKind,
