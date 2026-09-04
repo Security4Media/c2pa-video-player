@@ -200,6 +200,8 @@ export const C2PAPlayer = function (
         handleOnSeeking,
         updateC2PATimeline,
         replaceC2PATimelineSegments,
+        getIssuerAccentColor,
+        getIssuerName,
         renderWholeAssetVerdict,
         disposeTimeline,
     } = getTimelineFunctions(openMenuOnSegment);
@@ -571,6 +573,9 @@ export const C2PAPlayer = function (
             // whose verdicts have already been pruned behind it.
             const retentionSeconds = snapshot?.liveRetentionSeconds;
             dvrWindowSeconds = snapshot?.dvrWindowSeconds ?? null;
+            // Live only - see replaceC2PATimelineSegments's own doc comment;
+            // a VOD asset has one signer for its whole duration.
+            const colorizeByIssuer = Boolean(snapshot?.colorizeTimelineByIssuer) && isLive;
 
             if (c2paControlBar && (wholeAssetInvalid || ownsFullTimeline || isOrdinaryForwardTick)) {
                 if (wholeAssetInvalid) {
@@ -588,6 +593,7 @@ export const C2PAPlayer = function (
                         c2paControlBar,
                         isLive,
                         retentionSeconds,
+                        colorizeByIssuer,
                     );
                 } else {
                     handleC2PAValidation(
@@ -636,14 +642,24 @@ export const C2PAPlayer = function (
             const consentMidPlayback = consentMode !== 'whole-asset';
 
             if (showLabel || consentMidPlayback) {
+                const verdict = selectPlayheadVerdict({
+                    segments: snapshot?.timelineSegments,
+                    time: currentTime,
+                    ownsTimeline: ownsFullTimeline,
+                    wholeAssetInvalid,
+                    fallbackState: snapshot?.result?.validationState ?? null,
+                });
+
                 authenticityInputs = {
-                    verdict: selectPlayheadVerdict({
-                        segments: snapshot?.timelineSegments,
-                        time: currentTime,
-                        ownsTimeline: ownsFullTimeline,
-                        wholeAssetInvalid,
-                        fallbackState: snapshot?.result?.validationState ?? null,
-                    }),
+                    verdict,
+                    // Same assigner the timeline paints from (getIssuerAccentColor
+                    // reads it once per tick here, since this is a single call
+                    // rather than a per-segment render pass), so the label always
+                    // matches whichever colour is under the playhead.
+                    issuerAccentColor: colorizeByIssuer
+                        ? getIssuerAccentColor(verdict.segment)
+                        : null,
+                    issuerName: colorizeByIssuer ? getIssuerName(verdict.segment) : null,
                     labelEnabled: showLabel,
                     consentMode,
                     isLive,

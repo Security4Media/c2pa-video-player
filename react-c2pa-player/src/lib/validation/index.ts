@@ -38,6 +38,7 @@ export {
   createDefaultValidationPolicy,
   isTrustFixtureName,
   LocalTrustMaterialProvider,
+  resolveColorizeTimelineByIssuer,
   resolveConsentMode,
   resolveEnforceValidatedPlayback,
   resolveLiveRetentionSeconds,

@@ -16,6 +16,7 @@
 
 import type { CarriedSessionPolicy, MonolithicEngine, ValidationPolicy } from '../types';
 import { resolveConsentMode, resolveShowAuthenticityLabel } from './authenticity';
+import { resolveColorizeTimelineByIssuer } from './issuerColors';
 import { LocalTrustMaterialProvider } from './localTrustMaterialProvider';
 import {
   resolveEnforceValidatedPlayback,
@@ -114,6 +115,7 @@ export function createDefaultValidationPolicy(): ValidationPolicy {
     enforceValidatedPlayback: resolveEnforceValidatedPlayback(),
     showAuthenticityLabel: resolveShowAuthenticityLabel(),
     consentMode: resolveConsentMode(),
+    colorizeTimelineByIssuer: resolveColorizeTimelineByIssuer(),
   };
 }
 
@@ -129,11 +131,13 @@ export function carriedSessionPolicy(policy: ValidationPolicy): CarriedSessionPo
     enforceValidatedPlayback: policy.enforceValidatedPlayback,
     showAuthenticityLabel: policy.showAuthenticityLabel,
     consentMode: policy.consentMode,
+    colorizeTimelineByIssuer: policy.colorizeTimelineByIssuer,
   };
 }
 
 export { LocalTrustMaterialProvider };
 export { resolveConsentMode, resolveShowAuthenticityLabel } from './authenticity';
+export { resolveColorizeTimelineByIssuer } from './issuerColors';
 export {
   DEFAULT_LIVE_RETENTION_SECONDS,
   MIN_LIVE_WINDOW_SECONDS,

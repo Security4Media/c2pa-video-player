@@ -14,10 +14,14 @@
  * limitations under the License.
  */
 
-import { useEffect, useRef, useState } from 'react';
+import { type CSSProperties, useEffect, useRef, useState } from 'react';
 import type { AuthenticityLabelView } from './authenticityGate';
 
 const EXIT_DURATION_MS = 240;
+
+type AccentColorStyle = CSSProperties & {
+    '--c2pa-label-colour'?: string;
+};
 
 interface C2paAuthenticityLabelProps {
     /** What to say, or null to say nothing. See authenticityGate.ts. */
@@ -124,6 +128,18 @@ export function C2paAuthenticityLabel({ label, onClick }: C2paAuthenticityLabelP
                     ]
                         .filter(Boolean)
                         .join(' ')}
+                    // An inline custom property outranks the per-state class
+                    // rules in authenticity-label.css that set the same one
+                    // (`--c2pa-label-colour`), so this is the only change
+                    // needed to match the timeline's issuer colour - falls
+                    // back to the shared verdict colour the moment
+                    // accentColor is null (feature off, Invalid, Unknown, or
+                    // no resolvable issuer).
+                    style={
+                        shown.accentColor
+                            ? ({ '--c2pa-label-colour': shown.accentColor } as AccentColorStyle)
+                            : undefined
+                    }
                     // Stated in words, and in full even when collapsed, so the
                     // verdict is never carried by colour alone.
                     aria-label={`${shown.text}. Show content credentials.`}

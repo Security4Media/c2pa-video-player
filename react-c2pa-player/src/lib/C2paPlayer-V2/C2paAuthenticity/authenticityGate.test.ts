@@ -43,6 +43,8 @@ const inputs = (
   event: 'tick',
   labelEnabled: true,
   consentMode: 'per-run',
+  issuerAccentColor: null,
+  issuerName: null,
   isLive: false,
   dvrDepthSeconds: null,
   alreadyPausedSeconds: 0,
@@ -95,6 +97,89 @@ describe('what the label says', () => {
       'Invalid Authenticity',
       'Unknown provenance',
     ]);
+  });
+
+  it('carries the issuer accent colour through to the label, unmodified', () => {
+    const [withColor] = play([
+      { verdict: verdict('Trusted'), issuerAccentColor: '#3b82f6', nowMs: 0 },
+    ]);
+    const [withoutColor] = play([{ verdict: verdict('Trusted'), nowMs: 0 }]);
+
+    expect(withColor.label?.accentColor).toBe('#3b82f6');
+    expect(withoutColor.label?.accentColor).toBeNull();
+  });
+
+  it('says nothing about a colour when there is no label to show', () => {
+    const [decision] = play([
+      { verdict: verdict(null), issuerAccentColor: '#3b82f6', nowMs: 0 },
+    ]);
+
+    expect(decision.label).toBeNull();
+  });
+
+  it('names the issuer in a Valid label', () => {
+    const [decision] = play([
+      { verdict: verdict('Valid'), issuerName: 'Westdeutscher Rundfunk Intermediate', nowMs: 0 },
+    ]);
+
+    expect(decision.label?.text).toBe('Valid, signed by Westdeutscher Rundfunk Intermediate');
+  });
+
+  it('does not name an issuer for Trusted, even when one is given', () => {
+    // Trusted already states the strongest claim this player makes; the
+    // extra qualifier is reserved for Valid, where knowing who claims to
+    // have signed it is the more useful thing to say.
+    const [decision] = play([
+      { verdict: verdict('Trusted'), issuerName: 'Westdeutscher Rundfunk Intermediate', nowMs: 0 },
+    ]);
+
+    expect(decision.label?.text).toBe('Authenticity established');
+  });
+
+  it('reads as plain "Valid" when no issuer is resolvable', () => {
+    const [decision] = play([{ verdict: verdict('Valid'), issuerName: null, nowMs: 0 }]);
+
+    expect(decision.label?.text).toBe('Valid');
+  });
+
+  it('restarts the collapse timer when the issuer changes, even though the state does not', () => {
+    const decisions = play([
+      { verdict: verdict('Valid'), issuerName: 'Unified Tutorial Intermediate', nowMs: 0 },
+      { verdict: verdict('Valid'), issuerName: 'Unified Tutorial Intermediate', nowMs: COLLAPSE_MS - 1 },
+      // Same Valid verdict, but the stream has rotated to a different signer.
+      {
+        verdict: verdict('Valid'),
+        issuerName: 'Westdeutscher Rundfunk Intermediate',
+        nowMs: COLLAPSE_MS,
+      },
+    ]);
+
+    expect(decisions[1].label?.expanded).toBe(true);
+    // Would have collapsed by now under the *first* issuer's timer - the
+    // change re-expands it instead, with the new name, same as a fresh verdict.
+    expect(decisions[2].label).toMatchObject({
+      expanded: true,
+      text: 'Valid, signed by Westdeutscher Rundfunk Intermediate',
+    });
+  });
+
+  it('does not restart the timer when the same issuer is reported again', () => {
+    const decisions = play([
+      { verdict: verdict('Valid'), issuerName: 'Unified Tutorial Intermediate', nowMs: 0 },
+      { verdict: verdict('Valid'), issuerName: 'Unified Tutorial Intermediate', nowMs: 2000 },
+      { verdict: verdict('Valid'), issuerName: 'Unified Tutorial Intermediate', nowMs: 5100 },
+    ]);
+
+    expect(decisions[2].label?.expanded).toBe(false);
+  });
+
+  it('holds the issuer name across the same brief coverage gap the state is held across', () => {
+    const decisions = play([
+      { verdict: verdict('Valid'), issuerName: 'Unified Tutorial Intermediate', nowMs: 0 },
+      { verdict: verdict(null), issuerName: null, nowMs: 500 },
+    ]);
+
+    expect(decisions[1].label?.text).toBe('Valid, signed by Unified Tutorial Intermediate');
   });
 
   it('collapses a reassuring label after five seconds', () => {

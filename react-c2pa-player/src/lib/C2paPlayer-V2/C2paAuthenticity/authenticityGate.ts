@@ -50,6 +50,12 @@ import type { PlayheadVerdict } from '../C2paTimeline/playheadVerdict';
  * sentence is not left sitting over the picture. Invalid and Unknown do not
  * collapse at all: a warning that shrinks itself after five seconds is a
  * warning the viewer can miss.
+ *
+ * The timer restarts on any change to what the label says - a new verdict,
+ * or (for Valid) a new issuer under `?issuerColors=on` - so a viewer who has
+ * stopped looking gets a fresh five seconds to notice each one, and the
+ * pill's own CSS transitions (authenticity-label.css) carry the re-expand
+ * and re-collapse smoothly rather than jumping.
  */
 const LABEL_EXPANDED_MS = 5000;
 
@@ -97,7 +103,16 @@ export const LABEL_TEXT: Record<PlayerValidationState, string> = {
 export interface AuthenticityGateState {
   /** The verdict the label is showing, or null for no label at all. */
   labelState: PlayerValidationState | null;
-  /** When `labelState` was entered, for the collapse timer. */
+  /**
+   * The issuer named in a Valid label, or null (not shown for any other
+   * state - see the text-building logic below). Tracked separately from
+   * `labelState` so a change of issuer *without* a change of state (still
+   * Valid, but the stream has rotated to a different signer) is also
+   * something `labelSinceMs` resets for - the viewer is told exactly once
+   * per issuer, not once per verdict.
+   */
+  labelIssuerName: string | null;
+  /** When `labelState` (or `labelIssuerName`) last changed, for the collapse timer. */
   labelSinceMs: number;
   /** When a verdict last covered the playhead, for the grace above. */
   lastVerdictAtMs: number;
@@ -147,6 +162,22 @@ export interface AuthenticityGateInputs {
   labelEnabled: boolean;
   /** `?consent=`. `whole-asset` leaves this gate doing nothing. */
   consentMode: ConsentMode;
+  /**
+   * The colour the timeline is painting the playhead's segment under
+   * `?issuerColors=on`, or null when that doesn't apply (feature off, not
+   * live, Invalid/Unknown, or no resolvable issuer). The caller resolves
+   * this from the same segment `verdict` already carries, using the same
+   * assigner the timeline itself paints from - see main.ts.
+   */
+  issuerAccentColor: string | null;
+  /**
+   * The issuer signing the playhead's segment under `?issuerColors=on`, or
+   * null when that doesn't apply - same conditions as `issuerAccentColor`,
+   * resolved by the same caller. Only ever named in the label for a Valid
+   * verdict (see the text-building logic below); carried for every state so
+   * this input shape doesn't depend on what `verdict.state` turns out to be.
+   */
+  issuerName: string | null;
   isLive: boolean;
   /** What the origin retains, or null when unknown. */
   dvrDepthSeconds: number | null;
@@ -161,6 +192,12 @@ export interface AuthenticityLabelView {
   expanded: boolean;
   /** Invalid and Unknown, which do not collapse and do not stop pulsing. */
   glowing: boolean;
+  /**
+   * Overrides the verdict's usual colour to match the timeline under
+   * `?issuerColors=on`, or null to use the shared per-state colour as
+   * before. See `AuthenticityGateInputs.issuerAccentColor`.
+   */
+  accentColor: string | null;
 }
 
 export interface AuthenticityGateDecision {
@@ -199,6 +236,7 @@ export interface AuthenticityGateDecision {
 export function initialAuthenticityGateState(nowMs: number): AuthenticityGateState {
   return {
     labelState: null,
+    labelIssuerName: null,
     labelSinceMs: nowMs,
     lastVerdictAtMs: Number.NEGATIVE_INFINITY,
     answeredRunStart: null,
@@ -262,9 +300,22 @@ export function advanceAuthenticityGate(
   const withinGrace = nowMs - state.lastVerdictAtMs < NO_VERDICT_GRACE_MS;
   const effective =
     verdict.state ?? (withinGrace ? state.labelState : null);
+  // Named only for a genuinely Valid verdict, and held across the same grace
+  // window as the state itself - otherwise a momentary coverage gap would
+  // read as "the issuer changed" and re-trigger the expand/collapse below
+  // for no real reason.
+  const effectiveIssuerName =
+    verdict.state !== null
+      ? verdict.state === 'Valid'
+        ? inputs.issuerName
+        : null
+      : withinGrace
+        ? state.labelIssuerName
+        : null;
 
-  if (effective !== state.labelState) {
+  if (effective !== state.labelState || effectiveIssuerName !== state.labelIssuerName) {
     state.labelState = effective;
+    state.labelIssuerName = effectiveIssuerName;
     state.labelSinceMs = nowMs;
   }
 
@@ -272,12 +323,17 @@ export function advanceAuthenticityGate(
 
   if (labelEnabled && state.labelState !== null) {
     const warning = isWarning(state.labelState);
+    const baseText = LABEL_TEXT[state.labelState];
 
     label = {
       state: state.labelState,
-      text: LABEL_TEXT[state.labelState],
+      text:
+        state.labelState === 'Valid' && state.labelIssuerName
+          ? `${baseText}, signed by ${state.labelIssuerName}`
+          : baseText,
       expanded: warning || nowMs - state.labelSinceMs < LABEL_EXPANDED_MS,
       glowing: warning,
+      accentColor: inputs.issuerAccentColor,
     };
   }
 

@@ -15,7 +15,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { DashSegmentMetadataReader, segmentNumberFromUrl } from './dashSegmentMetadata';
+import { DashSegmentMetadataReader } from './dashSegmentMetadata';
 
 type Listener = (record: { manifest?: unknown }) => void;
 
@@ -53,83 +53,106 @@ const manifest = (title: string) => ({
 
 const reader = (
   pipeline: ReturnType<typeof stubPipeline>['pipeline'],
-  maxRetainedSegments?: number,
+  maxPendingPerMediaType?: number,
 ) =>
   new DashSegmentMetadataReader(
     pipeline as unknown as ConstructorParameters<typeof DashSegmentMetadataReader>[0],
-    maxRetainedSegments,
+    maxPendingPerMediaType,
   );
 
-describe('segmentNumberFromUrl', () => {
-  it('reads the number both pipelines agree on', () => {
-    expect(segmentNumberFromUrl('https://x/dash/channel1-video=1200000-465701125.m4s')).toBe(465701125);
-  });
-
-  it('copes with a query string', () => {
-    expect(segmentNumberFromUrl('https://x/seg-42.m4s?token=abc')).toBe(42);
-  });
-
-  it('returns null for anything that is not a numbered segment', () => {
-    expect(segmentNumberFromUrl('https://x/channel1-video=1200000.dash')).toBeNull();
-    expect(segmentNumberFromUrl('https://x/manifest.mpd')).toBeNull();
-    expect(segmentNumberFromUrl(undefined)).toBeNull();
-  });
-});
-
 describe('DashSegmentMetadataReader', () => {
-  it('keeps each segment\'s own manifest, not the last one seen', async () => {
+  it('joins by arrival order, not by an identifier', async () => {
     const { pipeline } = stubPipeline((i) => manifest(`title-${i}`));
     const subject = reader(pipeline);
 
-    await subject.read(1, new Uint8Array(), 'video');
-    await subject.read(2, new Uint8Array(), 'video');
+    await subject.read(new Uint8Array(), 'video');
+    await subject.read(new Uint8Array(), 'video');
 
-    expect(subject.get(1)).toMatchObject({ assertions: [{ data: { 'dc:title': 'title-1' } }] });
-    expect(subject.get(2)).toMatchObject({ assertions: [{ data: { 'dc:title': 'title-2' } }] });
+    expect(subject.takeNext('video')).toMatchObject({
+      assertions: [{ data: { 'dc:title': 'title-0' } }],
+    });
+    expect(subject.takeNext('video')).toMatchObject({
+      assertions: [{ data: { 'dc:title': 'title-1' } }],
+    });
   });
 
-  it('returns null for a segment it has not read', async () => {
+  it('keeps separate media types from interleaving', async () => {
+    const { pipeline } = stubPipeline((i) => manifest(`title-${i}`));
+    const subject = reader(pipeline);
+
+    await subject.read(new Uint8Array(), 'video');
+    await subject.read(new Uint8Array(), 'audio');
+
+    expect(subject.takeNext('video')).toMatchObject({
+      assertions: [{ data: { 'dc:title': 'title-0' } }],
+    });
+    expect(subject.takeNext('audio')).toMatchObject({
+      assertions: [{ data: { 'dc:title': 'title-1' } }],
+    });
+  });
+
+  it('returns null once the queue for a media type is drained', async () => {
     const { pipeline } = stubPipeline(() => manifest('x'));
     const subject = reader(pipeline);
 
-    expect(subject.get(99)).toBeNull();
+    expect(subject.takeNext('video')).toBeNull();
+
+    await subject.read(new Uint8Array(), 'video');
+    subject.takeNext('video');
+
+    expect(subject.takeNext('video')).toBeNull();
   });
 
-  it('records nothing when the segment carries no manifest', async () => {
-    const { pipeline } = stubPipeline(() => null);
+  it('queues a miss (not a skip) when a segment carries no manifest, keeping later draws aligned', async () => {
+    const { pipeline } = stubPipeline((i) => (i === 0 ? null : manifest(`title-${i}`)));
     const subject = reader(pipeline);
 
-    await subject.read(1, new Uint8Array(), 'video');
+    await subject.read(new Uint8Array(), 'video');
+    await subject.read(new Uint8Array(), 'video');
 
-    expect(subject.get(1)).toBeNull();
+    expect(subject.takeNext('video')).toBeNull();
+    expect(subject.takeNext('video')).toMatchObject({
+      assertions: [{ data: { 'dc:title': 'title-1' } }],
+    });
   });
 
-  it('survives a pipeline that throws, since metadata must not break playback', async () => {
+  it('queues a miss (not a skip) when the pipeline throws, since metadata must not break playback', async () => {
+    let calls = 0;
     const failing = {
       controller: { on: () => undefined },
       async route() {
-        throw new Error('validator exploded');
+        calls += 1;
+        if (calls === 1) {
+          throw new Error('validator exploded');
+        }
       },
     };
     const subject = reader(failing as unknown as ReturnType<typeof stubPipeline>['pipeline']);
 
-    await expect(subject.read(1, new Uint8Array(), 'video')).resolves.toBeUndefined();
-    expect(subject.get(1)).toBeNull();
+    await expect(subject.read(new Uint8Array(), 'video')).resolves.toBeUndefined();
+    await subject.read(new Uint8Array(), 'video');
+
+    expect(subject.takeNext('video')).toBeNull();
+    // The second read's manifest is still null here (the stub never sets one
+    // on success), but it must be a second, distinct queue entry rather than
+    // the first read's failure leaving nothing queued at all.
+    expect(subject.takeNext('video')).toBeNull();
+    expect(subject.takeNext('video')).toBeNull();
   });
 
-  it('forgets the oldest once the cache is full, so a long stream stays bounded', async () => {
-    // Cap stated here rather than inherited, so the case is about eviction
-    // and not about whatever the configured retention happens to be.
+  it('drops the oldest pending entry once a media type exceeds its bound, so a desync cannot grow unbounded', async () => {
     const { pipeline } = stubPipeline((i) => manifest(`title-${i}`));
     const subject = reader(pipeline, 10);
 
+    // Read far more than the bound without ever draining, simulating the
+    // primary pipeline having stalled or desynced.
     for (let i = 0; i < 15; i += 1) {
-      await subject.read(i, new Uint8Array(), 'video');
+      await subject.read(new Uint8Array(), 'video');
     }
 
-    expect(subject.get(0)).toBeNull();
-    expect(subject.get(4)).toBeNull();
-    expect(subject.get(14)).not.toBeNull();
+    expect(subject.takeNext('video')).toMatchObject({
+      assertions: [{ data: { 'dc:title': 'title-5' } }],
+    });
   });
 
   it('reads nothing more once disposed', async () => {
@@ -137,9 +160,9 @@ describe('DashSegmentMetadataReader', () => {
     const subject = reader(pipeline);
 
     subject.dispose();
-    await subject.read(1, new Uint8Array(), 'video');
+    await subject.read(new Uint8Array(), 'video');
 
     expect(routed).toHaveLength(0);
-    expect(subject.get(1)).toBeNull();
+    expect(subject.takeNext('video')).toBeNull();
   });
 });

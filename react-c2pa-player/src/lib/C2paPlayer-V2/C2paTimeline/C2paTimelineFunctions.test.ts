@@ -15,11 +15,22 @@
  */
 
 import { describe, expect, it } from 'vitest';
+import type { Manifest } from '@contentauth/c2pa-web';
+import type { C2PATimelineSegmentUpdate } from '@/lib/types/c2pa.types';
 import { MIN_LIVE_WINDOW_SECONDS } from '@/lib/validation/policy/liveRetention';
 import {
+  getSegmentColor,
+  getTimelineFunctions,
   getTimelineWindow,
   LIVE_WINDOW_SECONDS,
 } from './C2paTimelineFunctions';
+
+const COLORS = {
+  trusted: 'GREEN',
+  passed: 'BLUE',
+  failed: 'RED',
+  unknown: 'GREY',
+};
 
 /** What positionTimelineSegment does with a window, as a percentage of the bar. */
 const place = (
@@ -187,5 +198,173 @@ describe('placing segments in the window', () => {
     expect(place(window, 0, 25)).toEqual({ left: 0, width: 25 });
     expect(place(window, 25, 50)).toEqual({ left: 25, width: 25 });
     expect(place(window, 75, 100)).toEqual({ left: 75, width: 25 });
+  });
+});
+
+describe('getSegmentColor', () => {
+  it('is red for Invalid regardless of an issuer colour', () => {
+    expect(getSegmentColor('Invalid', false, COLORS, 'ISSUER')).toBe(COLORS.failed);
+    expect(getSegmentColor('false', false, COLORS, 'ISSUER')).toBe(COLORS.failed);
+    expect(getSegmentColor('Valid', true, COLORS, 'ISSUER')).toBe(COLORS.failed);
+  });
+
+  it('is grey for Unknown regardless of an issuer colour', () => {
+    expect(getSegmentColor('unknown', false, COLORS, 'ISSUER')).toBe(COLORS.unknown);
+  });
+
+  it('falls back to the shared verdict colour when no issuer colour applies', () => {
+    expect(getSegmentColor('Trusted', false, COLORS, null)).toBe(COLORS.trusted);
+    expect(getSegmentColor('Valid', false, COLORS, null)).toBe(COLORS.passed);
+  });
+
+  it('uses the issuer colour for a Trusted or Valid segment when one is given', () => {
+    expect(getSegmentColor('Trusted', false, COLORS, 'ISSUER')).toBe('ISSUER');
+    expect(getSegmentColor('Valid', false, COLORS, 'ISSUER')).toBe('ISSUER');
+  });
+});
+
+describe('getIssuerAccentColor (via getTimelineFunctions)', () => {
+  const PALETTE = ['blue-1', 'blue-2'] as const;
+
+  function manifestWithIssuer(issuer: string): Manifest {
+    return { label: 'urn:test', signature_info: { issuer } } as unknown as Manifest;
+  }
+
+  function segment(overrides: Partial<C2PATimelineSegmentUpdate> = {}): C2PATimelineSegmentUpdate {
+    return {
+      startTime: 0,
+      endTime: 4,
+      validationState: 'Valid',
+      ...overrides,
+    } as C2PATimelineSegmentUpdate;
+  }
+
+  it('is null with no segment', () => {
+    const { getIssuerAccentColor } = getTimelineFunctions();
+
+    expect(getIssuerAccentColor(null, PALETTE)).toBeNull();
+  });
+
+  it('is null for Invalid and Unknown, even when an issuer is resolvable', () => {
+    const { getIssuerAccentColor } = getTimelineFunctions();
+    const withIssuer = {
+      kind: 'single-manifest' as const,
+      manifest: manifestWithIssuer('Westdeutscher Rundfunk Intermediate'),
+      manifests: {},
+      validationState: 'Valid' as const,
+      validationErrors: [],
+    };
+
+    expect(
+      getIssuerAccentColor(segment({ validationState: 'Invalid', manifestRef: withIssuer }), PALETTE),
+    ).toBeNull();
+    expect(
+      getIssuerAccentColor(segment({ validationState: 'Unknown', manifestRef: withIssuer }), PALETTE),
+    ).toBeNull();
+  });
+
+  it('is null for a Valid segment with no resolvable issuer', () => {
+    const { getIssuerAccentColor } = getTimelineFunctions();
+
+    expect(getIssuerAccentColor(segment(), PALETTE)).toBeNull();
+    expect(getIssuerAccentColor(segment({ manifestRef: { kind: 'none' } }), PALETTE)).toBeNull();
+  });
+
+  it('assigns issuers a colour in first-seen order and stays stable for repeats', () => {
+    const { getIssuerAccentColor } = getTimelineFunctions();
+    const ref = (issuer: string) => ({
+      kind: 'single-manifest' as const,
+      manifest: manifestWithIssuer(issuer),
+      manifests: {},
+      validationState: 'Valid' as const,
+      validationErrors: [],
+    });
+
+    const wdr = segment({ manifestRef: ref('Westdeutscher Rundfunk Intermediate') });
+    const unified = segment({ manifestRef: ref('Unified Tutorial Intermediate') });
+
+    expect(getIssuerAccentColor(wdr, PALETTE)).toBe('blue-1');
+    expect(getIssuerAccentColor(unified, PALETTE)).toBe('blue-2');
+    // Same issuer again, even though it was not the most recently seen one.
+    expect(getIssuerAccentColor(wdr, PALETTE)).toBe('blue-1');
+  });
+
+  it('agrees on a colour whether asked from the timeline or the label', () => {
+    // Both the per-segment render path and main.ts's label logic call this
+    // same exposed function against the same assigner - this is the reason
+    // it is exposed at all, rather than each caller keeping its own map.
+    const { getIssuerAccentColor } = getTimelineFunctions();
+    const ref = {
+      kind: 'single-manifest' as const,
+      manifest: manifestWithIssuer('Unified Tutorial Intermediate'),
+      manifests: {},
+      validationState: 'Trusted' as const,
+      validationErrors: [],
+    };
+    const trusted = segment({ validationState: 'Trusted', manifestRef: ref });
+
+    const fromTimeline = getIssuerAccentColor(trusted, PALETTE);
+    const fromLabel = getIssuerAccentColor(trusted, PALETTE);
+
+    expect(fromTimeline).toBe(fromLabel);
+    expect(fromTimeline).toBe('blue-1');
+  });
+});
+
+describe('getIssuerName (via getTimelineFunctions)', () => {
+  function manifestWithIssuer(issuer: string): Manifest {
+    return { label: 'urn:test', signature_info: { issuer } } as unknown as Manifest;
+  }
+
+  function segment(overrides: Partial<C2PATimelineSegmentUpdate> = {}): C2PATimelineSegmentUpdate {
+    return {
+      startTime: 0,
+      endTime: 4,
+      validationState: 'Valid',
+      ...overrides,
+    } as C2PATimelineSegmentUpdate;
+  }
+
+  const ref = (issuer: string, validationState: 'Valid' | 'Trusted' | 'Invalid' = 'Valid') => ({
+    kind: 'single-manifest' as const,
+    manifest: manifestWithIssuer(issuer),
+    manifests: {},
+    validationState,
+    validationErrors: [],
+  });
+
+  it('is null with no segment', () => {
+    const { getIssuerName } = getTimelineFunctions();
+
+    expect(getIssuerName(null)).toBeNull();
+  });
+
+  it('resolves the issuer for a Valid or Trusted segment', () => {
+    const { getIssuerName } = getTimelineFunctions();
+
+    expect(
+      getIssuerName(
+        segment({ manifestRef: ref('Westdeutscher Rundfunk Intermediate') }),
+      ),
+    ).toBe('Westdeutscher Rundfunk Intermediate');
+    expect(
+      getIssuerName(
+        segment({ validationState: 'Trusted', manifestRef: ref('Unified Tutorial Intermediate', 'Trusted') }),
+      ),
+    ).toBe('Unified Tutorial Intermediate');
+  });
+
+  it('is null for Invalid and Unknown, even when an issuer is resolvable', () => {
+    const { getIssuerName } = getTimelineFunctions();
+    const withIssuer = ref('Westdeutscher Rundfunk Intermediate', 'Invalid');
+
+    expect(getIssuerName(segment({ validationState: 'Invalid', manifestRef: withIssuer }))).toBeNull();
+    expect(getIssuerName(segment({ validationState: 'Unknown', manifestRef: withIssuer }))).toBeNull();
+  });
+
+  it('is null for a Valid segment with no resolvable issuer', () => {
+    const { getIssuerName } = getTimelineFunctions();
+
+    expect(getIssuerName(segment())).toBeNull();
   });
 });
