@@ -51,7 +51,7 @@
         "test:config-panel": "node tests/browser/playerConfigPanel.mjs"
     },
     "dependencies": {
-        "@contentauth/c2pa-web": "^0.7.1",
+        "@contentauth/c2pa-web": "^0.11.0",
         "@nettrek/c2pa-hls-bridge": "^0.5.0",
         "@nettrek/c2pa-web-crypto": "^0.1.1",
         "@qualabs/c2pa-live-dashjs-plugin": "^1.2.0",
