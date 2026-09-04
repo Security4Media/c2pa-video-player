@@ -22,15 +22,19 @@
  * real - that the engine, the trust policy, the timeline and the menu agree.
  * Each case here costs 20 to 30 seconds, so this stays a smoke test.
  *
- * Trust outcomes are driven by `?trust=<fixture>` rather than by hunting for an
+ * Trust outcomes are driven by `?trust=<profile>` rather than by hunting for an
  * asset whose certificate happens to be in the right state, so the expectations
  * below do not rot as certificates expire.
+ *
+ * Two cases use `full-prod`, the shipped policy, rather than a profile. Those
+ * are the only ones that would notice the default changing.
  *
  * Not part of `npm test`: it needs a dev server, a Playwright browser, and (for
  * the HLS cases) the WDR test stream.
  *
  *   npm run dev -- --port 5199
  *   npm run test:browser
+ *   C2PA_TEST_ONLY='shipped policy' npm run test:browser   # one case
  */
 
 import { chromium } from 'playwright-core';
@@ -56,10 +60,16 @@ const PLAYBACK_RATE = 8;
  * matters is that the right colours are reachable and the wrong ones never are.
  */
 const CASES = [
+  // Deliberately the shipped policy rather than full-dev: this is real
+  // broadcaster content signed with production certificates, so it is the case
+  // that says a deployment with no query string still reports authentic live
+  // content as authentic. Measured, not assumed - it passes on trust/prod/
+  // alone, which is what makes the test-root demotion further down a
+  // demo-fixture problem rather than a production one.
   {
     name: 'HLS, fully trusted',
     url: WDR_STREAM,
-    trust: 'full',
+    trust: 'full-prod',
     expect: { overall: 'Trusted', identity: 'Trusted', shows: ['GREEN'], never: ['RED', 'BLUE'] },
   },
   {
@@ -85,7 +95,7 @@ const CASES = [
   {
     name: 'HLS, fragments tampered with',
     url: `${FIXTURES}/tampered-segs-corrupt/master.m3u8`,
-    trust: 'full',
+    trust: 'full-dev',
     // Both colours together are the point: the altered fragments go red while
     // the untouched one keeps its own verdict, which is what per-fragment
     // reporting means. Playback ends inside a tampered fragment, so the menu
@@ -95,20 +105,20 @@ const CASES = [
   {
     name: 'HLS, fragments stripped of their C2PA data',
     url: `${FIXTURES}/tampered-segs-stripped/master.m3u8`,
-    trust: 'full',
+    trust: 'full-dev',
     expect: { invalid: true, identity: null, shows: ['GREEN', 'RED'] },
   },
   {
     name: 'HLS, manifest tampered with',
     url: `${FIXTURES}/tampered-init/master.m3u8`,
-    trust: 'full',
+    trust: 'full-dev',
     // Nothing validates, so no fragment is ever shown as good.
     expect: { invalid: true, identity: null, shows: ['RED'], never: ['GREEN', 'BLUE'] },
   },
   {
     name: 'MP4, signed',
     url: `${MP4S}/PTS_TRUSTED_premiere_wmk_cawg_c2pa.mp4`,
-    trust: 'full',
+    trust: 'full-dev',
     // One verdict covers the whole file, so the bar carries it throughout.
     expect: { overall: 'Trusted', identity: 'Trusted', shows: ['GREEN'], never: ['RED'] },
   },
@@ -121,8 +131,26 @@ const CASES = [
   {
     name: 'MP4, manifest tampered with',
     url: `${MP4S}/TAMPERED_PTS_TRUSTED_premiere_wmk_cawg_c2pa.mp4`,
-    trust: 'full',
+    trust: 'full-dev',
     expect: { invalid: true, identity: null, shows: ['RED'], never: ['GREEN', 'BLUE'] },
+  },
+  // The guard on the shipped policy, and the pair to 'MP4, signed' above:
+  // the same asset, two profiles, two verdicts. Every other case here selects
+  // a profile, so none of them would notice if the default changed.
+  //
+  // This asset reaches Trusted only because trust/dev/ anchors the EBU *test*
+  // root, which was bisected rather than assumed: adding that one certificate
+  // to prod/trust_anchors.pem is sufficient and Adobe Product Services G4 on
+  // its own is not. Under the shipped policy it is Valid, and Valid is the
+  // right answer - the signature is sound and the claim signer is on the
+  // production allow-list, but nothing in a production trust list vouches for
+  // a test CA. If this case ever goes green, the test root has reached the
+  // shipped policy.
+  {
+    name: 'MP4, signed: NOT trusted under the shipped policy (test root declined)',
+    url: `${MP4S}/PTS_TRUSTED_premiere_wmk_cawg_c2pa.mp4`,
+    trust: 'full-prod',
+    expect: { overall: 'Valid', identity: 'Valid', shows: ['BLUE'], never: ['RED', 'GREEN'] },
   },
 ];
 
@@ -191,11 +219,23 @@ function compare(expected, actual) {
 }
 
 const browser = await chromium.launch({ headless: true });
+// A whole run is five minutes, which is too long to sit through when only
+// one case is in question. Substring match on the name, case-insensitive.
+const ONLY = process.env.C2PA_TEST_ONLY;
+const SELECTED = ONLY
+  ? CASES.filter((c) => c.name.toLowerCase().includes(ONLY.toLowerCase()))
+  : CASES;
+
+if (SELECTED.length === 0) {
+  console.error(`No case name contains ${JSON.stringify(ONLY)}.`);
+  process.exit(1);
+}
+
 let failed = 0;
 
 console.log(`\nTrust matrix against ${BASE}\n`);
 
-for (const testCase of CASES) {
+for (const testCase of SELECTED) {
   // A fresh context per case. Sharing one across ten multi-megabyte loads
   // starved the later pages until the app stopped rendering at all.
   const context = await browser.newContext();
@@ -222,5 +262,7 @@ for (const testCase of CASES) {
 }
 
 await browser.close();
-console.log(`\n${failed === 0 ? `all ${CASES.length} cases passed` : `${failed} of ${CASES.length} failed`}\n`);
+console.log(
+  `\n${failed === 0 ? `all ${SELECTED.length} cases passed` : `${failed} of ${SELECTED.length} failed`}\n`,
+);
 process.exit(failed === 0 ? 0 : 1);

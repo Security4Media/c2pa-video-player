@@ -35,7 +35,9 @@ const fixtureProviders = new Map<string, LocalTrustMaterialProvider>();
  * Present so the trusted / valid / untrusted outcomes can be demonstrated and
  * tested against the same asset, rather than by hunting for content whose
  * certificate happens to be in the right state. Unrecognised values fall back
- * to the shipped policy rather than failing, since this is a diagnostic.
+ * to the shipped policy rather than failing, since this is a diagnostic. That
+ * fallback direction is the safe one and is why it has not been changed: a
+ * typo loses the diagnostic, never the trust policy.
  */
 function selectedTrustProvider(): LocalTrustMaterialProvider {
   if (typeof window === 'undefined') {
@@ -44,7 +46,7 @@ function selectedTrustProvider(): LocalTrustMaterialProvider {
 
   const requested = new URLSearchParams(window.location.search).get('trust');
 
-  if (!requested || !isTrustFixtureName(requested) || requested === 'full') {
+  if (!requested || !isTrustFixtureName(requested) || requested === 'full-prod') {
     return defaultTrustMaterialProvider;
   }
 
@@ -53,7 +55,11 @@ function selectedTrustProvider(): LocalTrustMaterialProvider {
   if (!provider) {
     provider = new LocalTrustMaterialProvider(trustFixtures[requested]);
     fixtureProviders.set(requested, provider);
-    console.warn(`[C2PA] Using the '${requested}' trust fixture, not the shipped trust policy.`);
+    // Stated as a warning rather than a log because every one of these
+    // profiles reports a different verdict from the deployed player, and
+    // full-dev in particular trusts test certificates. Anyone reading a
+    // verdict off a screen with one of these on should be able to tell.
+    console.warn(`[C2PA] Using the '${requested}' trust profile, not the shipped trust policy.`);
   }
 
   return provider;

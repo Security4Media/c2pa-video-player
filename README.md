@@ -69,7 +69,18 @@ npm run preview --workspace react-c2pa-player
 
 ## Trust Stores and Sample Media
 
-The repository includes trust configuration files under `trust/` and `react-c2pa-player/trust/`, plus demonstration media under `react-c2pa-player/public/mp4s/`. Review these assets before publishing a public release to confirm they are suitable for redistribution.
+Trust configuration lives in one place, `react-c2pa-player/trust/`, split into
+`prod/` (the pinned production bundle, which is what a deployment trusts),
+`tsa/` (timestamp-authority anchors, read by every profile) and `dev/` (test
+roots and broadcaster test identities, reachable only through
+`?trust=full-dev`). A duplicate `trust/` directory used to sit here at the
+repository root; it was read by no code and has been removed. See
+`react-c2pa-player/trust/README.md`.
+
+Demonstration media is under `react-c2pa-player/public/mp4s/`. Review both
+before publishing a public release to confirm they are suitable for
+redistribution: the media is third-party broadcaster content, and `dev/`
+contains test certificates belonging to named organisations.
 
 ## Roadmap
 

@@ -50,6 +50,38 @@ describe('buildTrustMaterial', () => {
     expect(buildTrustMaterial(sources()).cawgTrust.verifyTrustList).toBe(true);
   });
 
+  // The engine has one anchor pool: tsaTrustStore() spreads the caller's store
+  // and only narrows allowedEku and empties allowedEndEntities, so there is
+  // nowhere else to put a timestamp anchor. Asserted in both policies because
+  // the CAWG identity is timestamped too.
+  it('folds the timestamp anchors into the anchor pool, local and remote', () => {
+    const material = buildTrustMaterial(
+      sources({ tsaAnchors: 'TSA_LOCAL', remoteTsaAnchors: 'TSA_REMOTE' }),
+    );
+
+    for (const policy of [material.trust, material.cawgTrust]) {
+      expect(contains(policy.trustAnchors, 'ANCHORS')).toBe(true);
+      expect(contains(policy.trustAnchors, 'TSA_LOCAL')).toBe(true);
+      expect(contains(policy.trustAnchors, 'TSA_REMOTE')).toBe(true);
+    }
+  });
+
+  // They are anchors, not end-entities: the engine drops the allow-list when
+  // it evaluates a TSA chain, so a timestamp anchor that leaked into the
+  // allow-list would be inert rather than merely redundant.
+  it('keeps them out of the allow-lists', () => {
+    const material = buildTrustMaterial(sources({ tsaAnchors: 'TSA_LOCAL' }));
+
+    expect(contains(material.trust.allowedList, 'TSA_LOCAL')).toBe(false);
+    expect(contains(material.cawgTrust.allowedList, 'TSA_LOCAL')).toBe(false);
+  });
+
+  it('leaves the anchors alone when no timestamp material is supplied', () => {
+    const material = buildTrustMaterial(sources());
+
+    expect(material.trust.trustAnchors).toBe('ANCHORS');
+  });
+
   it('shares anchors between the two policies by default', () => {
     const material = buildTrustMaterial(sources());
 
