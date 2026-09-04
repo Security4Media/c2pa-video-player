@@ -310,3 +310,61 @@ describe('getIssuerAccentColor (via getTimelineFunctions)', () => {
     expect(fromTimeline).toBe('blue-1');
   });
 });
+
+describe('getIssuerName (via getTimelineFunctions)', () => {
+  function manifestWithIssuer(issuer: string): Manifest {
+    return { label: 'urn:test', signature_info: { issuer } } as unknown as Manifest;
+  }
+
+  function segment(overrides: Partial<C2PATimelineSegmentUpdate> = {}): C2PATimelineSegmentUpdate {
+    return {
+      startTime: 0,
+      endTime: 4,
+      validationState: 'Valid',
+      ...overrides,
+    } as C2PATimelineSegmentUpdate;
+  }
+
+  const ref = (issuer: string, validationState: 'Valid' | 'Trusted' | 'Invalid' = 'Valid') => ({
+    kind: 'single-manifest' as const,
+    manifest: manifestWithIssuer(issuer),
+    manifests: {},
+    validationState,
+    validationErrors: [],
+  });
+
+  it('is null with no segment', () => {
+    const { getIssuerName } = getTimelineFunctions();
+
+    expect(getIssuerName(null)).toBeNull();
+  });
+
+  it('resolves the issuer for a Valid or Trusted segment', () => {
+    const { getIssuerName } = getTimelineFunctions();
+
+    expect(
+      getIssuerName(
+        segment({ manifestRef: ref('Westdeutscher Rundfunk Intermediate') }),
+      ),
+    ).toBe('Westdeutscher Rundfunk Intermediate');
+    expect(
+      getIssuerName(
+        segment({ validationState: 'Trusted', manifestRef: ref('Unified Tutorial Intermediate', 'Trusted') }),
+      ),
+    ).toBe('Unified Tutorial Intermediate');
+  });
+
+  it('is null for Invalid and Unknown, even when an issuer is resolvable', () => {
+    const { getIssuerName } = getTimelineFunctions();
+    const withIssuer = ref('Westdeutscher Rundfunk Intermediate', 'Invalid');
+
+    expect(getIssuerName(segment({ validationState: 'Invalid', manifestRef: withIssuer }))).toBeNull();
+    expect(getIssuerName(segment({ validationState: 'Unknown', manifestRef: withIssuer }))).toBeNull();
+  });
+
+  it('is null for a Valid segment with no resolvable issuer', () => {
+    const { getIssuerName } = getTimelineFunctions();
+
+    expect(getIssuerName(segment())).toBeNull();
+  });
+});

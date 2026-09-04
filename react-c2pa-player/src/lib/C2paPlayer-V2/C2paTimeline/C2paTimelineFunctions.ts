@@ -175,6 +175,12 @@ export interface TimelineFunctions {
         segment: C2PATimelineSegmentUpdate | null,
         palette?: readonly string[],
     ) => string | null;
+    /**
+     * The issuer behind that same colour, for a caller (the authenticity
+     * label) that names it rather than only showing it. Null under the same
+     * conditions `getIssuerAccentColor` is.
+     */
+    getIssuerName: (segment: C2PATimelineSegmentUpdate | null) => string | null;
     renderWholeAssetVerdict: (
         verificationStatus: TimelineVerificationStatus,
         videoPlayer: TimelineVideoPlayer,
@@ -378,6 +384,24 @@ function resolveSegmentIssuer(segment: C2PATimelineSegmentUpdate): string | null
 }
 
 /**
+ * The issuer behind `getIssuerAccentColor`/`getIssuerName` alike: null for
+ * anything but a Trusted/Valid segment, since an issuer colour or name on an
+ * Invalid or Unknown one would read as vouching for content that failed or
+ * was never checked (see `getSegmentColor`'s own doc comment).
+ */
+function resolveGatedIssuer(segment: C2PATimelineSegmentUpdate | null): string | null {
+    if (!segment) {
+        return null;
+    }
+
+    if (segment.validationState !== 'Trusted' && segment.validationState !== 'Valid') {
+        return null;
+    }
+
+    return resolveSegmentIssuer(segment);
+}
+
+/**
  * Create the imperative timeline helpers used by the current Video.js-based
  * player. The rendering remains DOM-driven for now, but the contract is typed
  * so the next React migration step can build on stable state semantics.
@@ -406,17 +430,20 @@ export function getTimelineFunctions(
         segment: C2PATimelineSegmentUpdate | null,
         palette: readonly string[] = readIssuerPaletteColors(),
     ): string | null {
-        if (!segment) {
-            return null;
-        }
-
-        if (segment.validationState !== 'Trusted' && segment.validationState !== 'Valid') {
-            return null;
-        }
-
-        const issuer = resolveSegmentIssuer(segment);
+        const issuer = resolveGatedIssuer(segment);
 
         return issuer ? issuerAssigner.colorFor(issuer, palette) : null;
+    };
+
+    /**
+     * The issuer behind a Trusted/Valid segment's colour, for a caller (the
+     * authenticity label) that wants to name it rather than only show its
+     * colour. Null under the same conditions `getIssuerAccentColor` is.
+     */
+    const getIssuerName = function (
+        segment: C2PATimelineSegmentUpdate | null,
+    ): string | null {
+        return resolveGatedIssuer(segment);
     };
 
     const handleOnSeeked = function (time: number) {
@@ -1028,6 +1055,7 @@ export function getTimelineFunctions(
         updateC2PATimeline,
         replaceC2PATimelineSegments,
         getIssuerAccentColor,
+        getIssuerName,
         renderWholeAssetVerdict,
         disposeTimeline,
     };

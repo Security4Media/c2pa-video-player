@@ -201,6 +201,7 @@ export const C2PAPlayer = function (
         updateC2PATimeline,
         replaceC2PATimelineSegments,
         getIssuerAccentColor,
+        getIssuerName,
         renderWholeAssetVerdict,
         disposeTimeline,
     } = getTimelineFunctions(openMenuOnSegment);
@@ -658,6 +659,7 @@ export const C2PAPlayer = function (
                     issuerAccentColor: colorizeByIssuer
                         ? getIssuerAccentColor(verdict.segment)
                         : null,
+                    issuerName: colorizeByIssuer ? getIssuerName(verdict.segment) : null,
                     labelEnabled: showLabel,
                     consentMode,
                     isLive,
