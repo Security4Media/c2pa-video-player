@@ -1,0 +1,396 @@
+/*
+ * Copyright 2026 European Broadcasting Union
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+import type { ManifestStore } from '@contentauth/c2pa-web';
+import { describe, expect, it } from 'vitest';
+import {
+  classifyFailureScope,
+  condemnsWholeAsset,
+  readIngredientEvidence,
+  readReaderEvidence,
+  readStoreEvidence,
+  worstScope,
+} from './evidence';
+
+// Codes and URLs below are the ones the engines actually emitted against the
+// WDR test stream and its tampered fixtures, not invented examples.
+const IDENTITY_URL = 'self#jumbf=/c2pa/urn:c2pa:x/c2pa.assertions/cawg.identity';
+const BMFF_URL = 'self#jumbf=/c2pa/urn:c2pa:x/c2pa.assertions/c2pa.hash.bmff.v3';
+
+const withIdentity = { assertions: [{ label: 'cawg.identity' }] };
+const withoutIdentity = { assertions: [{ label: 'c2pa.actions.v2' }] };
+
+/** The WebCrypto engine's shape: a declared verdict plus failures only. */
+function webCryptoStore(
+  state: string,
+  statuses: { code: string; url?: string }[] = [],
+  manifest: unknown = withIdentity,
+): ManifestStore {
+  return {
+    active_manifest: 'm',
+    manifests: { m: manifest },
+    validation_state: state,
+    validation_status: statuses,
+  } as unknown as ManifestStore;
+}
+
+/** The WASM engine's shape: per-code success and failure lists. */
+function wasmStore(
+  success: { code: string; url?: string }[],
+  failure: { code: string; url?: string }[] = [],
+  manifest: unknown = withIdentity,
+  declaredState?: string,
+): ManifestStore {
+  return {
+    active_manifest: 'm',
+    manifests: { m: manifest },
+    validation_results: { activeManifest: { success, failure } },
+    ...(declaredState ? { validation_state: declaredState } : {}),
+  } as unknown as ManifestStore;
+}
+
+describe('classifyFailureScope', () => {
+  it('treats a BMFF hash mismatch as reaching one fragment', () => {
+    expect(classifyFailureScope('assertion.bmffHash.mismatch', BMFF_URL)).toBe('fragment');
+  });
+
+  it.each([
+    'assertion.hashedURI.mismatch',
+    'claimSignature.mismatch',
+    'signingCredential.untrusted',
+    'signingCredential.expired',
+  ])('treats %s as reaching the whole manifest', (code) => {
+    expect(classifyFailureScope(code)).toBe('manifest');
+  });
+
+  it('recognises the identity by its differentiated code (WebCrypto)', () => {
+    expect(classifyFailureScope('cawg.identity.untrusted')).toBe('identity');
+  });
+
+  it('recognises the identity by URL when the code is generic (WASM)', () => {
+    expect(classifyFailureScope('signingCredential.untrusted', IDENTITY_URL)).toBe('identity');
+  });
+});
+
+describe('readStoreEvidence, WebCrypto shape', () => {
+  it('reports a trusted asset with a trusted identity', () => {
+    const evidence = readStoreEvidence(webCryptoStore('Trusted'));
+
+    expect(evidence.state).toBe('Trusted');
+    expect(evidence.identity).toBe('Trusted');
+    expect(evidence.failures).toHaveLength(0);
+  });
+
+  it('reports a signed but untrusted asset as valid, not invalid', () => {
+    const evidence = readStoreEvidence(webCryptoStore('Valid'));
+
+    expect(evidence.state).toBe('Valid');
+    expect(evidence.identity).toBe('Valid');
+  });
+
+  it('keeps the identity separate from the media, so a tampered fragment does not condemn it', () => {
+    const evidence = readStoreEvidence(
+      webCryptoStore('Invalid', [{ code: 'assertion.bmffHash.mismatch', url: BMFF_URL }]),
+    );
+
+    expect(evidence.state).toBe('Invalid');
+    expect(evidence.failures[0].scope).toBe('fragment');
+    // No identity failure was reported, so the identity itself passed.
+    expect(evidence.identity).not.toBe('Invalid');
+  });
+
+  it('reports an untrusted identity as valid while the asset stays valid', () => {
+    const evidence = readStoreEvidence(
+      webCryptoStore('Valid', [{ code: 'cawg.identity.untrusted', url: IDENTITY_URL }]),
+    );
+
+    expect(evidence.state).toBe('Valid');
+    expect(evidence.identity).toBe('Valid');
+    expect(evidence.failures[0].scope).toBe('identity');
+  });
+
+  it('reports a malformed identity as invalid, unlike a merely untrusted one', () => {
+    const evidence = readStoreEvidence(
+      webCryptoStore('Valid', [{ code: 'cawg.identity.malformed', url: IDENTITY_URL }]),
+    );
+
+    expect(evidence.identity).toBe('Invalid');
+  });
+
+  it('says absent when the manifest declares no identity at all', () => {
+    expect(readStoreEvidence(webCryptoStore('Trusted', [], withoutIdentity)).identity).toBe('Absent');
+  });
+});
+
+describe('readStoreEvidence, WASM shape', () => {
+  it('needs a positive trusted code for the identity, which this engine emits', () => {
+    const evidence = readStoreEvidence(
+      wasmStore([
+        { code: 'cawg.identity.well-formed', url: IDENTITY_URL },
+        { code: 'signingCredential.trusted', url: IDENTITY_URL },
+      ]),
+    );
+
+    expect(evidence.state).toBe('Trusted');
+    expect(evidence.identity).toBe('Trusted');
+  });
+
+  it('reports a well-formed but untrusted identity as valid', () => {
+    const evidence = readStoreEvidence(
+      wasmStore(
+        [{ code: 'cawg.identity.well-formed', url: IDENTITY_URL }],
+        [{ code: 'signingCredential.untrusted', url: IDENTITY_URL }],
+      ),
+    );
+
+    expect(evidence.identity).toBe('Valid');
+  });
+
+  it('does not let an untrusted identity alone condemn the asset', () => {
+    const evidence = readStoreEvidence(
+      wasmStore(
+        [{ code: 'cawg.identity.well-formed', url: IDENTITY_URL }],
+        [{ code: 'signingCredential.untrusted', url: IDENTITY_URL }],
+      ),
+    );
+
+    expect(evidence.state).not.toBe('Invalid');
+  });
+
+  it('condemns the asset on a non-identity failure', () => {
+    const evidence = readStoreEvidence(
+      wasmStore([{ code: 'claimSignature.validated' }], [{ code: 'assertion.hashedURI.mismatch' }]),
+    );
+
+    expect(evidence.state).toBe('Invalid');
+  });
+
+  it(
+    "prefers the store's own declared state over success.length, since this engine's " +
+      'signingCredential.trusted fires for a signer found on the allow-list alone, not only ' +
+      'one that chains to an anchor',
+    () => {
+      // Reproduces a real asset (PTS_TRUSTED_premiere_wmk_cawg_c2pa.mp4 under the
+      // shipped trust profile): the claim signature itself is trusted, no
+      // non-identity failure exists, yet the store's own verdict is 'Valid'
+      // because the signer only chains via the allow-list, not an anchor.
+      // Reading success.length > 0 as 'Trusted' here was wrong - measured
+      // against the real engine, not invented.
+      const evidence = readStoreEvidence(
+        wasmStore(
+          [{ code: 'signingCredential.trusted', url: 'self#jumbf=/c2pa/urn:c2pa:x/c2pa.signature' }],
+          [],
+          withIdentity,
+          'Valid',
+        ),
+      );
+
+      expect(evidence.state).toBe('Valid');
+    },
+  );
+
+  it('still reaches Trusted when the store declares it and nothing failed', () => {
+    const evidence = readStoreEvidence(
+      wasmStore(
+        [{ code: 'signingCredential.trusted', url: 'self#jumbf=/c2pa/urn:c2pa:x/c2pa.signature' }],
+        [],
+        withIdentity,
+        'Trusted',
+      ),
+    );
+
+    expect(evidence.state).toBe('Trusted');
+  });
+
+  it('lets a non-identity failure override even a declared Trusted state', () => {
+    const evidence = readStoreEvidence(
+      wasmStore(
+        [{ code: 'claimSignature.validated' }],
+        [{ code: 'assertion.hashedURI.mismatch' }],
+        withIdentity,
+        'Trusted',
+      ),
+    );
+
+    expect(evidence.state).toBe('Invalid');
+  });
+});
+
+describe('stores assembled from an adapter verdict', () => {
+  // The menu builds one of these when an adapter reports a verdict rather than
+  // an engine payload; its `success: [{}]` is a placeholder, not a coded result.
+  const placeholderStore = (state: string) =>
+    ({
+      active_manifest: 'm',
+      manifests: { m: withIdentity },
+      validation_state: state,
+      validation_status: [],
+      validation_results: { activeManifest: { success: [{}], failure: [] } },
+    }) as unknown as ManifestStore;
+
+  it('is not read as "no trusted code present"', () => {
+    const evidence = readStoreEvidence(placeholderStore('Trusted'));
+
+    expect(evidence.state).toBe('Trusted');
+    expect(evidence.identity).toBe('Trusted');
+  });
+
+  it('still distinguishes an untrusted verdict', () => {
+    expect(readStoreEvidence(placeholderStore('Valid')).identity).toBe('Valid');
+  });
+});
+
+describe('readIngredientEvidence', () => {
+  const coded = (success: { code: string }[], failure: { code: string }[] = []) => ({
+    validation_results: { activeManifest: { success, failure } },
+  });
+
+  it('says unknown when the ingredient carries no evidence, rather than invalid', () => {
+    expect(readIngredientEvidence({}).state).toBe('Unknown');
+    expect(readIngredientEvidence(null).state).toBe('Unknown');
+  });
+
+  it('needs a trusted signer to call an ingredient trusted', () => {
+    expect(readIngredientEvidence(coded([{ code: 'signingCredential.trusted' }])).state).toBe('Trusted');
+  });
+
+  it('stops at valid when the ingredient validated but its signer is not trusted', () => {
+    expect(readIngredientEvidence(coded([{ code: 'ingredient.manifest.validated' }])).state).toBe('Valid');
+  });
+
+  it('keeps an untrusted signer at valid: intact provenance, just not vouched for', () => {
+    expect(readIngredientEvidence(coded([], [{ code: 'signingCredential.untrusted' }])).state).toBe('Valid');
+  });
+
+  it('reports a genuinely broken ingredient as invalid', () => {
+    expect(readIngredientEvidence(coded([], [{ code: 'assertion.hashedURI.mismatch' }])).state).toBe('Invalid');
+  });
+
+  it('applies the same leniency to a flat failure list', () => {
+    expect(readIngredientEvidence({ validation_status: [{ code: 'signingCredential.untrusted' }] }).state)
+      .toBe('Valid');
+    expect(readIngredientEvidence({ validation_status: [{ code: 'claimSignature.mismatch' }] }).state)
+      .toBe('Invalid');
+  });
+});
+
+describe('readReaderEvidence', () => {
+  const reader = (state: string | null, errors: { code: string; url?: string }[] = []) => ({
+    getManifestStoreValidationState: () => state,
+    getValidationErrors: () => errors,
+  });
+
+  it('takes the verdict the reader states', () => {
+    expect(readReaderEvidence(reader('Trusted')).state).toBe('Trusted');
+  });
+
+  it('falls back to invalid when the reader states nothing usable', () => {
+    expect(readReaderEvidence(reader(null)).state).toBe('Invalid');
+  });
+
+  it('scopes the reader\'s failures, which is how a fragment is told from the asset', () => {
+    const evidence = readReaderEvidence(
+      reader('Invalid', [{ code: 'assertion.bmffHash.mismatch', url: BMFF_URL }]),
+    );
+
+    expect(evidence.failures).toEqual([
+      { code: 'assertion.bmffHash.mismatch', scope: 'fragment', url: BMFF_URL },
+    ]);
+  });
+
+  it('reports unknown for a missing reader instead of guessing', () => {
+    expect(readReaderEvidence(null).state).toBe('Unknown');
+  });
+});
+
+describe('worstScope', () => {
+  const failure = (code: string, url?: string) => ({
+    code,
+    scope: classifyFailureScope(code, url),
+    ...(url ? { url } : {}),
+  });
+
+  it('is null when nothing failed, so the fragment is coloured by its verdict alone', () => {
+    expect(worstScope([])).toBeNull();
+  });
+
+  it('confines a BMFF hash mismatch to the fragment', () => {
+    // The tampered fixtures report exactly this on the fragments that were
+    // altered, and nothing on the ones that were not.
+    expect(worstScope([failure('assertion.bmffHash.mismatch', BMFF_URL)])).toBe('fragment');
+  });
+
+  it('lets a manifest failure condemn the asset', () => {
+    // Altering an assertion in the init manifest reports this on every
+    // fragment, including untouched ones.
+    expect(worstScope([failure('assertion.hashedURI.mismatch')])).toBe('manifest');
+  });
+
+  it('takes the worse scope when a fragment failure sits alongside a manifest one', () => {
+    expect(
+      worstScope([failure('assertion.bmffHash.mismatch', BMFF_URL), failure('claimSignature.mismatch')]),
+    ).toBe('manifest');
+  });
+
+  it('ignores an untrusted identity, which condemns neither', () => {
+    // Counting it painted the whole timeline red for content that is merely
+    // valid-but-untrusted.
+    expect(worstScope([failure('cawg.identity.untrusted', IDENTITY_URL)])).toBeNull();
+  });
+
+  it('still confines the fragment when an identity failure accompanies it', () => {
+    expect(
+      worstScope([
+        failure('assertion.bmffHash.mismatch', BMFF_URL),
+        failure('cawg.identity.untrusted', IDENTITY_URL),
+      ]),
+    ).toBe('fragment');
+  });
+});
+
+describe('condemnsWholeAsset', () => {
+  const fragment = (validationState: 'Trusted' | 'Valid' | 'Invalid', failureScope: 'fragment' | 'manifest' | null) =>
+    ({ validationState, failureScope }) as const;
+
+  it('leaves a clean asset alone', () => {
+    expect(condemnsWholeAsset([fragment('Trusted', null), fragment('Trusted', null)])).toBe(false);
+  });
+
+  it('condemns the asset when the manifest itself failed', () => {
+    // Altering an assertion in the init manifest reports this on every
+    // fragment, so one is enough.
+    expect(condemnsWholeAsset([fragment('Invalid', 'manifest')])).toBe(true);
+  });
+
+  it('does not condemn the asset for a tampered fragment', () => {
+    // Otherwise the whole timeline goes red and hides which parts were altered.
+    expect(
+      condemnsWholeAsset([fragment('Trusted', null), fragment('Invalid', 'fragment')]),
+    ).toBe(false);
+  });
+
+  it('does not condemn the asset for an untrusted signer', () => {
+    // Reported against the manifest, yet the verdict stays 'Valid': the content
+    // is intact and merely unvouched for. Scope alone painted this red.
+    expect(condemnsWholeAsset([fragment('Valid', 'manifest')])).toBe(false);
+  });
+
+  it('still condemns when a manifest failure sits among fragment ones', () => {
+    expect(
+      condemnsWholeAsset([fragment('Invalid', 'fragment'), fragment('Invalid', 'manifest')]),
+    ).toBe(true);
+  });
+});

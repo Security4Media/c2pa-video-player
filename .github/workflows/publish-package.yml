@@ -1,0 +1,67 @@
+name: Publish package
+
+on:
+  workflow_dispatch: {}
+  release:
+    types: [published]
+
+jobs:
+  publish-npm:
+    # workflow_dispatch is restricted to main; a release event fires from
+    # whatever tag release-please created and is always allowed through.
+    if: github.event_name == 'release' || github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+      - name: Set up Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: 'npm'
+          registry-url: 'https://npm.pkg.github.com'
+          scope: '@security4media'
+      - name: Install dependencies
+        run: npm ci
+      - name: Build library
+        run: npm run build-lib --workspace=react-c2pa-player
+      - name: Publish to GitHub Packages
+        run: npm publish --workspace=react-c2pa-player
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  publish-docker:
+    if: github.event_name == 'release' || github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+      - name: Determine image tag
+        id: image
+        run: |
+          owner="$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')"
+          version="${{ github.event.release.tag_name }}"
+          echo "owner=$owner" >> "$GITHUB_OUTPUT"
+          echo "version=${version:-manual-$(date +%s)}" >> "$GITHUB_OUTPUT"
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Log in to ghcr.io
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ghcr.io/${{ steps.image.outputs.owner }}/c2pa-player:latest
+            ghcr.io/${{ steps.image.outputs.owner }}/c2pa-player:${{ steps.image.outputs.version }}
