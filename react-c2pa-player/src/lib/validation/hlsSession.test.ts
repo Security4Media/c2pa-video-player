@@ -226,6 +226,7 @@ describe('HlsFragmentedFmp4Session', () => {
           enforceValidatedPlayback: false,
           showAuthenticityLabel: true,
           consentMode: 'per-run',
+          colorizeTimelineByIssuer: true,
         },
       );
 
@@ -233,6 +234,7 @@ describe('HlsFragmentedFmp4Session', () => {
         enforceValidatedPlayback: false,
         showAuthenticityLabel: true,
         consentMode: 'per-run',
+        colorizeTimelineByIssuer: true,
       });
     });
 

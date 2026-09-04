@@ -43,6 +43,7 @@ const inputs = (
   event: 'tick',
   labelEnabled: true,
   consentMode: 'per-run',
+  issuerAccentColor: null,
   isLive: false,
   dvrDepthSeconds: null,
   alreadyPausedSeconds: 0,
@@ -95,6 +96,24 @@ describe('what the label says', () => {
       'Invalid Authenticity',
       'Unknown provenance',
     ]);
+  });
+
+  it('carries the issuer accent colour through to the label, unmodified', () => {
+    const [withColor] = play([
+      { verdict: verdict('Trusted'), issuerAccentColor: '#3b82f6', nowMs: 0 },
+    ]);
+    const [withoutColor] = play([{ verdict: verdict('Trusted'), nowMs: 0 }]);
+
+    expect(withColor.label?.accentColor).toBe('#3b82f6');
+    expect(withoutColor.label?.accentColor).toBeNull();
+  });
+
+  it('says nothing about a colour when there is no label to show', () => {
+    const [decision] = play([
+      { verdict: verdict(null), issuerAccentColor: '#3b82f6', nowMs: 0 },
+    ]);
+
+    expect(decision.label).toBeNull();
   });
 
   it('collapses a reassuring label after five seconds', () => {

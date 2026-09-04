@@ -147,6 +147,14 @@ export interface AuthenticityGateInputs {
   labelEnabled: boolean;
   /** `?consent=`. `whole-asset` leaves this gate doing nothing. */
   consentMode: ConsentMode;
+  /**
+   * The colour the timeline is painting the playhead's segment under
+   * `?issuerColors=on`, or null when that doesn't apply (feature off, not
+   * live, Invalid/Unknown, or no resolvable issuer). The caller resolves
+   * this from the same segment `verdict` already carries, using the same
+   * assigner the timeline itself paints from - see main.ts.
+   */
+  issuerAccentColor: string | null;
   isLive: boolean;
   /** What the origin retains, or null when unknown. */
   dvrDepthSeconds: number | null;
@@ -161,6 +169,12 @@ export interface AuthenticityLabelView {
   expanded: boolean;
   /** Invalid and Unknown, which do not collapse and do not stop pulsing. */
   glowing: boolean;
+  /**
+   * Overrides the verdict's usual colour to match the timeline under
+   * `?issuerColors=on`, or null to use the shared per-state colour as
+   * before. See `AuthenticityGateInputs.issuerAccentColor`.
+   */
+  accentColor: string | null;
 }
 
 export interface AuthenticityGateDecision {
@@ -278,6 +292,7 @@ export function advanceAuthenticityGate(
       text: LABEL_TEXT[state.labelState],
       expanded: warning || nowMs - state.labelSinceMs < LABEL_EXPANDED_MS,
       glowing: warning,
+      accentColor: inputs.issuerAccentColor,
     };
   }
 
