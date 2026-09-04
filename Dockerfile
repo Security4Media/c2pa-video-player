@@ -4,7 +4,7 @@
 # back in at `docker run` time (e.g. -v ./mp4s:/usr/share/nginx/html/mp4s)
 # if a given deployment needs sample videos.
 
-FROM node:20-alpine AS builder
+FROM node:24-alpine AS builder
 WORKDIR /app
 
 COPY package.json package-lock.json ./

@@ -7,7 +7,7 @@
     "homepage": "https://Security4Media.github.io/c2pa-player/",
     "license": "Apache-2.0",
     "engines": {
-        "node": ">=20"
+        "node": ">=24"
     },
     "publishConfig": {
         "registry": "https://npm.pkg.github.com"
