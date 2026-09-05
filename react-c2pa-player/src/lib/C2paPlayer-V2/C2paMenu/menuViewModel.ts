@@ -287,7 +287,11 @@ export function buildMenuRenderState(
                 selectorManifestStore ?? undefined,
                 c2paStatus?.adapterKind,
             ),
-            aiOptOut: selectAiOptOutSection(activeManifest),
+            aiOptOut: selectAiOptOutSection(
+                activeManifest,
+                selectorManifestStore ?? undefined,
+                c2paStatus?.adapterKind,
+            ),
             history: selectorManifestStore
                 ? selectHistorySection(activeManifest, selectorManifestStore)
                 : null,
@@ -409,7 +413,11 @@ function buildSegmentMenuRenderState(
                 adapterKind,
             ),
             work: selectWorkSection(activeManifest, selectorManifestStore ?? undefined, adapterKind),
-            aiOptOut: selectAiOptOutSection(activeManifest),
+            aiOptOut: selectAiOptOutSection(
+                activeManifest,
+                selectorManifestStore ?? undefined,
+                adapterKind,
+            ),
             history: selectorManifestStore
                 ? selectHistorySection(activeManifest, selectorManifestStore)
                 : null,

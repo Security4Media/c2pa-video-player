@@ -84,12 +84,11 @@ export function CopyrightSection({
                 <span className="itemName">Published by:</span>{' '}
                 {copyright.publisher.legalName ?? copyright.publisher.name}
                 {copyright.publisher.alternateName ? ` (${copyright.publisher.alternateName})` : ''}
-                {copyright.publisher.website ? (
-                  <>
-                    {' — '}
-                    <WebsiteLink href={copyright.publisher.website} />
-                  </>
-                ) : null}
+              </div>
+            ) : null}
+            {copyright.publisher?.website ? (
+              <div className="c2pa-menu-section__row">
+                <span className="itemName">Website:</span> <WebsiteLink href={copyright.publisher.website} />
               </div>
             ) : null}
           </div>
