@@ -155,6 +155,7 @@ describe('a failure at the playhead', () => {
 
         expect(state.sections?.claimGenerator).toBeNull();
         expect(state.sections?.organization).toBeNull();
+        expect(state.sections?.copyright).toBeNull();
         expect(state.sections?.history).toBeNull();
     });
 });

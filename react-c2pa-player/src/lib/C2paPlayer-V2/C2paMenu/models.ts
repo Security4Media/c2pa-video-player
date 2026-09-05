@@ -77,6 +77,31 @@ export interface DublinCoreMetadataItem {
     description: string | null;
 }
 
+export interface CawgCopyrightHolderItem {
+    name: string | null;
+    sameAs: string[] | null;
+}
+
+export interface CawgCopyrightPublisherItem {
+    name: string | null;
+    legalName: string | null;
+    alternateName: string | null;
+    website: string | null;
+}
+
+/**
+ * The schema.org-flavored shape `cawg.metadata` can take (as opposed to the
+ * Dublin Core `dc:*` shape covered by `DublinCoreMetadataItem`). Either shape
+ * can appear under the same assertion label.
+ */
+export interface CawgMetadataCopyrightItem {
+    copyrightNotice: string | null;
+    copyrightHolder: CawgCopyrightHolderItem | null;
+    copyrightYear: number | null;
+    creditText: string | null;
+    publisher: CawgCopyrightPublisherItem | null;
+}
+
 export interface ClaimGeneratorItem {
     name: string;
     version: string | null;
@@ -108,12 +133,17 @@ export interface CawgOrganizationItem {
     role?: CawgRole | null;
     creativeWork: CreativeWorkContentItem | null;
     dublinCore: DublinCoreMetadataItem | null;
+    copyright: CawgMetadataCopyrightItem | null;
     validationStatus: ValidationState;
 }
 
 export interface OrganizationSectionItem {
     organization: OrganizationIdentityItem | null;
     cawg: CawgOrganizationItem | null;
+}
+
+export interface CopyrightSectionItem {
+    copyright: CawgMetadataCopyrightItem;
 }
 
 export interface WorkSectionItem {

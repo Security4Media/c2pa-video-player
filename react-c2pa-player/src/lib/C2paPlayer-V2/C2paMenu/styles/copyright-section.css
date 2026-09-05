@@ -14,21 +14,21 @@
  * limitations under the License.
  */
 
-export { AiOptOutSection } from './AiOptOutSection';
-export { ClaimGeneratorSection } from './ClaimGeneratorSection';
-export { CopyrightSection } from './CopyrightSection';
-export { HistoryDetailView, HistorySection } from './HistorySection';
-export { OrganizationSection } from './OrganizationSection';
-export { SummarySection } from './SummarySection';
-export { WorkSection } from './WorkSection';
-export {
-  AlertItem,
-  InvalidState,
-  LoadingState,
-  MenuField,
-  MenuHeader,
-  NoManifestState,
-  SectionToggle,
-  ValidationBadge,
-  WebsiteLink,
-} from './shared';
+/* Copyright section. Only what is genuinely specific to it - the toggle,
+   header and layout come from section-shared.css, same as every other
+   collapsible section. */
+
+.vjs-menu li.vjs-menu-item .c2pa-copyright-section__content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.vjs-menu li.vjs-menu-item .c2pa-copyright-section__status {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.15rem;
+  line-height: 1;
+  cursor: help;
+}

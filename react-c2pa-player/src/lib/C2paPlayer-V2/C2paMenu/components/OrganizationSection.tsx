@@ -19,7 +19,7 @@ import type {
   OrganizationIdentityItem,
   OrganizationSectionItem,
 } from '../models';
-import { UNVERIFIED_IDENTITY_CAVEAT } from '@/lib/validation/rules';
+import { REFERENCED_CONTENT_HIDDEN_NOTE, UNVERIFIED_IDENTITY_CAVEAT } from '@/lib/validation/rules';
 import { WebsiteLink } from './shared';
 
 function getValidationIndicator(validationStatus: CawgOrganizationItem['validationStatus']) {
@@ -161,13 +161,22 @@ export function OrganizationSection({
             </span>
           ) : null}
         </div>
-         {section.cawg ? <IdentityDetails itemValue={section.cawg} /> : null}
+         {/* Referenced content (title, publisher, license, copyright...) is
+            withheld rather than shown-with-a-caveat below Trusted: it is
+            unauthenticated by definition unless the identity vouching for it
+            is itself trusted. */}
+        {section.cawg && section.cawg.validationStatus === 'Trusted' ? (
+          <IdentityDetails itemValue={section.cawg} />
+        ) : null}
         {/* Spelled out rather than left to the icon's tooltip. The whole point
             of this section is the names in it, and a viewer reading a title
             and a publisher has no reason to hover a glyph to find out that
             nothing vouched for them. */}
         {section.cawg?.validationStatus === 'Unknown' ? (
           <p className="c2pa-org-section__caveat">{UNVERIFIED_IDENTITY_CAVEAT}</p>
+        ) : null}
+        {section.cawg && section.cawg.validationStatus !== 'Trusted' ? (
+          <p className="c2pa-org-section__caveat">{REFERENCED_CONTENT_HIDDEN_NOTE}</p>
         ) : null}
         {section.organization && (
           section.organization.website ||

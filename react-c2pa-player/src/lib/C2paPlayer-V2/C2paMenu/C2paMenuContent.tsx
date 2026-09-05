@@ -24,6 +24,7 @@ import {
   AiOptOutSection,
   AlertItem,
   ClaimGeneratorSection,
+  CopyrightSection,
   HistoryDetailView,
   HistorySection,
   InvalidState,
@@ -99,12 +100,14 @@ export function C2paMenuContent({
   onBackToLive,
 }: C2paMenuContentProps) {
   const [activeView, setActiveView] = useState<'default' | 'history'>('default');
+  const [copyrightExpanded, setCopyrightExpanded] = useState(false);
   const [workExpanded, setWorkExpanded] = useState(false);
   const [aiOptOutExpanded, setAiOptOutExpanded] = useState(false);
   const [ingredientsExpanded, setIngredientsExpanded] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     setActiveView('default');
+    setCopyrightExpanded(false);
     setWorkExpanded(false);
     setAiOptOutExpanded(false);
     setIngredientsExpanded({});
@@ -205,6 +208,14 @@ export function C2paMenuContent({
           <OrganizationSection
             section={sections.organization}
             title={sectionTitles.organization}
+          />
+        ) : null}
+        {sections.copyright ? (
+          <CopyrightSection
+            section={sections.copyright}
+            title={sectionTitles.copyright}
+            isExpanded={copyrightExpanded}
+            onToggle={() => setCopyrightExpanded(current => !current)}
           />
         ) : null}
         {sections.work ? (

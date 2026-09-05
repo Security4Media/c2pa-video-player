@@ -20,6 +20,7 @@ import { verifiesCawgIdentity } from '@/lib/validation/rules';
 import type { AdapterKind } from '@/lib/validation';
 import type { ValidationState } from '@/lib/types/c2pa.types';
 import { CawgOrganizationItem, ManifestCawgAssertion } from '../models';
+import { selectCawgMetadataCopyright } from './cawgMetadataCopyrightSelectors';
 import { selectCreativeWorkContent } from './creativeWorkSelectors';
 import { selectDublinCoreMetadata } from './dublinCoreSelectors';
 import {
@@ -106,20 +107,37 @@ export function selectOrganizationIdentity(
     cawgItemBuilder.validationStatus = readIdentityStatus(manifestStore, adapterKind);
     cawgItemBuilder.creativeWork = null;
     cawgItemBuilder.dublinCore = null;
+    cawgItemBuilder.copyright = null;
 
     const referencedAssertionLabels = getReferencedAssertionLabels(cawgAssertion);
 
-    if (referencedAssertionLabels.includes(CREATIVE_WORK_ASSERTION_LABEL)) {
-        cawgItemBuilder.creativeWork = selectCreativeWorkContent(manifest);
+    // Content another assertion merely claims to be referenced is not
+    // authenticated by anything unless the identity vouching for it is
+    // itself trusted - a Valid/Unknown/Invalid identity's claimed
+    // references are exactly as unverified as the content they point to.
+    if (cawgItemBuilder.validationStatus === 'Trusted') {
+        if (referencedAssertionLabels.includes(CREATIVE_WORK_ASSERTION_LABEL)) {
+            cawgItemBuilder.creativeWork = selectCreativeWorkContent(manifest);
+        }
+
+        // Live streams (C2PA Live Video spec) commonly reference the simpler
+        // Dublin Core `cawg.metadata` assertion instead of CreativeWork;
+        // broadcast VOD sources have been seen referencing a schema.org
+        // copyright/credit shape under the same label instead.
+        if (referencedAssertionLabels.includes(CAWG_METADATA_ASSERTION_LABEL)) {
+            cawgItemBuilder.dublinCore = selectDublinCoreMetadata(manifest);
+            cawgItemBuilder.copyright = selectCawgMetadataCopyright(manifest);
+        }
     }
 
-    // Live streams (C2PA Live Video spec) commonly reference the simpler
-    // Dublin Core `cawg.metadata` assertion instead of CreativeWork.
-    if (referencedAssertionLabels.includes(CAWG_METADATA_ASSERTION_LABEL)) {
-        cawgItemBuilder.dublinCore = selectDublinCoreMetadata(manifest);
-    }
+    const referencesKnownContent =
+        referencedAssertionLabels.includes(CREATIVE_WORK_ASSERTION_LABEL) ||
+        referencedAssertionLabels.includes(CAWG_METADATA_ASSERTION_LABEL);
 
-    if (!cawgItemBuilder.creativeWork && !cawgItemBuilder.dublinCore) {
+    // Only worth a developer's attention when the identity references neither
+    // known content type at all. An identity that *does* reference one but
+    // isn't (yet) Trusted is an expected, common state - not a warning.
+    if (!referencesKnownContent) {
         console.warn(
             `[C2PA] CAWG assertion references neither '${CREATIVE_WORK_ASSERTION_LABEL}' nor '${CAWG_METADATA_ASSERTION_LABEL}', returning CAWG-only organization identity`
         );

@@ -71,6 +71,20 @@ export const UNVERIFIED_IDENTITY_CAVEAT =
   'Declared in the stream; this player did not verify who signed it.';
 
 /**
+ * What to say when an identity's referenced content (title, publisher,
+ * copyright, credit) is being withheld rather than shown-with-a-caveat.
+ *
+ * Applies to any verdict short of Trusted: Valid (verified but not to a
+ * trusted anchor), Unknown (nothing checked) and Invalid (checked and
+ * failed) all withhold the content the identity vouches for, not just
+ * re-badge it - showing a declared title or publisher next to a cross or a
+ * question mark still reads as "here is who made this", which the player
+ * cannot support unless the credentials are actually trusted.
+ */
+export const REFERENCED_CONTENT_HIDDEN_NOTE =
+  "Details this identity declares (title, publisher, copyright) are not shown until its signing credentials are trusted.";
+
+/**
  * @svta/cml-c2pa (behind @qualabs/c2pa-live-dashjs-plugin) only performs
  * cryptographic/structural validation (COSE signature, hash, continuity) —
  * it does not check the signing certificate against a trust anchor list.

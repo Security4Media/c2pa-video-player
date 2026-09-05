@@ -38,11 +38,19 @@ export function selectDublinCoreMetadata(manifest: Manifest): DublinCoreMetadata
 
     const { data } = assertion;
 
-    return {
+    const item = {
         title: readDcField(data, 'dc:title'),
         publisher: readDcField(data, 'dc:publisher'),
         rights: readDcField(data, 'dc:rights'),
         creator: readDcField(data, 'dc:creator'),
         description: readDcField(data, 'dc:description'),
     };
+
+    // `cawg.metadata` is arbitrary JSON-LD, and a schema.org-shaped payload
+    // (see cawgMetadataCopyrightSelectors.ts) carries none of these dc:*
+    // keys. Returning an all-null object here rather than null would make it
+    // look like Dublin Core content was found when it wasn't.
+    const hasAnyField = Object.values(item).some(value => value !== null);
+
+    return hasAnyField ? item : null;
 }

@@ -91,11 +91,14 @@ export function MenuHeader({
  */
 export function SectionToggle({
   title,
+  badge,
   isExpanded,
   controls,
   onToggle,
 }: {
   title: string;
+  /** Optional trailing indicator (e.g. a trust tag) shown next to the title. */
+  badge?: ReactNode;
   isExpanded?: boolean;
   controls?: string;
   onToggle: () => void;
@@ -109,6 +112,7 @@ export function SectionToggle({
       aria-controls={controls}
     >
       <span className="itemName c2pa-menu-section__title">{title}</span>
+      {badge}
       <span
         className={`c2pa-menu-section__toggle ${isExpanded ? 'expanded' : ''}`}
         aria-hidden="true"
