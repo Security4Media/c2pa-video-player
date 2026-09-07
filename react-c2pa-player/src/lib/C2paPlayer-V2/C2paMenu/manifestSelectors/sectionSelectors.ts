@@ -20,9 +20,11 @@ import {
     ClaimGeneratorSectionItem,
     CopyrightSectionItem,
     HistorySectionItem,
+    ManifestCawgAssertion,
     OrganizationSectionItem,
     WorkSectionItem,
 } from '../models';
+import { hasPublishedAction, selectActionsAssertion } from './actionsSelectors';
 import { selectOrganizationIdentity } from './cawgSelectors';
 import { selectClaimGenerator } from './claimGeneratorSelectors';
 import {
@@ -30,6 +32,7 @@ import {
     selectCreativeWorkOrganization,
 } from './creativeWorkSelectors';
 import { selectIngredients } from './ingredientSelectors';
+import { getReferencedAssertionLabels, selectX509CawgAssertion } from './shared';
 
 /**
  * Select the claim-generator section model for the menu.
@@ -68,28 +71,82 @@ export function selectHistorySection(
 }
 
 /**
+ * What to call the Organization Identity section, and whether to flag it as
+ * ambiguous.
+ *
+ * A `c2pa.published` action alone does not make this identity the publisher
+ * - only its own `referenced_assertions` covering the actions assertion does
+ * that. Absent a publish action at all, there is nothing publisher-related
+ * to say either way, so the title stays generic and no hint is shown.
+ */
+function resolveOrganizationTitle(
+    manifest: Manifest,
+    x509Assertion: ManifestCawgAssertion,
+): { title: string; titleHint: string | null } {
+    if (!hasPublishedAction(manifest)) {
+        return { title: 'Organization Identity', titleHint: null };
+    }
+
+    const actionsAssertion = selectActionsAssertion(manifest);
+    const isReferenced = actionsAssertion
+        ? getReferencedAssertionLabels(x509Assertion).includes(actionsAssertion.label)
+        : false;
+
+    if (isReferenced) {
+        return { title: 'Publisher Identity', titleHint: null };
+    }
+
+    return {
+        title: 'Organization Identity',
+        titleHint: 'This content was published, but this identity does not cryptographically reference the actions that published it, so it cannot be confirmed as the publisher.',
+    };
+}
+
+/**
  * Select the organization section model, combining CreativeWork organization
- * details with CAWG organization identity information when available.
+ * details with CAWG organization identity information.
+ *
+ * Gated on two things, both required:
+ *  - the active manifest carries an X.509-shaped `cawg.identity` specifically
+ *    (see `selectX509CawgAssertion`) - every field this section shows
+ *    (`signature_info`, referenced CreativeWork/Dublin Core content) only
+ *    ever comes from that shape, not a CAWG Identity Claims Aggregation
+ *    credential or a bare CreativeWork organization with no identity at all;
+ *  - that identity's verdict is `Trusted`. Valid/Unknown/Invalid are not
+ *    enough: unlike the badge-and-caveat treatment this section used to give
+ *    those states, an unresolved or failed identity has no organization or
+ *    publisher worth naming at all, so the section - title, badge and all -
+ *    does not appear rather than showing a claim this app cannot vouch for.
  *
  * @param manifest - The manifest containing organization-related assertions
  * @param manifestStore - Optional manifest store used for CAWG validation status
- * @returns Structured organization section data, or null when both sources are absent
+ * @returns Structured organization section data, or null unless a Trusted X.509 cawg.identity is present
  */
 export function selectOrganizationSection(
     manifest: Manifest,
     manifestStore?: ManifestStore,
     adapterKind?: AdapterKind | null,
 ): OrganizationSectionItem | null {
-    const organization = selectCreativeWorkOrganization(manifest);
-    const cawg = selectOrganizationIdentity(manifest, manifestStore, adapterKind);
+    const x509Assertion = selectX509CawgAssertion(manifest);
 
-    if (!organization && !cawg) {
+    if (!x509Assertion) {
         return null;
     }
+
+    const cawg = selectOrganizationIdentity(manifest, manifestStore, adapterKind);
+
+    if (cawg?.validationStatus !== 'Trusted') {
+        return null;
+    }
+
+    const organization = selectCreativeWorkOrganization(manifest);
+    const { title, titleHint } = resolveOrganizationTitle(manifest, x509Assertion);
 
     return {
         organization,
         cawg,
+        title,
+        titleHint,
     };
 }
 

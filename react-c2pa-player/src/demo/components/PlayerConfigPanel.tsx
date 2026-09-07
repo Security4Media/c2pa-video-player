@@ -21,11 +21,13 @@ import {
   detectAdapterKind,
   resolveConsentMode,
   resolveEnforceValidatedPlayback,
+  resolveIcaTrustFixtureName,
   resolveLiveRetentionSeconds,
   resolveMonolithicEngine,
   resolveShowAuthenticityLabel,
   resolveTrustFixtureName,
   type ConsentMode,
+  type IcaTrustFixtureName,
   type MediaSourceDescriptor,
   type MonolithicEngine,
   type TrustFixtureName,
@@ -64,6 +66,13 @@ const TRUST_PROFILES: { value: TrustFixtureName | 'full-prod'; label: string }[]
   { value: 'wrong-anchor', label: 'wrong-anchor' },
 ];
 
+const ICA_TRUST_PROFILES: { value: IcaTrustFixtureName | 'full-prod'; label: string }[] = [
+  { value: 'full-prod', label: 'full-prod (default)' },
+  { value: 'full-dev', label: 'full-dev' },
+  { value: 'empty', label: 'empty' },
+  { value: 'wrong-issuer', label: 'wrong-issuer' },
+];
+
 /**
  * Visual controls for the query-string switches documented in the top-level
  * README's "Runtime parameters" table. Previously URL-only - see that table
@@ -78,6 +87,9 @@ export function PlayerConfigPanel({ mediaSource, onApply }: PlayerConfigPanelPro
   const [consent, setConsent] = useState<ConsentMode>(() => resolveConsentMode());
   const [trust, setTrust] = useState<TrustFixtureName | 'full-prod'>(
     () => resolveTrustFixtureName() ?? 'full-prod'
+  );
+  const [icaTrust, setIcaTrust] = useState<IcaTrustFixtureName | 'full-prod'>(
+    () => resolveIcaTrustFixtureName() ?? 'full-prod'
   );
   const [windowSeconds, setWindowSeconds] = useState<number>(() => resolveLiveRetentionSeconds());
   const [gateEnabled, setGateEnabled] = useState<boolean>(() => resolveEnforceValidatedPlayback());
@@ -120,6 +132,15 @@ export function PlayerConfigPanel({ mediaSource, onApply }: PlayerConfigPanelPro
     (value: TrustFixtureName | 'full-prod') => {
       setTrust(value);
       applyParam('trust', value === 'full-prod' ? null : value);
+      onApply();
+    },
+    [onApply]
+  );
+
+  const handleIcaTrustChange = useCallback(
+    (value: IcaTrustFixtureName | 'full-prod') => {
+      setIcaTrust(value);
+      applyParam('icaTrust', value === 'full-prod' ? null : value);
       onApply();
     },
     [onApply]
@@ -202,6 +223,25 @@ export function PlayerConfigPanel({ mediaSource, onApply }: PlayerConfigPanelPro
             }
           >
             {TRUST_PROFILES.map((profile) => (
+              <option key={profile.value} value={profile.value}>
+                {profile.label}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label
+          className="player-config-control"
+          title="Which DIDs this player trusts as issuers of CAWG Identity Claims Aggregation (ICA) credentials - a separate, app-level trust list, since the C2PA engine has no DID trust-anchor concept of its own. Unrecognised values fall back to full-prod. (?icaTrust=)"
+        >
+          ICA issuer trust profile
+          <select
+            value={icaTrust}
+            onChange={(event) =>
+              handleIcaTrustChange(event.target.value as IcaTrustFixtureName | 'full-prod')
+            }
+          >
+            {ICA_TRUST_PROFILES.map((profile) => (
               <option key={profile.value} value={profile.value}>
                 {profile.label}
               </option>

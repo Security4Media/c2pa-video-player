@@ -16,6 +16,8 @@
 
 import type { CarriedSessionPolicy, MonolithicEngine, ValidationPolicy } from '../types';
 import { resolveConsentMode, resolveShowAuthenticityLabel } from './authenticity';
+import { LocalIcaIssuerProvider } from './icaIssuerProvider';
+import { icaTrustFixtures, isIcaTrustFixtureName, type IcaTrustFixtureName } from './icaTrustFixtures';
 import { LocalTrustMaterialProvider } from './localTrustMaterialProvider';
 import {
   resolveEnforceValidatedPlayback,
@@ -28,6 +30,9 @@ const defaultTrustMaterialProvider = new LocalTrustMaterialProvider();
 // Providers are cached per fixture so repeated loads reuse one fetch, and so a
 // fixture's material can never be served to a differently configured provider.
 const fixtureProviders = new Map<string, LocalTrustMaterialProvider>();
+
+const defaultIcaIssuerProvider = new LocalIcaIssuerProvider();
+const icaFixtureProviders = new Map<string, LocalIcaIssuerProvider>();
 
 const currentSearch = () => (typeof window === 'undefined' ? undefined : window.location.search);
 
@@ -86,6 +91,52 @@ function selectedTrustProvider(): LocalTrustMaterialProvider {
 }
 
 /**
+ * What `?icaTrust=` currently resolves to, or `null` for the shipped policy.
+ * See `resolveTrustFixtureName` - same split and same reasoning, for the
+ * independent ICA-issuer trust dimension.
+ */
+export function resolveIcaTrustFixtureName(
+  search: string | undefined = currentSearch(),
+): IcaTrustFixtureName | null {
+  if (!search) {
+    return null;
+  }
+
+  const requested = new URLSearchParams(search).get('icaTrust');
+
+  return requested && isIcaTrustFixtureName(requested) && requested !== 'full-prod'
+    ? requested
+    : null;
+}
+
+/**
+ * `?icaTrust=<fixture>` selects an ICA-issuer trust policy other than the
+ * shipped one.
+ *
+ * Exported (unlike `selectedTrustProvider`) because, unlike X.509 trust
+ * material, the resolved issuer set never reaches the C2PA engine's own
+ * `Settings` - it's read directly by the menu layer (see
+ * `C2paMenu/useTrustedIcaIssuers.ts`), which has no other path to it.
+ */
+export function selectedIcaIssuerProvider(): LocalIcaIssuerProvider {
+  const requested = resolveIcaTrustFixtureName();
+
+  if (!requested) {
+    return defaultIcaIssuerProvider;
+  }
+
+  let provider = icaFixtureProviders.get(requested);
+
+  if (!provider) {
+    provider = new LocalIcaIssuerProvider(icaTrustFixtures[requested]);
+    icaFixtureProviders.set(requested, provider);
+    console.warn(`[C2PA] Using the '${requested}' ICA-issuer trust profile, not the shipped one.`);
+  }
+
+  return provider;
+}
+
+/**
  * `?monolithicEngine=c2pa-web` swaps the monolithic MP4 validation runtime
  * from the shipped one (`nettrek`) to an independent one that calls
  * `@contentauth/c2pa-web` directly - see `MonolithicEngine` in `../types`.
@@ -133,6 +184,8 @@ export function carriedSessionPolicy(policy: ValidationPolicy): CarriedSessionPo
 }
 
 export { LocalTrustMaterialProvider };
+export type { IcaIssuerProvider } from './icaIssuerProvider';
+export { icaTrustFixtures, isIcaTrustFixtureName, type IcaTrustFixtureName } from './icaTrustFixtures';
 export { resolveConsentMode, resolveShowAuthenticityLabel } from './authenticity';
 export {
   DEFAULT_LIVE_RETENTION_SECONDS,

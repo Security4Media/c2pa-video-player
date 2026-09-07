@@ -112,7 +112,11 @@ export function SectionToggle({
       aria-controls={controls}
     >
       <span className="itemName c2pa-menu-section__title">{title}</span>
-      {badge}
+      {/* margin-left: auto lives on this slot, not on each section's own
+          badge markup, so any section adopting this prop gets the badge
+          positioned immediately before the chevron for free - see
+          section-shared.css. */}
+      {badge ? <span className="c2pa-menu-section__badge-slot">{badge}</span> : null}
       <span
         className={`c2pa-menu-section__toggle ${isExpanded ? 'expanded' : ''}`}
         aria-hidden="true"

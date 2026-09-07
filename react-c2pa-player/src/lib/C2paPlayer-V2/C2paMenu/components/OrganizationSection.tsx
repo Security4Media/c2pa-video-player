@@ -133,12 +133,29 @@ function IdentityDetails({ itemValue }: { itemValue: CawgOrganizationItem }) {
   );
 }
 
+/**
+ * Distinct from the ✅/☑️/❔/❌ validation glyphs elsewhere - `❔` already
+ * means "Unknown trust state" everywhere in this menu, and reusing it here
+ * would answer a different question ("is this a publisher?") with the same
+ * symbol used for "is this identity trusted?".
+ */
+function PublisherAmbiguityHint({ hint }: { hint: string }) {
+  return (
+    <span
+      className="c2pa-org-section__title-hint"
+      aria-label={`Why this isn't titled Publisher Identity: ${hint}`}
+      title={hint}
+      data-testid="c2pa-org-title-hint"
+    >
+      ?
+    </span>
+  );
+}
+
 export function OrganizationSection({
   section,
-  title,
 }: {
   section: OrganizationSectionItem;
-  title: string;
 }) {
   const validationIndicator = section.cawg
     ? getValidationIndicator(section.cawg.validationStatus)
@@ -148,16 +165,21 @@ export function OrganizationSection({
     <li className="vjs-menu-item">
       <div className="c2pa-menu-section c2pa-org-section">
         <div className="c2pa-menu-section__header">
-          <span className="itemName c2pa-menu-section__title">{title}</span>
-          {validationIndicator ? (
-            <span
-              className="c2pa-org-section__status"
-              aria-label={`Organization identity status: ${section.cawg?.validationStatus}`}
-              title={validationIndicator.message}
-              data-testid="c2pa-identity-status"
-              data-validation-state={section.cawg?.validationStatus ?? 'Unknown'}
-            >
-              {validationIndicator.icon}
+          <span className="itemName c2pa-menu-section__title">{section.title}</span>
+          {section.titleHint || validationIndicator ? (
+            <span className="c2pa-org-section__badge-cluster">
+              {section.titleHint ? <PublisherAmbiguityHint hint={section.titleHint} /> : null}
+              {validationIndicator ? (
+                <span
+                  className="c2pa-org-section__status"
+                  aria-label={`Organization identity status: ${section.cawg?.validationStatus}`}
+                  title={validationIndicator.message}
+                  data-testid="c2pa-identity-status"
+                  data-validation-state={section.cawg?.validationStatus ?? 'Unknown'}
+                >
+                  {validationIndicator.icon}
+                </span>
+              ) : null}
             </span>
           ) : null}
         </div>

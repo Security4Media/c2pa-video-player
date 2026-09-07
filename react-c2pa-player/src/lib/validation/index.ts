@@ -36,17 +36,22 @@ export {
 } from './normalization';
 export {
   createDefaultValidationPolicy,
+  icaTrustFixtures,
+  isIcaTrustFixtureName,
   isTrustFixtureName,
   LocalTrustMaterialProvider,
   resolveConsentMode,
   resolveEnforceValidatedPlayback,
+  resolveIcaTrustFixtureName,
   resolveLiveRetentionSeconds,
   resolveMonolithicEngine,
   resolveShowAuthenticityLabel,
   resolveTrustFixtureName,
+  selectedIcaIssuerProvider,
   trustFixtures,
   DEFAULT_LIVE_RETENTION_SECONDS,
   MIN_LIVE_WINDOW_SECONDS,
+  type IcaTrustFixtureName,
   type TrustFixtureName,
 } from './policy';
 export {

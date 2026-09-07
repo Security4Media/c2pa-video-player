@@ -126,6 +126,23 @@ export function selectCawgAssertion(manifest: Manifest): ManifestCawgAssertion |
     return cawgAssertion;
 }
 
+/**
+ * `cawg.identity` can be the X.509/COSE hard-binding shape this type models
+ * (`signer_payload.referenced_assertions`), or a CAWG Identity Claims
+ * Aggregation (ICA) Verifiable Credential - a different shape entirely, with
+ * no `signer_payload` at all (see `creatorSelectors.ts`'s `selectIcaAssertion`,
+ * which discriminates the other way, on `verifiedIdentities` presence).
+ * Fields specific to the X.509 shape (`signature_info`, referenced
+ * CreativeWork/Dublin Core content) are only meaningful once this check
+ * passes - reused wherever a section needs to gate on "is this specifically
+ * an X.509 identity", not just "is there a cawg.identity of any kind".
+ */
+export function selectX509CawgAssertion(manifest: Manifest): ManifestCawgAssertion | null {
+    const cawgAssertion = selectCawgAssertion(manifest);
+
+    return cawgAssertion?.data?.signer_payload?.sig_type === 'cawg.x509.cose' ? cawgAssertion : null;
+}
+
 export function selectCreativeWorkAssertion(manifest: Manifest): ManifestCreativeWorkAssertion | null {
     const cawgAssertion = selectCawgAssertion(manifest);
     const referencedAssertionLabels = cawgAssertion

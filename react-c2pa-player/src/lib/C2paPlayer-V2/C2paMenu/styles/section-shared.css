@@ -68,13 +68,30 @@
   color: #7db4ff;
 }
 
+.vjs-menu li.vjs-menu-item .c2pa-menu-section__badge-slot {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+}
+
 .vjs-menu li.vjs-menu-item .c2pa-menu-section__toggle {
+  /* Pushes the chevron right when there is no badge slot before it (History,
+     Work, AI opt-out, ...). Flexbox splits free space *evenly* across every
+     auto margin on the line - measured: with both this and the badge slot
+     above carrying `margin-left: auto`, the two landed with an equal gap
+     between them instead of side by side. The rule below resets this margin
+     to 0 specifically when a badge slot precedes it, so the slot alone owns
+     the push and the chevron just follows it at the row's normal `gap`. */
   margin-left: auto;
   color: #7db4ff;
   font-size: 1.25rem;
   line-height: 1;
   transition: transform 0.2s ease;
   user-select: none;
+}
+
+.vjs-menu li.vjs-menu-item .c2pa-menu-section__badge-slot + .c2pa-menu-section__toggle {
+  margin-left: 0;
 }
 
 .vjs-menu li.vjs-menu-item .c2pa-menu-section__toggle.expanded {

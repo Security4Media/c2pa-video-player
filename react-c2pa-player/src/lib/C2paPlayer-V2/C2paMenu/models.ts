@@ -140,6 +140,10 @@ export interface CawgOrganizationItem {
 export interface OrganizationSectionItem {
     organization: OrganizationIdentityItem | null;
     cawg: CawgOrganizationItem | null;
+    /** "Organization Identity", or "Publisher Identity" when this identity references a published c2pa.actions. */
+    title: string;
+    /** Explains an ambiguous case (published, but not referenced) as a tooltip; null otherwise. */
+    titleHint: string | null;
 }
 
 export interface CopyrightSectionItem {
@@ -166,5 +170,47 @@ export interface AiOptOutAssertionItem {
 
 export interface AiOptOutSectionItem {
     assertion: AiOptOutAssertionItem;
+}
+
+/**
+ * One CAWG Identity Claims Aggregation (ICA) verified-identity claim
+ * (`cawg.identity`'s `verifiedIdentities` entries, e.g. a social media
+ * profile or a document-verification result).
+ *
+ * `type` is left as an open string rather than a union: the ICA spec defines
+ * a fixed set today, but a manifest can declare a type this app has never
+ * seen, and dropping it silently would be worse than rendering it plainly.
+ * `displayName` is `username` (social media) or `name` (document
+ * verification) normalized to one field, since only one is ever present.
+ */
+export interface VerifiedIdentityClaim {
+    type: string;
+    displayName: string | null;
+    uri: string | null;
+    verifiedAt: string | null;
+    providerName: string | null;
+}
+
+/**
+ * Verified-identity claims found on one manifest node (the active manifest,
+ * or one ingredient, however deeply nested), labeled by where they came from
+ * so claims from different signers in a provenance chain are never shown as
+ * if they were one person.
+ *
+ * `validationStatus` is never `'Invalid'` here - a confirmed-broken
+ * credential is withheld entirely rather than turned into a group. `Unknown`
+ * (nothing checked this credential's signature) and `Valid` (checked, just
+ * not on this app's trusted-issuer list) are both shown, each carrying its
+ * own verdict, so a viewer isn't left unable to tell "no identity was
+ * declared" from "one was declared but withheld".
+ */
+export interface CreatorIdentityGroup {
+    source: string;
+    claims: VerifiedIdentityClaim[];
+    validationStatus: ValidationState;
+}
+
+export interface CreatorSectionItem {
+    groups: CreatorIdentityGroup[];
 }
 

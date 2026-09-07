@@ -17,6 +17,7 @@
 import type { C2PATimelineState } from '../C2PAPlayerRoot.types';
 import { C2paMenuContent } from './C2paMenuContent';
 import { buildMenuRenderState, c2paMenuSectionTitles } from './menuViewModel';
+import { useTrustedIcaIssuers } from './useTrustedIcaIssuers';
 import { C2PAStatus } from '@/lib/types/c2pa.types';
 import type { ValidationTimelineSegment } from '@/lib/validation';
 
@@ -34,7 +35,8 @@ interface C2paMenuRootProps {
  * content component.
  */
 export function C2paMenuRoot({ c2paStatus, timeline, resetKey, selectedSegment, onBackToLive }: C2paMenuRootProps) {
-  const renderState = buildMenuRenderState(c2paStatus, timeline, selectedSegment);
+  const trustedIcaIssuers = useTrustedIcaIssuers();
+  const renderState = buildMenuRenderState(c2paStatus, timeline, selectedSegment, trustedIcaIssuers);
   // Two different segments can resolve to the same manifestId (e.g. distinct
   // DASH integrity-only segments always resolve to the literal 'segment', or
   // two segments genuinely covered by the same live manifest) - fold in the

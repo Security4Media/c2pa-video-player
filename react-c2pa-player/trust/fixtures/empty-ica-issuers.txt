@@ -1,0 +1,3 @@
+# Empty on purpose - the `empty` and `anchors-only`-style ICA trust fixtures
+# use this to prove that a well-formed but unlisted ICA credential still
+# resolves to 'Valid', never 'Trusted'.
