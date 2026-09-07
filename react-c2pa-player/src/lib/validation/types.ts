@@ -114,6 +114,12 @@ export interface ValidationPolicy {
    * been, or once per contiguous stretch of invalid content.
    */
   consentMode: ConsentMode;
+  /**
+   * Whether a valid segment's timeline colour (and the authenticity label's,
+   * when shown) is chosen by which issuer signed it, instead of the shared
+   * verdict colour. Live only - see policy/issuerColors.ts.
+   */
+  colorizeTimelineByIssuer: boolean;
 }
 
 /**
@@ -146,6 +152,7 @@ export interface CarriedSessionPolicy {
   enforceValidatedPlayback: boolean;
   showAuthenticityLabel: boolean;
   consentMode: ConsentMode;
+  colorizeTimelineByIssuer: boolean;
 }
 
 /**
@@ -268,6 +275,8 @@ export interface ValidationStatusSnapshot {
   showAuthenticityLabel?: boolean;
   /** Where to raise the consent question. See CarriedSessionPolicy. */
   consentMode?: ConsentMode;
+  /** Whether to colour valid segments by issuer. See CarriedSessionPolicy. */
+  colorizeTimelineByIssuer?: boolean;
 }
 
 export type ValidationSessionListener = (snapshot: ValidationStatusSnapshot) => void;

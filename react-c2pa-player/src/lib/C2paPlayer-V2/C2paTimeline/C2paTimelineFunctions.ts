@@ -18,7 +18,14 @@ import { DEFAULT_LIVE_RETENTION_SECONDS } from '@/lib/validation/policy/liveRete
 import type { C2PATimelineSegmentUpdate, ValidationState } from '@/lib/types/c2pa.types';
 import type { C2PATimelineState } from '../C2PAPlayerRoot.types';
 import type { VideoJsPlayerLike } from '../C2paMenu/C2paMenu.types';
+import { resolveManifestFromSource } from '../C2paMenu/manifestSelectors/manifestSourceDispatch';
+import { selectSignatureIssuer } from '../C2paMenu/manifestSelectors/signatureSelectors';
 import { advanceLiveEdge, prefersReducedMotion, type LiveEdgeState } from './liveEdgeClock';
+import {
+    createIssuerColorAssigner,
+    readIssuerPaletteColors,
+    type IssuerColorAssigner,
+} from './issuerColorPalette';
 import { setLiveTimelineWindow } from './liveWindowState';
 
 type TimelineVerificationStatus = ValidationState | 'unknown' | 'false';
@@ -149,7 +156,31 @@ export interface TimelineFunctions {
         c2paControlBar: TimelineComponentLike,
         isLive?: boolean,
         retentionSeconds?: number,
+        colorizeByIssuer?: boolean,
     ) => void;
+    /**
+     * The colour a Valid/Trusted segment would show under issuer colouring, or
+     * null if none applies (Invalid/Unknown, no resolvable issuer, or no
+     * segment). Exposed so the authenticity label can match the bar - both
+     * read the same underlying assigner, so a given issuer gets one colour for
+     * the whole session regardless of which caller asks first. Callers gate
+     * whether to call this at all on the `colorizeByIssuer` policy and on
+     * liveness; it does not re-check either.
+     *
+     * `palette` defaults to a fresh CSS read when omitted, for a caller (the
+     * label) that asks once per tick; a caller painting many segments in one
+     * pass (the timeline itself) reads it once and passes it explicitly.
+     */
+    getIssuerAccentColor: (
+        segment: C2PATimelineSegmentUpdate | null,
+        palette?: readonly string[],
+    ) => string | null;
+    /**
+     * The issuer behind that same colour, for a caller (the authenticity
+     * label) that names it rather than only showing it. Null under the same
+     * conditions `getIssuerAccentColor` is.
+     */
+    getIssuerName: (segment: C2PATimelineSegmentUpdate | null) => string | null;
     renderWholeAssetVerdict: (
         verificationStatus: TimelineVerificationStatus,
         videoPlayer: TimelineVideoPlayer,
@@ -309,24 +340,65 @@ function readVerdictColors(): VerdictColors {
     };
 }
 
-function getSegmentColor(
+/**
+ * A segment's colour, folding in the issuer colour when one applies.
+ *
+ * `issuerColor` is only ever honoured for Trusted/Valid: an issuer colour
+ * says who signed something the player is willing to vouch for, and applying
+ * it to Invalid or Unknown would read as vouching for content that failed or
+ * was never checked. Callers resolve `issuerColor` themselves (see
+ * `getIssuerAccentColor`) and pass `null` when issuer colouring does not
+ * apply, so this function does not need to know about the policy or
+ * liveness that gate the feature.
+ */
+export function getSegmentColor(
     verificationStatus: TimelineVerificationStatus,
     isManifestInvalid = false,
     colors: VerdictColors = readVerdictColors(),
+    issuerColor: string | null = null,
 ) {
     if (isManifestInvalid || verificationStatus === 'Invalid' || verificationStatus === 'false') {
         return colors.failed;
     }
 
     if (verificationStatus === 'Trusted') {
-        return colors.trusted;
+        return issuerColor ?? colors.trusted;
     }
 
     if (verificationStatus === 'Valid') {
-        return colors.passed;
+        return issuerColor ?? colors.passed;
     }
 
     return colors.unknown;
+}
+
+/**
+ * Resolves the issuer that signed a segment's own manifest, or null when
+ * there is none to read - never hardcoded to a specific issuer name, since
+ * any stream may be signed by any organisation.
+ */
+function resolveSegmentIssuer(segment: C2PATimelineSegmentUpdate): string | null {
+    const manifest = resolveManifestFromSource(segment.manifestRef);
+
+    return manifest ? selectSignatureIssuer(manifest) : null;
+}
+
+/**
+ * The issuer behind `getIssuerAccentColor`/`getIssuerName` alike: null for
+ * anything but a Trusted/Valid segment, since an issuer colour or name on an
+ * Invalid or Unknown one would read as vouching for content that failed or
+ * was never checked (see `getSegmentColor`'s own doc comment).
+ */
+function resolveGatedIssuer(segment: C2PATimelineSegmentUpdate | null): string | null {
+    if (!segment) {
+        return null;
+    }
+
+    if (segment.validationState !== 'Trusted' && segment.validationState !== 'Valid') {
+        return null;
+    }
+
+    return resolveSegmentIssuer(segment);
 }
 
 /**
@@ -348,6 +420,31 @@ export function getTimelineFunctions(
     // Read once rather than per render: it is a viewer preference, and
     // re-querying matchMedia on every frame would be a style read per frame.
     const reducedMotion = prefersReducedMotion();
+    // One assigner per player instance (this factory is itself created once
+    // per instance - see main.ts), so an issuer's colour is stable for the
+    // session and resets on the next reload/source change rather than
+    // accumulating forever.
+    const issuerAssigner: IssuerColorAssigner = createIssuerColorAssigner();
+
+    const getIssuerAccentColor = function (
+        segment: C2PATimelineSegmentUpdate | null,
+        palette: readonly string[] = readIssuerPaletteColors(),
+    ): string | null {
+        const issuer = resolveGatedIssuer(segment);
+
+        return issuer ? issuerAssigner.colorFor(issuer, palette) : null;
+    };
+
+    /**
+     * The issuer behind a Trusted/Valid segment's colour, for a caller (the
+     * authenticity label) that wants to name it rather than only show its
+     * colour. Null under the same conditions `getIssuerAccentColor` is.
+     */
+    const getIssuerName = function (
+        segment: C2PATimelineSegmentUpdate | null,
+    ): string | null {
+        return resolveGatedIssuer(segment);
+    };
 
     const handleOnSeeked = function (time: number) {
         console.log('[C2PA] Player seeked: ', time);
@@ -363,6 +460,8 @@ export function getTimelineFunctions(
         provisional: boolean;
         pending: boolean;
         source?: C2PATimelineSegmentUpdate;
+        /** Resolved by the caller; see getIssuerAccentColor. */
+        issuerColor?: string | null;
     }
 
     /**
@@ -412,6 +511,7 @@ export function getTimelineFunctions(
             render.verificationStatus,
             render.isManifestInvalid,
             colors,
+            render.issuerColor ?? null,
         );
         segment.classList.toggle(PROVISIONAL_CLASS, render.provisional);
 
@@ -831,7 +931,15 @@ export function getTimelineFunctions(
         c2paControlBar: TimelineComponentLike,
         isLive = false,
         retentionSeconds = DEFAULT_LIVE_RETENTION_SECONDS,
+        colorizeByIssuer = false,
     ) {
+        // Live only, even if asked for on a VOD source: one signer for the
+        // whole duration there leaves nothing to distinguish, and the label
+        // above `?issuerColors=` documents this as a live-only setting.
+        const useIssuerColors = colorizeByIssuer && isLive;
+        // Read once for the whole pass, not once per segment - the same
+        // getComputedStyle cost readVerdictColors is batched to avoid.
+        const issuerPalette = useIssuerColors ? readIssuerPaletteColors() : null;
         const renders: SegmentRender[] = [...segments]
             .filter((segment) => Number.isFinite(segment.startTime) && Number.isFinite(segment.endTime))
             .filter((segment) => segment.endTime >= segment.startTime)
@@ -846,6 +954,7 @@ export function getTimelineFunctions(
                 provisional: segment.provisional === true,
                 pending: segment.pending === true,
                 source: segment,
+                issuerColor: issuerPalette ? getIssuerAccentColor(segment, issuerPalette) : null,
             }));
 
         reconcileSegments(renders, c2paControlBar);
@@ -945,6 +1054,8 @@ export function getTimelineFunctions(
         formatTime,
         updateC2PATimeline,
         replaceC2PATimelineSegments,
+        getIssuerAccentColor,
+        getIssuerName,
         renderWholeAssetVerdict,
         disposeTimeline,
     };
