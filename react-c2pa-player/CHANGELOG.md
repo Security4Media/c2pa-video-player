@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.2.0](https://github.com/Security4Media/c2pa-video-player/compare/v1.1.0...v1.2.0) (2026-09-07)
+
+
+### Features
+
+* colorize live DASH segments by issuer, fix missing per-segment C2PA metadata ([#28](https://github.com/Security4Media/c2pa-video-player/issues/28)) ([02e8b0d](https://github.com/Security4Media/c2pa-video-player/commit/02e8b0d66a9aa8ced97a0029980f33ace8c82f6b))
+* show cawg.metadata copyright info, gated on a trusted cawg.identity ([#29](https://github.com/Security4Media/c2pa-video-player/issues/29)) ([78807b5](https://github.com/Security4Media/c2pa-video-player/commit/78807b5e25e748082ca4ce2d73fce5ed751a1b18))
+
 ## [1.1.0](https://github.com/Security4Media/c2pa-video-player/compare/v1.0.0...v1.1.0) (2026-09-04)
 
 
