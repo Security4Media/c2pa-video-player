@@ -19,6 +19,7 @@ import { describe, expect, it } from 'vitest';
 import {
   classifyFailureScope,
   condemnsWholeAsset,
+  readIcaCredentialEvidence,
   readIngredientEvidence,
   readReaderEvidence,
   readStoreEvidence,
@@ -29,6 +30,11 @@ import {
 // WDR test stream and its tampered fixtures, not invented examples.
 const IDENTITY_URL = 'self#jumbf=/c2pa/urn:c2pa:x/c2pa.assertions/cawg.identity';
 const BMFF_URL = 'self#jumbf=/c2pa/urn:c2pa:x/c2pa.assertions/c2pa.hash.bmff.v3';
+
+// Observed via c2patool against a real Adobe-signed asset (adobe-27.1.mp4)
+// and the same asset re-wrapped one manifest deep by WDR (test-5.mp4).
+const ICA_MANIFEST_ID = 'urn:c2pa:7b5b4bc6-5dd4-4b20-97c4-c834b7f5bbc1';
+const ICA_IDENTITY_URL = `self#jumbf=/c2pa/${ICA_MANIFEST_ID}/c2pa.assertions/cawg.identity`;
 
 const withIdentity = { assertions: [{ label: 'cawg.identity' }] };
 const withoutIdentity = { assertions: [{ label: 'c2pa.actions.v2' }] };
@@ -159,6 +165,22 @@ describe('readStoreEvidence, WASM shape', () => {
     expect(evidence.identity).toBe('Valid');
   });
 
+  it('reports a well-formed identity as invalid when some other identity failure accompanies it, not merely untrusted', () => {
+    // Well-formed only ever speaks to the assertion's own structure, not to
+    // an unrelated identity-scoped failure landing on it too - this must not
+    // read the same as the untrusted-only case above. Mirrors the check
+    // identityFromFailures already makes for the WebCrypto shape, so the two
+    // readers do not disagree given the same conceptual input.
+    const evidence = readStoreEvidence(
+      wasmStore(
+        [{ code: 'cawg.identity.well-formed', url: IDENTITY_URL }],
+        [{ code: 'cawg.identity.malformed', url: IDENTITY_URL }],
+      ),
+    );
+
+    expect(evidence.identity).toBe('Invalid');
+  });
+
   it('does not let an untrusted identity alone condemn the asset', () => {
     const evidence = readStoreEvidence(
       wasmStore(
@@ -226,6 +248,128 @@ describe('readStoreEvidence, WASM shape', () => {
     );
 
     expect(evidence.state).toBe('Invalid');
+  });
+});
+
+describe('readStoreEvidence, ICA credential shape', () => {
+  it('reads an ICA-only identity as well-formed rather than Invalid', () => {
+    // adobe-27.1.mp4's active manifest carries only an ICA credential (no
+    // cawg.identity.well-formed will ever fire for it) - reading "neither of
+    // the two known codes fired" as Invalid mislabelled a perfectly
+    // well-formed credential the reader just didn't recognise yet.
+    const evidence = readStoreEvidence(
+      wasmStore([{ code: 'cawg.ica.credential_valid', url: IDENTITY_URL }]),
+    );
+
+    expect(evidence.identity).not.toBe('Invalid');
+  });
+
+  it('still cannot call it Trusted here: this reader has no DID trust-anchor concept', () => {
+    const evidence = readStoreEvidence(
+      wasmStore([{ code: 'cawg.ica.credential_valid', url: IDENTITY_URL }]),
+    );
+
+    expect(evidence.identity).toBe('Valid');
+  });
+});
+
+describe('readIcaCredentialEvidence', () => {
+  it('is neither well-formed nor failed with no store', () => {
+    expect(readIcaCredentialEvidence(null, ICA_MANIFEST_ID)).toEqual({ wellFormed: false, failed: false });
+  });
+
+  it('finds the code when scoped to the right manifest id and assertion (WASM/coded shape)', () => {
+    const store = wasmStore([{ code: 'cawg.ica.credential_valid', url: ICA_IDENTITY_URL }]);
+
+    expect(readIcaCredentialEvidence(store, ICA_MANIFEST_ID)).toEqual({ wellFormed: true, failed: false });
+  });
+
+  it('finds the code in the flat validation_status array too (bubbled-up ingredient evidence)', () => {
+    // Reproduces test-5.mp4: the ICA credential lives on a direct ingredient,
+    // one level below the active manifest, yet the engine reports its
+    // evidence at the top level rather than nested under ingredientDeltas.
+    const store = {
+      active_manifest: 'm',
+      manifests: { m: withIdentity },
+      validation_status: [{ code: 'cawg.ica.credential_valid', url: ICA_IDENTITY_URL }],
+    } as unknown as ManifestStore;
+
+    expect(readIcaCredentialEvidence(store, ICA_MANIFEST_ID)).toEqual({ wellFormed: true, failed: false });
+  });
+
+  it('does not read a coexisting flat validation_status entry as a failure when coded results already cover this assertion', () => {
+    // The flat array is only ever the sole channel this credential's
+    // evidence bubbles through in every case observed so far - never
+    // alongside coded results for the same store. So when coded results do
+    // cover this assertion, a flat entry that also happens to reference it -
+    // whatever it is, even something that is not the known success code -
+    // must not be read as a failure for this credential.
+    const store = {
+      active_manifest: 'm',
+      manifests: { m: withIdentity },
+      validation_results: {
+        activeManifest: {
+          success: [{ code: 'cawg.ica.credential_valid', url: ICA_IDENTITY_URL }],
+          failure: [],
+        },
+      },
+      validation_status: [{ code: 'some.other.code', url: ICA_IDENTITY_URL }],
+    } as unknown as ManifestStore;
+
+    expect(readIcaCredentialEvidence(store, ICA_MANIFEST_ID)).toEqual({ wellFormed: true, failed: false });
+  });
+
+  it('does not match a code reported for a different manifest', () => {
+    const store = wasmStore([{ code: 'cawg.ica.credential_valid', url: ICA_IDENTITY_URL }]);
+
+    expect(readIcaCredentialEvidence(store, 'urn:c2pa:some-other-manifest')).toEqual({
+      wellFormed: false,
+      failed: false,
+    });
+  });
+
+  it('does not match a same-manifest code for a different assertion', () => {
+    const store = wasmStore([
+      { code: 'cawg.ica.credential_valid', url: `self#jumbf=/c2pa/${ICA_MANIFEST_ID}/c2pa.assertions/c2pa.actions.v2` },
+    ]);
+
+    expect(readIcaCredentialEvidence(store, ICA_MANIFEST_ID)).toEqual({ wellFormed: false, failed: false });
+  });
+
+  it('does not match a manifest id that is merely a substring of a different one', () => {
+    // 'urn:c2pa:x' is a substring of 'urn:c2pa:xy' - scoping by whole path
+    // segment, not bare substring containment, must not confuse the two.
+    // Short/test ids like these are far more likely to collide this way
+    // than real UUIDs, which is exactly why this needs its own case.
+    const store = wasmStore([
+      { code: 'cawg.ica.credential_valid', url: 'self#jumbf=/c2pa/urn:c2pa:xy/c2pa.assertions/cawg.identity' },
+    ]);
+
+    expect(readIcaCredentialEvidence(store, 'urn:c2pa:x')).toEqual({ wellFormed: false, failed: false });
+  });
+
+  it('is neither well-formed nor failed under an engine that never checks this credential form at all', () => {
+    // Reproduces the default nettrek/WebCrypto engine against adobe-27.1.mp4:
+    // validation_results.activeManifest is null and validation_status is
+    // empty, since that engine explicitly defers ICA cryptographic
+    // verification rather than reporting either outcome.
+    const store = {
+      active_manifest: ICA_MANIFEST_ID,
+      manifests: { [ICA_MANIFEST_ID]: withIdentity },
+      validation_state: 'Trusted',
+      validation_status: [],
+    } as unknown as ManifestStore;
+
+    expect(readIcaCredentialEvidence(store, ICA_MANIFEST_ID)).toEqual({ wellFormed: false, failed: false });
+  });
+
+  it('reports failed when some other coded entry lands on this exact assertion', () => {
+    const store = wasmStore(
+      [],
+      [{ code: 'cawg.identity.malformed', url: ICA_IDENTITY_URL }],
+    );
+
+    expect(readIcaCredentialEvidence(store, ICA_MANIFEST_ID)).toEqual({ wellFormed: false, failed: true });
   });
 });
 

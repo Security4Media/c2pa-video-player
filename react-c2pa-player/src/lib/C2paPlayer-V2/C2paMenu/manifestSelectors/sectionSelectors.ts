@@ -15,13 +15,17 @@
  */
 
 import { Manifest, ManifestStore } from '@contentauth/c2pa-web';
-import type { AdapterKind } from '@/lib/validation';
+import type { AdapterKind, IdentityTrustMode } from '@/lib/validation';
+import { meetsIdentityTrustThreshold } from '@/lib/validation/rules';
 import {
     ClaimGeneratorSectionItem,
+    CopyrightSectionItem,
     HistorySectionItem,
+    ManifestCawgAssertion,
     OrganizationSectionItem,
     WorkSectionItem,
 } from '../models';
+import { hasPublishedAction, selectActionsAssertion } from './actionsSelectors';
 import { selectOrganizationIdentity } from './cawgSelectors';
 import { selectClaimGenerator } from './claimGeneratorSelectors';
 import {
@@ -29,6 +33,7 @@ import {
     selectCreativeWorkOrganization,
 } from './creativeWorkSelectors';
 import { selectIngredients } from './ingredientSelectors';
+import { getReferencedAssertionLabels, selectX509CawgAssertion } from './shared';
 
 /**
  * Select the claim-generator section model for the menu.
@@ -67,46 +72,150 @@ export function selectHistorySection(
 }
 
 /**
+ * What to call the Organization Identity section, and whether to flag it as
+ * ambiguous.
+ *
+ * A `c2pa.published` action alone does not make this identity the publisher
+ * - only its own `referenced_assertions` covering the actions assertion does
+ * that. Absent a publish action at all, there is nothing publisher-related
+ * to say either way, so the title stays generic and no hint is shown.
+ */
+function resolveOrganizationTitle(
+    manifest: Manifest,
+    x509Assertion: ManifestCawgAssertion,
+): { title: string; titleHint: string | null } {
+    if (!hasPublishedAction(manifest)) {
+        return { title: 'Organization Identity', titleHint: null };
+    }
+
+    const actionsAssertion = selectActionsAssertion(manifest);
+    const isReferenced = actionsAssertion
+        ? getReferencedAssertionLabels(x509Assertion).includes(actionsAssertion.label)
+        : false;
+
+    if (isReferenced) {
+        return { title: 'Publisher Identity', titleHint: null };
+    }
+
+    return {
+        title: 'Organization Identity',
+        titleHint: 'This content was published, but this identity does not cryptographically reference the actions that published it, so it cannot be confirmed as the publisher.',
+    };
+}
+
+/**
  * Select the organization section model, combining CreativeWork organization
- * details with CAWG organization identity information when available.
+ * details with CAWG organization identity information.
+ *
+ * Gated on two things, both required:
+ *  - the active manifest carries an X.509-shaped `cawg.identity` specifically
+ *    (see `selectX509CawgAssertion`) - every field this section shows
+ *    (`signature_info`, referenced CreativeWork/Dublin Core content) only
+ *    ever comes from that shape, not a CAWG Identity Claims Aggregation
+ *    credential or a bare CreativeWork organization with no identity at all;
+ *  - that identity's verdict clears `identityTrustMode`'s bar (default
+ *    `'relaxed'`: `Trusted` or `Valid`; `'strict'`: `Trusted` only). Below
+ *    that bar, this section - title, badge and all - does not appear rather
+ *    than showing a claim this app cannot vouch for to the configured degree.
+ *
+ * `showCreativeWork` (default on) additionally gates the unguarded
+ * `organization` field (Organization Details: website/identifier/LEI/ISO
+ * 6523) - unrelated to the trust threshold above.
  *
  * @param manifest - The manifest containing organization-related assertions
  * @param manifestStore - Optional manifest store used for CAWG validation status
- * @returns Structured organization section data, or null when both sources are absent
+ * @param adapterKind - Which adapter produced this result
+ * @param identityTrustMode - How strict the identity verdict must be (see `meetsIdentityTrustThreshold`)
+ * @param showCreativeWork - Whether to include CreativeWork-derived organization details
+ * @returns Structured organization section data, or null unless a sufficiently-trusted X.509 cawg.identity is present
  */
 export function selectOrganizationSection(
     manifest: Manifest,
     manifestStore?: ManifestStore,
     adapterKind?: AdapterKind | null,
+    identityTrustMode: IdentityTrustMode = 'relaxed',
+    showCreativeWork: boolean = true,
 ): OrganizationSectionItem | null {
-    const organization = selectCreativeWorkOrganization(manifest);
-    const cawg = selectOrganizationIdentity(manifest, manifestStore, adapterKind);
+    const x509Assertion = selectX509CawgAssertion(manifest);
 
-    if (!organization && !cawg) {
+    if (!x509Assertion) {
         return null;
     }
+
+    const cawg = selectOrganizationIdentity(
+        manifest,
+        manifestStore,
+        adapterKind,
+        identityTrustMode,
+        showCreativeWork,
+    );
+
+    if (!cawg || !meetsIdentityTrustThreshold(cawg.validationStatus, identityTrustMode)) {
+        return null;
+    }
+
+    const organization = showCreativeWork ? selectCreativeWorkOrganization(manifest) : null;
+    const { title, titleHint } = resolveOrganizationTitle(manifest, x509Assertion);
 
     return {
         organization,
         cawg,
+        title,
+        titleHint,
     };
+}
+
+/**
+ * Select the copyright/credit section model, derived from the schema.org
+ * shape of `cawg.metadata` (copyrightHolder, publisher, creditText,
+ * copyrightNotice). `selectOrganizationIdentity` only populates this field
+ * when the referencing `cawg.identity` clears `identityTrustMode`'s bar, so
+ * this section is null (and hidden) for any lesser verdict. Unaffected by
+ * `showCreativeWork`: `cawg.metadata` is not CreativeWork-derived.
+ *
+ * @param manifest - The manifest containing CAWG assertions
+ * @param manifestStore - Optional manifest store used to compute CAWG validation status
+ * @param adapterKind - Which adapter produced this result
+ * @param identityTrustMode - How strict the identity verdict must be (see `meetsIdentityTrustThreshold`)
+ * @returns Structured copyright section data, or null when absent or below the trust threshold
+ */
+export function selectCopyrightSection(
+    manifest: Manifest,
+    manifestStore?: ManifestStore,
+    adapterKind?: AdapterKind | null,
+    identityTrustMode: IdentityTrustMode = 'relaxed',
+): CopyrightSectionItem | null {
+    const cawg = selectOrganizationIdentity(manifest, manifestStore, adapterKind, identityTrustMode);
+
+    if (!cawg?.copyright) {
+        return null;
+    }
+
+    return { copyright: cawg.copyright, validationStatus: cawg.validationStatus };
 }
 
 /**
  * Select the work/authors section model from CreativeWork data and the
  * optional CAWG role.
  *
+ * `showCreativeWork` (default on) gates the CreativeWork-derived fields
+ * (authors, organization name) - not `role`, which comes from the identity
+ * assertion itself, not CreativeWork, and is shown regardless.
+ *
  * @param manifest - The manifest containing CreativeWork and CAWG assertions
  * @param manifestStore - Optional manifest store used to compute CAWG status
+ * @param adapterKind - Which adapter produced this result
+ * @param showCreativeWork - Whether to include CreativeWork-derived authors/organization name
  * @returns Structured work section data, or null when no author or role data exists
  */
 export function selectWorkSection(
     manifest: Manifest,
     manifestStore?: ManifestStore,
     adapterKind?: AdapterKind | null,
+    showCreativeWork: boolean = true,
 ): WorkSectionItem | null {
-    const authors = selectCreativeWorkAuthors(manifest);
-    const organization = selectCreativeWorkOrganization(manifest);
+    const authors = showCreativeWork ? selectCreativeWorkAuthors(manifest) : [];
+    const organization = showCreativeWork ? selectCreativeWorkOrganization(manifest) : null;
     // Only the role is read from here, which no engine verifies either way -
     // but the argument is passed so the two selectors cannot answer the same
     // question differently.

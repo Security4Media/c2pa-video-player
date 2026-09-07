@@ -37,13 +37,36 @@
  * outright, not because anything was visibly broken. The orange heading was
  * visibly broken. */
 
-.vjs-menu li.vjs-menu-item .c2pa-org-section__status {
+/* Holds the title-hint "?" and the validation badge together at the far
+   right, so a header with both shows them as one cluster rather than two
+   independently-pushed elements landing on top of each other. */
+.vjs-menu li.vjs-menu-item .c2pa-org-section__badge-cluster {
   margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.vjs-menu li.vjs-menu-item .c2pa-org-section__status {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   font-size: 1.15rem;
   line-height: 1;
+  cursor: help;
+}
+
+.vjs-menu li.vjs-menu-item .c2pa-org-section__title-hint {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.15rem;
+  height: 1.15rem;
+  border-radius: 50%;
+  border: 1px solid currentColor;
+  font-size: 0.75rem;
+  line-height: 1;
+  opacity: 0.8;
   cursor: help;
 }
 

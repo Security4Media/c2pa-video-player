@@ -24,6 +24,8 @@ import {
   AiOptOutSection,
   AlertItem,
   ClaimGeneratorSection,
+  CopyrightSection,
+  CreatorSection,
   HistoryDetailView,
   HistorySection,
   InvalidState,
@@ -99,12 +101,18 @@ export function C2paMenuContent({
   onBackToLive,
 }: C2paMenuContentProps) {
   const [activeView, setActiveView] = useState<'default' | 'history'>('default');
+  const [copyrightExpanded, setCopyrightExpanded] = useState(false);
+  // Starts expanded, unlike the other collapsible sections: a viewer opening
+  // the panel should see who's behind the content without an extra click.
+  const [creatorExpanded, setCreatorExpanded] = useState(true);
   const [workExpanded, setWorkExpanded] = useState(false);
   const [aiOptOutExpanded, setAiOptOutExpanded] = useState(false);
   const [ingredientsExpanded, setIngredientsExpanded] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     setActiveView('default');
+    setCopyrightExpanded(false);
+    setCreatorExpanded(true);
     setWorkExpanded(false);
     setAiOptOutExpanded(false);
     setIngredientsExpanded({});
@@ -202,9 +210,22 @@ export function C2paMenuContent({
           />
         ) : null}
         {sections.organization ? (
-          <OrganizationSection
-            section={sections.organization}
-            title={sectionTitles.organization}
+          <OrganizationSection section={sections.organization} />
+        ) : null}
+        {sections.copyright ? (
+          <CopyrightSection
+            section={sections.copyright}
+            title={sectionTitles.copyright}
+            isExpanded={copyrightExpanded}
+            onToggle={() => setCopyrightExpanded(current => !current)}
+          />
+        ) : null}
+        {sections.creator ? (
+          <CreatorSection
+            section={sections.creator}
+            title={sectionTitles.creator}
+            isExpanded={creatorExpanded}
+            onToggle={() => setCreatorExpanded(current => !current)}
           />
         ) : null}
         {sections.work ? (

@@ -22,11 +22,16 @@ import {
   resolveColorizeTimelineByIssuer,
   resolveConsentMode,
   resolveEnforceValidatedPlayback,
+  resolveIcaTrustFixtureName,
+  resolveIdentityTrustMode,
   resolveLiveRetentionSeconds,
   resolveMonolithicEngine,
   resolveShowAuthenticityLabel,
+  resolveShowCreativeWork,
   resolveTrustFixtureName,
   type ConsentMode,
+  type IcaTrustFixtureName,
+  type IdentityTrustMode,
   type MediaSourceDescriptor,
   type MonolithicEngine,
   type TrustFixtureName,
@@ -65,6 +70,13 @@ const TRUST_PROFILES: { value: TrustFixtureName | 'full-prod'; label: string }[]
   { value: 'wrong-anchor', label: 'wrong-anchor' },
 ];
 
+const ICA_TRUST_PROFILES: { value: IcaTrustFixtureName | 'full-prod'; label: string }[] = [
+  { value: 'full-prod', label: 'full-prod (default)' },
+  { value: 'full-dev', label: 'full-dev' },
+  { value: 'empty', label: 'empty' },
+  { value: 'wrong-issuer', label: 'wrong-issuer' },
+];
+
 /**
  * Visual controls for the query-string switches documented in the top-level
  * README's "Runtime parameters" table. Previously URL-only - see that table
@@ -80,9 +92,16 @@ export function PlayerConfigPanel({ mediaSource, onApply }: PlayerConfigPanelPro
   const [trust, setTrust] = useState<TrustFixtureName | 'full-prod'>(
     () => resolveTrustFixtureName() ?? 'full-prod'
   );
+  const [icaTrust, setIcaTrust] = useState<IcaTrustFixtureName | 'full-prod'>(
+    () => resolveIcaTrustFixtureName() ?? 'full-prod'
+  );
   const [windowSeconds, setWindowSeconds] = useState<number>(() => resolveLiveRetentionSeconds());
   const [gateEnabled, setGateEnabled] = useState<boolean>(() => resolveEnforceValidatedPlayback());
   const [engine, setEngine] = useState<MonolithicEngine>(() => resolveMonolithicEngine());
+  const [identityTrustRelaxed, setIdentityTrustRelaxed] = useState<boolean>(
+    () => resolveIdentityTrustMode() === 'relaxed'
+  );
+  const [showCreativeWork, setShowCreativeWork] = useState<boolean>(() => resolveShowCreativeWork());
   const [issuerColors, setIssuerColors] = useState<boolean>(() => resolveColorizeTimelineByIssuer());
 
   const adapterKind = useMemo(
@@ -127,6 +146,15 @@ export function PlayerConfigPanel({ mediaSource, onApply }: PlayerConfigPanelPro
     [onApply]
   );
 
+  const handleIcaTrustChange = useCallback(
+    (value: IcaTrustFixtureName | 'full-prod') => {
+      setIcaTrust(value);
+      applyParam('icaTrust', value === 'full-prod' ? null : value);
+      onApply();
+    },
+    [onApply]
+  );
+
   const handleWindowChange = useCallback(
     (value: number) => {
       setWindowSeconds(value);
@@ -152,6 +180,25 @@ export function PlayerConfigPanel({ mediaSource, onApply }: PlayerConfigPanelPro
     (value: MonolithicEngine) => {
       setEngine(value);
       applyParam('monolithicEngine', value === 'c2pa-web' ? value : null);
+      onApply();
+    },
+    [onApply]
+  );
+
+  const handleIdentityTrustChange = useCallback(
+    (checked: boolean) => {
+      setIdentityTrustRelaxed(checked);
+      const mode: IdentityTrustMode = checked ? 'relaxed' : 'strict';
+      applyParam('identityTrust', mode === 'strict' ? 'strict' : null);
+      onApply();
+    },
+    [onApply]
+  );
+
+  const handleShowCreativeWorkChange = useCallback(
+    (checked: boolean) => {
+      setShowCreativeWork(checked);
+      applyParam('showCreativeWork', checked ? null : 'off');
       onApply();
     },
     [onApply]
@@ -187,6 +234,30 @@ export function PlayerConfigPanel({ mediaSource, onApply }: PlayerConfigPanelPro
         </label>
 
         <label
+          className="player-config-control player-config-control--checkbox"
+          title="Shows organization/publisher, copyright, AI opt-out, and Creator information for an identity that is only Valid (structurally verified but not on this player's trusted-anchor list), not just Trusted. On by default. Unchecking sets ?identityTrust=strict, which also tightens Creator to Trusted-only. (?identityTrust=strict when unchecked)"
+        >
+          <input
+            type="checkbox"
+            checked={identityTrustRelaxed}
+            onChange={(event) => handleIdentityTrustChange(event.target.checked)}
+          />
+          Show info for Valid (not just Trusted) identities
+        </label>
+
+        <label
+          className="player-config-control player-config-control--checkbox"
+          title="Shows information derived from the stds.schema-org.CreativeWork assertion: Organization Details, About the Producer (authors/organization name), and Organization Identity's Published-on/License lines. On by default. Does not affect Copyright, which is cawg.metadata-derived. (?showCreativeWork=off when unchecked)"
+        >
+          <input
+            type="checkbox"
+            checked={showCreativeWork}
+            onChange={(event) => handleShowCreativeWorkChange(event.target.checked)}
+          />
+          Show CreativeWork information
+        </label>
+
+        <label
           className="player-config-control"
           title="Where the consent question is raised: once per source, only if already known bad (whole-asset, default); the first time invalid content plays (per-stream); or once per contiguous invalid stretch (per-run). (?consent=)"
         >
@@ -213,6 +284,25 @@ export function PlayerConfigPanel({ mediaSource, onApply }: PlayerConfigPanelPro
             }
           >
             {TRUST_PROFILES.map((profile) => (
+              <option key={profile.value} value={profile.value}>
+                {profile.label}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label
+          className="player-config-control"
+          title="Which DIDs this player trusts as issuers of CAWG Identity Claims Aggregation (ICA) credentials - a separate, app-level trust list, since the C2PA engine has no DID trust-anchor concept of its own. Unrecognised values fall back to full-prod. (?icaTrust=)"
+        >
+          ICA issuer trust profile
+          <select
+            value={icaTrust}
+            onChange={(event) =>
+              handleIcaTrustChange(event.target.value as IcaTrustFixtureName | 'full-prod')
+            }
+          >
+            {ICA_TRUST_PROFILES.map((profile) => (
               <option key={profile.value} value={profile.value}>
                 {profile.label}
               </option>

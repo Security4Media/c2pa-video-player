@@ -139,6 +139,21 @@ export interface ValidationPolicy {
 export type ConsentMode = 'whole-asset' | 'per-stream' | 'per-run';
 
 /**
+ * How strict a `cawg.identity` verdict must be before the menu shows content
+ * gated on it (Organization/Publisher Identity, Copyright, AI opt-out,
+ * Creator). See `meetsIdentityTrustThreshold` in `./rules` - every gated
+ * selector calls that instead of hand-rolling this comparison - and
+ * `resolveIdentityTrustMode` in `./policy/menuDisplay` for how `?identityTrust=`
+ * resolves to one of these.
+ *
+ * `'relaxed'` (default) shows content for `Trusted` or `Valid`; Creator keeps
+ * its own separate, already-more-permissive policy on top of this (also
+ * shows `Unknown`). `'strict'` requires exactly `Trusted` everywhere,
+ * including tightening Creator.
+ */
+export type IdentityTrustMode = 'relaxed' | 'strict';
+
+/**
  * The part of the policy the player layer reads off the snapshot.
  *
  * One object rather than a field per setting, because a field per setting is

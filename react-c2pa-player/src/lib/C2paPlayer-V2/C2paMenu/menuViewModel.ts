@@ -16,7 +16,7 @@
 
 import type { Manifest } from '@contentauth/c2pa-web';
 import type { C2PAStatus } from '@/lib/types/c2pa.types';
-import type { AdapterKind, ValidationTimelineSegment } from '@/lib/validation';
+import type { AdapterKind, IdentityTrustMode, ValidationTimelineSegment } from '@/lib/validation';
 import type { C2PATimelineState } from '../C2PAPlayerRoot.types';
 import { readStoreEvidence } from '@/lib/validation/evidence';
 import { getActiveManifest } from '@/lib/validation/rules';
@@ -25,6 +25,8 @@ import {
     resolveManifestStoreFromSource,
     selectAiOptOutSection,
     selectClaimGeneratorSection,
+    selectCopyrightSection,
+    selectCreatorSection,
     selectHistorySection,
     selectOrganizationSection,
     selectSignatureIssuer,
@@ -34,6 +36,8 @@ import {
 import type {
     AiOptOutSectionItem,
     ClaimGeneratorSectionItem,
+    CopyrightSectionItem,
+    CreatorSectionItem,
     HistorySectionItem,
     OrganizationSectionItem,
     WorkSectionItem,
@@ -43,7 +47,12 @@ export const c2paMenuSectionTitles = {
     summaryIssuer: 'Issued by',
     summaryDate: 'Issued on',
     claimGenerator: 'App or device used',
-    organization: 'Organization Identity',
+    // No 'organization' entry: OrganizationSectionItem carries its own
+    // manifest-derived title (see resolveOrganizationTitle in
+    // sectionSelectors.ts) - "Organization Identity" or "Publisher Identity"
+    // depending on what the active manifest's identity actually references.
+    copyright: 'Copyright',
+    creator: 'Creator',
     work: 'About the Producer',
     aiOptOut: 'About Training and Data mining',
     history: 'History of provenance',
@@ -65,6 +74,8 @@ export interface C2paMenuSections {
     summary: SummarySectionItem;
     claimGenerator: ClaimGeneratorSectionItem | null;
     organization: OrganizationSectionItem | null;
+    copyright: CopyrightSectionItem | null;
+    creator: CreatorSectionItem | null;
     work: WorkSectionItem | null;
     aiOptOut: AiOptOutSectionItem | null;
     history: HistorySectionItem | null;
@@ -179,15 +190,28 @@ function getManifestId(activeManifest: Manifest | null, c2paStatus: C2PAStatus |
  *
  * @param c2paStatus - Current C2PA player status payload
  * @param timeline - Timeline snapshot from the shared player controller
+ * @param selectedSegment - A clicked timeline fragment, if any, in place of the live/current status
+ * @param trustedIcaIssuers - This app's own trusted CAWG ICA issuer DIDs (see useTrustedIcaIssuers)
+ * @param identityTrustMode - How strict a cawg.identity verdict must be before its content shows (see resolveIdentityTrustMode)
+ * @param showCreativeWork - Whether to include CreativeWork-derived content (see resolveShowCreativeWork)
  * @returns Render state describing menu mode, manifest identity, and visible sections
  */
 export function buildMenuRenderState(
     c2paStatus: C2PAStatus | null,
     timeline: C2PATimelineState,
     selectedSegment?: ValidationTimelineSegment | null,
+    trustedIcaIssuers: ReadonlySet<string> = new Set(),
+    identityTrustMode: IdentityTrustMode = 'relaxed',
+    showCreativeWork: boolean = true,
 ): C2paMenuRenderState {
     if (selectedSegment) {
-        return buildSegmentMenuRenderState(selectedSegment, c2paStatus?.adapterKind);
+        return buildSegmentMenuRenderState(
+            selectedSegment,
+            c2paStatus?.adapterKind,
+            trustedIcaIssuers,
+            identityTrustMode,
+            showCreativeWork,
+        );
     }
 
     const manifestStore = c2paStatus?.manifestStore ?? null;
@@ -272,13 +296,33 @@ export function buildMenuRenderState(
                 activeManifest,
                 selectorManifestStore ?? undefined,
                 c2paStatus?.adapterKind,
+                identityTrustMode,
+                showCreativeWork,
             ),
+            copyright: selectCopyrightSection(
+                activeManifest,
+                selectorManifestStore ?? undefined,
+                c2paStatus?.adapterKind,
+                identityTrustMode,
+            ),
+            // Ingredient-aware, like history below: needs a real manifestStore
+            // to resolve ingredient manifests by id, not just to read trust
+            // status off of.
+            creator: selectorManifestStore
+                ? selectCreatorSection(activeManifest, selectorManifestStore, trustedIcaIssuers, identityTrustMode)
+                : null,
             work: selectWorkSection(
                 activeManifest,
                 selectorManifestStore ?? undefined,
                 c2paStatus?.adapterKind,
+                showCreativeWork,
             ),
-            aiOptOut: selectAiOptOutSection(activeManifest),
+            aiOptOut: selectAiOptOutSection(
+                activeManifest,
+                selectorManifestStore ?? undefined,
+                c2paStatus?.adapterKind,
+                identityTrustMode,
+            ),
             history: selectorManifestStore
                 ? selectHistorySection(activeManifest, selectorManifestStore)
                 : null,
@@ -303,6 +347,8 @@ function buildInvalidOnlySections(alert: string | null): C2paMenuSections {
         },
         claimGenerator: null,
         organization: null,
+        copyright: null,
+        creator: null,
         work: null,
         aiOptOut: null,
         history: null,
@@ -331,10 +377,18 @@ function buildSegmentAlertMessage(segment: ValidationTimelineSegment): string | 
  * segment has a manifest (`manifestRef` resolves to one); falls back to a
  * status/anomaly-only view (mode 'segment-integrity') when it doesn't - the
  * DASH VSI/integrity-only case, or any segment with no manifestRef at all.
+ *
+ * `identityTrustMode` and `showCreativeWork` are forwarded straight through
+ * to those same selectors, same meaning as in `buildMenuRenderState` above -
+ * a clicked fragment's manifest is gated on the same display policy the live
+ * status is, not a separate one.
  */
 function buildSegmentMenuRenderState(
     segment: ValidationTimelineSegment,
     adapterKind: AdapterKind | null | undefined,
+    trustedIcaIssuers: ReadonlySet<string>,
+    identityTrustMode: IdentityTrustMode,
+    showCreativeWork: boolean,
 ): C2paMenuRenderState {
     const activeManifest = resolveManifestFromSource(segment.manifestRef);
     const validationStatus = segment.validationState;
@@ -354,6 +408,8 @@ function buildSegmentMenuRenderState(
                 },
                 claimGenerator: null,
                 organization: null,
+                copyright: null,
+                creator: null,
                 work: null,
                 aiOptOut: null,
                 history: null,
@@ -391,9 +447,30 @@ function buildSegmentMenuRenderState(
                 activeManifest,
                 selectorManifestStore ?? undefined,
                 adapterKind,
+                identityTrustMode,
+                showCreativeWork,
             ),
-            work: selectWorkSection(activeManifest, selectorManifestStore ?? undefined, adapterKind),
-            aiOptOut: selectAiOptOutSection(activeManifest),
+            copyright: selectCopyrightSection(
+                activeManifest,
+                selectorManifestStore ?? undefined,
+                adapterKind,
+                identityTrustMode,
+            ),
+            creator: selectorManifestStore
+                ? selectCreatorSection(activeManifest, selectorManifestStore, trustedIcaIssuers, identityTrustMode)
+                : null,
+            work: selectWorkSection(
+                activeManifest,
+                selectorManifestStore ?? undefined,
+                adapterKind,
+                showCreativeWork,
+            ),
+            aiOptOut: selectAiOptOutSection(
+                activeManifest,
+                selectorManifestStore ?? undefined,
+                adapterKind,
+                identityTrustMode,
+            ),
             history: selectorManifestStore
                 ? selectHistorySection(activeManifest, selectorManifestStore)
                 : null,

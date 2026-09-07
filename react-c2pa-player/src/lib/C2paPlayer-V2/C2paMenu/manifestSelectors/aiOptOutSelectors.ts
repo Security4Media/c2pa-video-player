@@ -14,12 +14,15 @@
  * limitations under the License.
  */
 
-import { Manifest } from '@contentauth/c2pa-web';
+import { Manifest, ManifestStore } from '@contentauth/c2pa-web';
+import type { AdapterKind, IdentityTrustMode } from '@/lib/validation';
+import { meetsIdentityTrustThreshold } from '@/lib/validation/rules';
 import {
     AiOptOutAssertionItem,
     AiOptOutEntryItem,
     AiOptOutSectionItem,
 } from '../models';
+import { selectOrganizationIdentity } from './cawgSelectors';
 import {
     CAWG_TRAINING_MINING_ASSERTION_LABEL,
     C2PA_TRAINING_MINING_ASSERTION_LABEL,
@@ -96,17 +99,35 @@ function mapTrainingMiningAssertion(
 
 /**
  * Select AI/training opt-out assertions only when they are explicitly
- * referenced by the manifest's `cawg.identity` assertion.
+ * referenced by the manifest's `cawg.identity` assertion, and that identity
+ * clears `identityTrustMode`'s bar (default `'relaxed'`: `Trusted` or
+ * `Valid`; `'strict'`: `Trusted` only).
  *
- * This prevents standalone training-mining assertions from appearing in the
- * menu unless the publisher identity has actually signed over them.
+ * Same rule as the Copyright and Organization Identity sections: a
+ * training-mining assertion merely being referenced is not authenticated by
+ * anything unless the identity vouching for it clears that bar - anything
+ * below it has claimed references exactly as unverified as the content they
+ * point to.
  *
  * @param manifest - The manifest containing CAWG and training-mining assertions
- * @returns Structured AI opt-out section data, or null when no referenced assertions exist
+ * @param manifestStore - Optional manifest store used to compute CAWG validation status
+ * @param adapterKind - Which adapter produced this result
+ * @param identityTrustMode - How strict the identity verdict must be (see `meetsIdentityTrustThreshold`)
+ * @returns Structured AI opt-out section data, or null when not referenced by a sufficiently-trusted identity
  */
-export function selectAiOptOutSection(manifest: Manifest): AiOptOutSectionItem | null {
+export function selectAiOptOutSection(
+    manifest: Manifest,
+    manifestStore?: ManifestStore,
+    adapterKind?: AdapterKind | null,
+    identityTrustMode: IdentityTrustMode = 'relaxed',
+): AiOptOutSectionItem | null {
     const cawgAssertion = selectCawgAssertion(manifest);
     if (!cawgAssertion) {
+        return null;
+    }
+
+    const validationStatus = selectOrganizationIdentity(manifest, manifestStore, adapterKind)?.validationStatus;
+    if (!validationStatus || !meetsIdentityTrustThreshold(validationStatus, identityTrustMode)) {
         return null;
     }
 

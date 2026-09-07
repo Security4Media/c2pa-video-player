@@ -16,6 +16,8 @@
 
 export { AiOptOutSection } from './AiOptOutSection';
 export { ClaimGeneratorSection } from './ClaimGeneratorSection';
+export { CopyrightSection } from './CopyrightSection';
+export { CreatorSection } from './CreatorSection';
 export { HistoryDetailView, HistorySection } from './HistorySection';
 export { OrganizationSection } from './OrganizationSection';
 export { SummarySection } from './SummarySection';

@@ -1,0 +1,6 @@
+# Development-only overlay for trusted CAWG ICA issuer DIDs. See
+# ../prod/cawg_ica_issuers.txt for what this list is and why it exists.
+#
+# Empty for now: no test-only ICA issuer DID is known to this project yet.
+# Add one here (not to prod/) if a test-signed ICA credential needs to reach
+# 'Trusted' under `?trust=full-dev` without also trusting it in production.

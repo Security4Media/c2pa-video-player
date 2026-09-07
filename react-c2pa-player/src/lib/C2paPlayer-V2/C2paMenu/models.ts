@@ -77,6 +77,31 @@ export interface DublinCoreMetadataItem {
     description: string | null;
 }
 
+export interface CawgCopyrightHolderItem {
+    name: string | null;
+    sameAs: string[] | null;
+}
+
+export interface CawgCopyrightPublisherItem {
+    name: string | null;
+    legalName: string | null;
+    alternateName: string | null;
+    website: string | null;
+}
+
+/**
+ * The schema.org-flavored shape `cawg.metadata` can take (as opposed to the
+ * Dublin Core `dc:*` shape covered by `DublinCoreMetadataItem`). Either shape
+ * can appear under the same assertion label.
+ */
+export interface CawgMetadataCopyrightItem {
+    copyrightNotice: string | null;
+    copyrightHolder: CawgCopyrightHolderItem | null;
+    copyrightYear: number | null;
+    creditText: string | null;
+    publisher: CawgCopyrightPublisherItem | null;
+}
+
 export interface ClaimGeneratorItem {
     name: string;
     version: string | null;
@@ -108,12 +133,23 @@ export interface CawgOrganizationItem {
     role?: CawgRole | null;
     creativeWork: CreativeWorkContentItem | null;
     dublinCore: DublinCoreMetadataItem | null;
+    copyright: CawgMetadataCopyrightItem | null;
     validationStatus: ValidationState;
 }
 
 export interface OrganizationSectionItem {
     organization: OrganizationIdentityItem | null;
     cawg: CawgOrganizationItem | null;
+    /** "Organization Identity", or "Publisher Identity" when this identity references a published c2pa.actions. */
+    title: string;
+    /** Explains an ambiguous case (published, but not referenced) as a tooltip; null otherwise. */
+    titleHint: string | null;
+}
+
+export interface CopyrightSectionItem {
+    copyright: CawgMetadataCopyrightItem;
+    /** The referencing identity's verdict - never below the threshold that let this section render (see selectCopyrightSection), so only 'Trusted' or 'Valid' in practice. */
+    validationStatus: ValidationState;
 }
 
 export interface WorkSectionItem {
@@ -136,5 +172,47 @@ export interface AiOptOutAssertionItem {
 
 export interface AiOptOutSectionItem {
     assertion: AiOptOutAssertionItem;
+}
+
+/**
+ * One CAWG Identity Claims Aggregation (ICA) verified-identity claim
+ * (`cawg.identity`'s `verifiedIdentities` entries, e.g. a social media
+ * profile or a document-verification result).
+ *
+ * `type` is left as an open string rather than a union: the ICA spec defines
+ * a fixed set today, but a manifest can declare a type this app has never
+ * seen, and dropping it silently would be worse than rendering it plainly.
+ * `displayName` is `username` (social media) or `name` (document
+ * verification) normalized to one field, since only one is ever present.
+ */
+export interface VerifiedIdentityClaim {
+    type: string;
+    displayName: string | null;
+    uri: string | null;
+    verifiedAt: string | null;
+    providerName: string | null;
+}
+
+/**
+ * Verified-identity claims found on one manifest node (the active manifest,
+ * or one ingredient, however deeply nested), labeled by where they came from
+ * so claims from different signers in a provenance chain are never shown as
+ * if they were one person.
+ *
+ * `validationStatus` is never `'Invalid'` here - a confirmed-broken
+ * credential is withheld entirely rather than turned into a group. `Unknown`
+ * (nothing checked this credential's signature) and `Valid` (checked, just
+ * not on this app's trusted-issuer list) are both shown, each carrying its
+ * own verdict, so a viewer isn't left unable to tell "no identity was
+ * declared" from "one was declared but withheld".
+ */
+export interface CreatorIdentityGroup {
+    source: string;
+    claims: VerifiedIdentityClaim[];
+    validationStatus: ValidationState;
+}
+
+export interface CreatorSectionItem {
+    groups: CreatorIdentityGroup[];
 }
 

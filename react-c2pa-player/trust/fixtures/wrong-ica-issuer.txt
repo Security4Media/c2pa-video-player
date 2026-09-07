@@ -1,0 +1,3 @@
+# A DID belonging to no one this project actually trusts, as a negative
+# control for the ICA issuer trust list - mirrors trust/fixtures/unrelated-anchor.pem.
+did:web:example.invalid
