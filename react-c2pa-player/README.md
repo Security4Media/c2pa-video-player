@@ -127,10 +127,12 @@ panel just reads and writes it.
 | `?monolithicEngine=c2pa-web` | `nettrek` | Swaps the monolithic MP4 validation runtime from the shipped bridge-based one to an independent runtime that calls `@contentauth/c2pa-web` directly (see `runtimes/monolithicC2paWebRuntime.ts`). Has no effect on HLS/DASH. |
 | `?identityTrust=strict` | `relaxed` | Tightens Organization/Publisher Identity, Copyright, AI opt-out, and Creator so each requires an exactly `Trusted` `cawg.identity` before showing anything. The default, `relaxed`, additionally shows those sections for a `Valid` (structurally verified but not on this player's trusted-anchor list) identity; Creator alone also shows `Unknown` (nothing checked) under `relaxed`, unchanged from before this switch existed. |
 | `?showCreativeWork=off` | on | Hides everything derived from the `stds.schema-org.CreativeWork` assertion: Organization Details, About the Producer (authors/organization name), and Organization Identity's Published-on/License lines. Does not affect Copyright, which is `cawg.metadata`-derived, or `?identityTrust=`, which is orthogonal. |
+| `?issuerColors=on` | off | Paints each valid timeline segment (and the authenticity label, when shown) by which issuer signed it, instead of the shared Valid/Trusted colour — so a stream that rotates between signers is easy to tell apart at a glance. Issuers get a colour from a small blue-ish palette in the order they're first seen this session; invalid stays red and unknown provenance stays grey regardless. Live only — see note below. |
 
-`?window=` and `?gate=` only ever affect a live source — both are no-ops on
-VOD (`validatedPlaybackGate.ts`, `liveResume.ts`). The demo panel disables
-both unless the loaded source's *format* can be live (HLS/DASH); it can't
+`?window=`, `?gate=` and `?issuerColors=` only ever affect a live source —
+all are no-ops on VOD (`validatedPlaybackGate.ts`, `liveResume.ts`, a VOD
+asset's one signer for its whole duration). The demo panel disables all
+three unless the loaded source's *format* can be live (HLS/DASH); it can't
 know a specific HLS/DASH file actually *is* live before its manifest is
 parsed, so that's an approximation, not a guarantee the control does
 something. Likewise the panel disables `?monolithicEngine=` unless the

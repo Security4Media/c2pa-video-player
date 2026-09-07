@@ -40,6 +40,7 @@ export {
   isIcaTrustFixtureName,
   isTrustFixtureName,
   LocalTrustMaterialProvider,
+  resolveColorizeTimelineByIssuer,
   resolveConsentMode,
   resolveEnforceValidatedPlayback,
   resolveIcaTrustFixtureName,

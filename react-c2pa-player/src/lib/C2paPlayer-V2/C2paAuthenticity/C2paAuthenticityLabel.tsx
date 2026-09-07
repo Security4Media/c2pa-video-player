@@ -14,10 +14,14 @@
  * limitations under the License.
  */
 
-import { useEffect, useRef, useState } from 'react';
+import { type CSSProperties, useEffect, useRef, useState } from 'react';
 import type { AuthenticityLabelView } from './authenticityGate';
 
 const EXIT_DURATION_MS = 240;
+
+type AccentColorStyle = CSSProperties & {
+    '--c2pa-label-colour'?: string;
+};
 
 interface C2paAuthenticityLabelProps {
     /** What to say, or null to say nothing. See authenticityGate.ts. */
@@ -69,7 +73,8 @@ export function C2paAuthenticityLabel({ label, onClick }: C2paAuthenticityLabelP
                 current &&
                 current.state === label.state &&
                 current.expanded === label.expanded &&
-                current.text === label.text
+                current.text === label.text &&
+                current.fullText === label.fullText
                     ? current
                     : label,
             );
@@ -101,9 +106,9 @@ export function C2paAuthenticityLabel({ label, onClick }: C2paAuthenticityLabelP
 
         announcedState.current = state;
         setAnnouncement(
-            state === 'Invalid' || state === 'Unknown' ? (label?.text ?? '') : '',
+            state === 'Invalid' || state === 'Unknown' ? (label?.fullText ?? '') : '',
         );
-    }, [label?.state, label?.text]);
+    }, [label?.state, label?.fullText]);
 
     return (
         <>
@@ -124,10 +129,25 @@ export function C2paAuthenticityLabel({ label, onClick }: C2paAuthenticityLabelP
                     ]
                         .filter(Boolean)
                         .join(' ')}
-                    // Stated in words, and in full even when collapsed, so the
-                    // verdict is never carried by colour alone.
-                    aria-label={`${shown.text}. Show content credentials.`}
-                    title={shown.text}
+                    // An inline custom property outranks the per-state class
+                    // rules in authenticity-label.css that set the same one
+                    // (`--c2pa-label-colour`), so this is the only change
+                    // needed to match the timeline's issuer colour - falls
+                    // back to the shared verdict colour the moment
+                    // accentColor is null (feature off, Invalid, Unknown, or
+                    // no resolvable issuer).
+                    style={
+                        shown.accentColor
+                            ? ({ '--c2pa-label-colour': shown.accentColor } as AccentColorStyle)
+                            : undefined
+                    }
+                    // fullText, not text: stated in words, and in full even
+                    // when the pill itself has been trimmed for brevity (see
+                    // AuthenticityLabelView.fullText) or collapsed to a dot,
+                    // so the verdict is never carried by the visible text or
+                    // colour alone.
+                    aria-label={`${shown.fullText}. Show content credentials.`}
+                    title={shown.fullText}
                     onClick={onClick}
                 >
                     <span className="c2pa-authenticity-label__mark" aria-hidden="true" />

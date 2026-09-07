@@ -104,6 +104,7 @@
   transition:
     max-width 220ms ease,
     padding 220ms ease,
+    gap 220ms ease,
     border-color 260ms ease,
     opacity 240ms ease,
     transform 240ms ease;
@@ -201,6 +202,29 @@
 .c2pa-authenticity-label--collapsed .c2pa-authenticity-label__text {
   max-width: 0;
   opacity: 0;
+}
+
+/*
+ * Hovering (or focusing, for a keyboard user) a collapsed label reads its
+ * text without waiting for a fresh verdict/issuer change and without the
+ * side effects a click has (opening the menu, pausing playback) - purely
+ * visual, and purely CSS: these restore the same values the base rule and
+ * `.c2pa-authenticity-label__text` already default to when not collapsed,
+ * at higher specificity than the `--collapsed` rules above, so no new JS
+ * state is needed and the existing transitions carry it smoothly both ways.
+ * Moving the mouse away (or off focus) reverts immediately, with the same
+ * animation - there is no timer to interact with here.
+ */
+.video-js .c2pa-authenticity-label--collapsed:hover,
+.video-js .c2pa-authenticity-label--collapsed:focus-visible {
+  gap: 0.5rem;
+  padding: 0.4rem 0.7rem;
+}
+
+.c2pa-authenticity-label--collapsed:hover .c2pa-authenticity-label__text,
+.c2pa-authenticity-label--collapsed:focus-visible .c2pa-authenticity-label__text {
+  max-width: 16rem;
+  opacity: 1;
 }
 
 /* --- the four verdicts ---------------------------------------------------- */
@@ -314,6 +338,11 @@
   }
 
   .c2pa-authenticity-label__text {
+    max-width: 9rem;
+  }
+
+  .c2pa-authenticity-label--collapsed:hover .c2pa-authenticity-label__text,
+  .c2pa-authenticity-label--collapsed:focus-visible .c2pa-authenticity-label__text {
     max-width: 9rem;
   }
 }

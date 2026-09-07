@@ -19,6 +19,7 @@ import {
   DEFAULT_LIVE_RETENTION_SECONDS,
   MIN_LIVE_WINDOW_SECONDS,
   detectAdapterKind,
+  resolveColorizeTimelineByIssuer,
   resolveConsentMode,
   resolveEnforceValidatedPlayback,
   resolveIcaTrustFixtureName,
@@ -101,6 +102,7 @@ export function PlayerConfigPanel({ mediaSource, onApply }: PlayerConfigPanelPro
     () => resolveIdentityTrustMode() === 'relaxed'
   );
   const [showCreativeWork, setShowCreativeWork] = useState<boolean>(() => resolveShowCreativeWork());
+  const [issuerColors, setIssuerColors] = useState<boolean>(() => resolveColorizeTimelineByIssuer());
 
   const adapterKind = useMemo(
     () => (mediaSource ? detectAdapterKind(mediaSource) : null),
@@ -197,6 +199,15 @@ export function PlayerConfigPanel({ mediaSource, onApply }: PlayerConfigPanelPro
     (checked: boolean) => {
       setShowCreativeWork(checked);
       applyParam('showCreativeWork', checked ? null : 'off');
+      onApply();
+    },
+    [onApply]
+  );
+
+  const handleIssuerColorsChange = useCallback(
+    (checked: boolean) => {
+      setIssuerColors(checked);
+      applyParam('issuerColors', checked ? 'on' : null);
       onApply();
     },
     [onApply]
@@ -345,6 +356,19 @@ export function PlayerConfigPanel({ mediaSource, onApply }: PlayerConfigPanelPro
               onChange={(event) => handleGateChange(event.target.checked)}
             />
             Validated-playback gate
+          </label>
+
+          <label
+            className="player-config-control player-config-control--checkbox"
+            title="Paints each valid segment by which issuer signed it, instead of the shared Valid/Trusted colour - so a stream that rotates between signers is easy to tell apart at a glance. Issuers get a colour in the order they're first seen this session. Invalid stays red and unknown provenance stays grey either way. Off by default. Only applies to a live HLS/DASH source. (?issuerColors=on)"
+          >
+            <input
+              type="checkbox"
+              checked={issuerColors}
+              disabled={!isLiveCapableFormat}
+              onChange={(event) => handleIssuerColorsChange(event.target.checked)}
+            />
+            Colorize by issuer
           </label>
         </div>
       </fieldset>

@@ -26,8 +26,7 @@ import type {
 import { Emitter, type EmitterListener } from '../emitter';
 import { normalizeDashSegmentRecord } from '../normalization/dash';
 import type { NormalizedValidationResult, ValidationAdapterContext } from '../types';
-import { retainedSegmentCount } from '../policy/liveRetention';
-import { DashSegmentMetadataReader, segmentNumberFromUrl } from './dashSegmentMetadata';
+import { DashSegmentMetadataReader } from './dashSegmentMetadata';
 import { recordDiagnostic } from '../diagnostics/diagnosticsLog';
 
 type RuntimeListener = EmitterListener<void>;
@@ -361,8 +360,9 @@ export class DashBridgeRuntime {
 
     const timing = this.#pendingTiming.get(record.mediaType)?.shift() ?? null;
     // The segment's own manifest where the metadata pipeline has one, since on
-    // the VSI path `record.manifest` is the init's and carries no CAWG.
-    const perSegmentManifest = this.#metadata?.get(record.segmentNumber) ?? null;
+    // the VSI path `record.manifest` is the init's and carries no CAWG. Drawn
+    // in arrival order, not by segmentNumber - see dashSegmentMetadata.ts.
+    const perSegmentManifest = this.#metadata?.takeNext(record.mediaType) ?? null;
     const { result } = normalizeDashSegmentRecord(
       perSegmentManifest ? { ...record, manifest: perSegmentManifest } : record,
       this.#latestManifest,
@@ -506,10 +506,7 @@ export class DashBridgeRuntime {
       mediaTypes: [...VALIDATED_MEDIA_TYPES],
       logger: false,
     });
-    const reader = new DashSegmentMetadataReader(
-      pipeline,
-      retainedSegmentCount(this.#retentionSeconds),
-    );
+    const reader = new DashSegmentMetadataReader(pipeline);
     this.#metadata = reader;
 
     const interceptor = async (response: {
@@ -517,20 +514,14 @@ export class DashBridgeRuntime {
       data?: unknown;
     }) => {
       const request = response?.request?.customData?.request;
-      const segmentNumber = segmentNumberFromUrl(response?.request?.url);
 
       if (
         request?.type === 'MediaSegment' &&
         request.mediaType &&
         (VALIDATED_MEDIA_TYPES as readonly string[]).includes(request.mediaType) &&
-        segmentNumber !== null &&
         response.data instanceof ArrayBuffer
       ) {
-        await reader.read(
-          segmentNumber,
-          new Uint8Array(response.data),
-          request.mediaType as MediaType,
-        );
+        await reader.read(new Uint8Array(response.data), request.mediaType as MediaType);
       }
 
       // Interceptors are chained by reducing over their results, so the

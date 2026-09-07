@@ -18,6 +18,7 @@ import type { CarriedSessionPolicy, MonolithicEngine, ValidationPolicy } from '.
 import { resolveConsentMode, resolveShowAuthenticityLabel } from './authenticity';
 import { LocalIcaIssuerProvider } from './icaIssuerProvider';
 import { icaTrustFixtures, isIcaTrustFixtureName, type IcaTrustFixtureName } from './icaTrustFixtures';
+import { resolveColorizeTimelineByIssuer } from './issuerColors';
 import { LocalTrustMaterialProvider } from './localTrustMaterialProvider';
 import {
   resolveEnforceValidatedPlayback,
@@ -165,6 +166,7 @@ export function createDefaultValidationPolicy(): ValidationPolicy {
     enforceValidatedPlayback: resolveEnforceValidatedPlayback(),
     showAuthenticityLabel: resolveShowAuthenticityLabel(),
     consentMode: resolveConsentMode(),
+    colorizeTimelineByIssuer: resolveColorizeTimelineByIssuer(),
   };
 }
 
@@ -180,6 +182,7 @@ export function carriedSessionPolicy(policy: ValidationPolicy): CarriedSessionPo
     enforceValidatedPlayback: policy.enforceValidatedPlayback,
     showAuthenticityLabel: policy.showAuthenticityLabel,
     consentMode: policy.consentMode,
+    colorizeTimelineByIssuer: policy.colorizeTimelineByIssuer,
   };
 }
 
@@ -187,6 +190,7 @@ export { LocalTrustMaterialProvider };
 export type { IcaIssuerProvider } from './icaIssuerProvider';
 export { icaTrustFixtures, isIcaTrustFixtureName, type IcaTrustFixtureName } from './icaTrustFixtures';
 export { resolveConsentMode, resolveShowAuthenticityLabel } from './authenticity';
+export { resolveColorizeTimelineByIssuer } from './issuerColors';
 export {
   resolveIdentityTrustMode,
   resolveShowCreativeWork,
