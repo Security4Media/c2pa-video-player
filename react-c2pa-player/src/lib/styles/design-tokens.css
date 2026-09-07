@@ -42,7 +42,21 @@
      the same red today, but one means "this stream is running" and the other
      means "this content failed", and they must be free to diverge. */
   --c2pa-live-dot: #d31510;
-  
+
+  /* Per-issuer timeline colours (?issuerColors=on, live only).
+     A small blue-ish palette so a valid segment's colour can say *which*
+     issuer signed it rather than only that it is valid - distinct from each
+     other, from the grey of --c2pa-unknown and from the red of
+     --c2pa-failed. Assigned to issuer names dynamically, in the order they
+     are first seen (see issuerColorPalette.ts) - never hardcoded to a
+     specific issuer. */
+  --c2pa-issuer-1: #3b82f6;
+  --c2pa-issuer-2: #1d4ed8;
+  --c2pa-issuer-3: #38bdf8;
+  --c2pa-issuer-4: #6366f1;
+  --c2pa-issuer-5: #0e7490;
+  --c2pa-issuer-6: #93c5fd;
+
   /* Neutral Colors */
   --color-background: #ffffff;
   --color-surface: #f8f9fa;

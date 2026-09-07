@@ -61,6 +61,7 @@ const readControls = () =>
     const windowControl = byLabel('Live retention window');
     const gateControl = byLabel('Validated-playback gate');
     const engineControl = byLabel('Monolithic engine');
+    const issuerColorsControl = byLabel('Colorize by issuer');
     return {
       panelPresent: Boolean(document.querySelector('.player-config-panel')),
       controlCount: document.querySelectorAll('.player-config-control').length,
@@ -68,6 +69,7 @@ const readControls = () =>
       windowTitle: windowControl?.title ?? null,
       gateDisabled: gateControl?.querySelector('input')?.disabled,
       engineDisabled: engineControl?.querySelector('select')?.disabled,
+      issuerColorsDisabled: issuerColorsControl?.querySelector('input')?.disabled,
     };
   });
 
@@ -102,19 +104,19 @@ async function selectEngine(value) {
 }
 
 // ---------------------------------------------------------------------------
-console.log('=== 1. panel renders with all 6 controls ===');
+console.log('=== 1. panel renders with all 7 controls ===');
 // ---------------------------------------------------------------------------
 {
   await page.goto(BASE, { waitUntil: 'domcontentloaded' });
   const state = await readControls();
   console.log(`   ${JSON.stringify(state)}`);
   check('panel is present', state.panelPresent);
-  check('all 6 controls render', state.controlCount === 6, String(state.controlCount));
+  check('all 7 controls render', state.controlCount === 7, String(state.controlCount));
   check('window tooltip mentions the seconds grammar', /window=/.test(state.windowTitle ?? ''));
 }
 
 // ---------------------------------------------------------------------------
-console.log('=== 2. loading a monolithic MP4: window/gate disabled, engine enabled ===');
+console.log('=== 2. loading a monolithic MP4: window/gate/issuerColors disabled, engine enabled ===');
 // ---------------------------------------------------------------------------
 {
   await loadUrl(MP4);
@@ -123,11 +125,12 @@ console.log('=== 2. loading a monolithic MP4: window/gate disabled, engine enabl
   console.log(`   ${JSON.stringify(state)}`);
   check('window disabled for MP4', state.windowDisabled === true);
   check('gate disabled for MP4', state.gateDisabled === true);
+  check('issuer colors disabled for MP4', state.issuerColorsDisabled === true);
   check('engine dropdown enabled for MP4', state.engineDisabled === false);
 }
 
 // ---------------------------------------------------------------------------
-console.log('=== 3. loading an HLS fixture: window/gate enabled, engine disabled ===');
+console.log('=== 3. loading an HLS fixture: window/gate/issuerColors enabled, engine disabled ===');
 // ---------------------------------------------------------------------------
 {
   await loadUrl(HLS);
@@ -136,6 +139,7 @@ console.log('=== 3. loading an HLS fixture: window/gate enabled, engine disabled
   console.log(`   ${JSON.stringify(state)}`);
   check('window enabled for HLS', state.windowDisabled === false);
   check('gate enabled for HLS', state.gateDisabled === false);
+  check('issuer colors enabled for HLS', state.issuerColorsDisabled === false);
   check('engine dropdown disabled for HLS', state.engineDisabled === true);
 }
 
