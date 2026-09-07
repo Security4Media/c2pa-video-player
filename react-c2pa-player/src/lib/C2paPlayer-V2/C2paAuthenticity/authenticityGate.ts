@@ -188,7 +188,20 @@ export interface AuthenticityGateInputs {
 
 export interface AuthenticityLabelView {
   state: PlayerValidationState;
+  /**
+   * What the pill itself shows. Trimmed once an issuer is named (`Signed by
+   * <issuer>`, dropping the state word) since the colour and the phrase
+   * already say as much - see `fullText` for the untrimmed statement.
+   */
   text: string;
+  /**
+   * The complete statement of the verdict, always including the state word
+   * ("Valid, signed by <issuer>", "Authenticity established", ...) - read by
+   * `aria-label`/`title` rather than `text`, so the verdict is still in
+   * words even when the visible pill has been trimmed for brevity. Identical
+   * to `text` for every state that isn't a Valid-with-issuer label.
+   */
+  fullText: string;
   expanded: boolean;
   /** Invalid and Unknown, which do not collapse and do not stop pulsing. */
   glowing: boolean;
@@ -324,13 +337,16 @@ export function advanceAuthenticityGate(
   if (labelEnabled && state.labelState !== null) {
     const warning = isWarning(state.labelState);
     const baseText = LABEL_TEXT[state.labelState];
+    const hasIssuer = state.labelState === 'Valid' && Boolean(state.labelIssuerName);
 
     label = {
       state: state.labelState,
-      text:
-        state.labelState === 'Valid' && state.labelIssuerName
-          ? `${baseText}, signed by ${state.labelIssuerName}`
-          : baseText,
+      // Trimmed for the pill itself: once an issuer is named, saying
+      // "Valid" as well is redundant with what the colour and "signed by"
+      // already say.
+      text: hasIssuer ? `Signed by ${state.labelIssuerName}` : baseText,
+      // Always the complete statement - see AuthenticityLabelView.fullText.
+      fullText: hasIssuer ? `${baseText}, signed by ${state.labelIssuerName}` : baseText,
       expanded: warning || nowMs - state.labelSinceMs < LABEL_EXPANDED_MS,
       glowing: warning,
       accentColor: inputs.issuerAccentColor,

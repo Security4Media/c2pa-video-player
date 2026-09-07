@@ -117,12 +117,15 @@ describe('what the label says', () => {
     expect(decision.label).toBeNull();
   });
 
-  it('names the issuer in a Valid label', () => {
+  it('names the issuer in a Valid label, trimmed of the word "Valid" itself', () => {
     const [decision] = play([
       { verdict: verdict('Valid'), issuerName: 'Westdeutscher Rundfunk Intermediate', nowMs: 0 },
     ]);
 
-    expect(decision.label?.text).toBe('Valid, signed by Westdeutscher Rundfunk Intermediate');
+    // The pill drops "Valid" - the colour and "signed by" already say as
+    // much - but the full statement survives for aria-label/title.
+    expect(decision.label?.text).toBe('Signed by Westdeutscher Rundfunk Intermediate');
+    expect(decision.label?.fullText).toBe('Valid, signed by Westdeutscher Rundfunk Intermediate');
   });
 
   it('does not name an issuer for Trusted, even when one is given', () => {
@@ -134,12 +137,24 @@ describe('what the label says', () => {
     ]);
 
     expect(decision.label?.text).toBe('Authenticity established');
+    expect(decision.label?.fullText).toBe('Authenticity established');
   });
 
-  it('reads as plain "Valid" when no issuer is resolvable', () => {
+  it('reads as plain "Valid" when no issuer is resolvable, in both the pill and the full text', () => {
     const [decision] = play([{ verdict: verdict('Valid'), issuerName: null, nowMs: 0 }]);
 
     expect(decision.label?.text).toBe('Valid');
+    expect(decision.label?.fullText).toBe('Valid');
+  });
+
+  it('only diverges the pill text from the full text once an issuer is actually named', () => {
+    const [withIssuer] = play([
+      { verdict: verdict('Valid'), issuerName: 'Unified Tutorial Intermediate', nowMs: 0 },
+    ]);
+    const [withoutIssuer] = play([{ verdict: verdict('Valid'), issuerName: null, nowMs: 0 }]);
+
+    expect(withIssuer.label?.text).not.toBe(withIssuer.label?.fullText);
+    expect(withoutIssuer.label?.text).toBe(withoutIssuer.label?.fullText);
   });
 
   it('restarts the collapse timer when the issuer changes, even though the state does not', () => {
@@ -159,7 +174,8 @@ describe('what the label says', () => {
     // change re-expands it instead, with the new name, same as a fresh verdict.
     expect(decisions[2].label).toMatchObject({
       expanded: true,
-      text: 'Valid, signed by Westdeutscher Rundfunk Intermediate',
+      text: 'Signed by Westdeutscher Rundfunk Intermediate',
+      fullText: 'Valid, signed by Westdeutscher Rundfunk Intermediate',
     });
   });
 
@@ -179,7 +195,8 @@ describe('what the label says', () => {
       { verdict: verdict(null), issuerName: null, nowMs: 500 },
     ]);
 
-    expect(decisions[1].label?.text).toBe('Valid, signed by Unified Tutorial Intermediate');
+    expect(decisions[1].label?.text).toBe('Signed by Unified Tutorial Intermediate');
+    expect(decisions[1].label?.fullText).toBe('Valid, signed by Unified Tutorial Intermediate');
   });
 
   it('collapses a reassuring label after five seconds', () => {
