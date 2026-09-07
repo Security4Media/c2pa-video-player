@@ -14,7 +14,9 @@
  * limitations under the License.
  */
 
+export { hasPublishedAction, selectActionsAssertion } from './actionsSelectors';
 export { selectOrganizationIdentity } from './cawgSelectors';
+export { selectCreatorSection } from './creatorSelectors';
 export {
     selectCreativeWorkAuthors,
     selectCreativeWorkContent,
@@ -27,6 +29,7 @@ export { selectClaimGenerator } from './claimGeneratorSelectors';
 export { selectAiOptOutSection } from './aiOptOutSelectors';
 export {
     selectClaimGeneratorSection,
+    selectCopyrightSection,
     selectHistorySection,
     selectOrganizationSection,
     selectWorkSection,

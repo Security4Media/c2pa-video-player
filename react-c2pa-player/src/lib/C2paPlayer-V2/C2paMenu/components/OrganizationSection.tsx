@@ -133,12 +133,29 @@ function IdentityDetails({ itemValue }: { itemValue: CawgOrganizationItem }) {
   );
 }
 
+/**
+ * Distinct from the ✅/☑️/❔/❌ validation glyphs elsewhere - `❔` already
+ * means "Unknown trust state" everywhere in this menu, and reusing it here
+ * would answer a different question ("is this a publisher?") with the same
+ * symbol used for "is this identity trusted?".
+ */
+function PublisherAmbiguityHint({ hint }: { hint: string }) {
+  return (
+    <span
+      className="c2pa-org-section__title-hint"
+      aria-label={`Why this isn't titled Publisher Identity: ${hint}`}
+      title={hint}
+      data-testid="c2pa-org-title-hint"
+    >
+      ?
+    </span>
+  );
+}
+
 export function OrganizationSection({
   section,
-  title,
 }: {
   section: OrganizationSectionItem;
-  title: string;
 }) {
   const validationIndicator = section.cawg
     ? getValidationIndicator(section.cawg.validationStatus)
@@ -148,24 +165,40 @@ export function OrganizationSection({
     <li className="vjs-menu-item">
       <div className="c2pa-menu-section c2pa-org-section">
         <div className="c2pa-menu-section__header">
-          <span className="itemName c2pa-menu-section__title">{title}</span>
-          {validationIndicator ? (
-            <span
-              className="c2pa-org-section__status"
-              aria-label={`Organization identity status: ${section.cawg?.validationStatus}`}
-              title={validationIndicator.message}
-              data-testid="c2pa-identity-status"
-              data-validation-state={section.cawg?.validationStatus ?? 'Unknown'}
-            >
-              {validationIndicator.icon}
+          <span className="itemName c2pa-menu-section__title">{section.title}</span>
+          {section.titleHint || validationIndicator ? (
+            <span className="c2pa-org-section__badge-cluster">
+              {section.titleHint ? <PublisherAmbiguityHint hint={section.titleHint} /> : null}
+              {validationIndicator ? (
+                <span
+                  className="c2pa-org-section__status"
+                  aria-label={`Organization identity status: ${section.cawg?.validationStatus}`}
+                  title={validationIndicator.message}
+                  data-testid="c2pa-identity-status"
+                  data-validation-state={section.cawg?.validationStatus ?? 'Unknown'}
+                >
+                  {validationIndicator.icon}
+                </span>
+              ) : null}
             </span>
           ) : null}
         </div>
-         {section.cawg ? <IdentityDetails itemValue={section.cawg} /> : null}
+         {/* This section only ever renders when section.cawg's own verdict
+            already cleared `identityTrustMode`'s bar (see
+            selectOrganizationSection), and the referenced-content fields
+            below (creativeWork/dublinCore/copyright) were only ever
+            populated under that same bar - so whatever cawg carries here is
+            already cleared to show, with no separate re-check needed. */}
+        {section.cawg ? (
+          <IdentityDetails itemValue={section.cawg} />
+        ) : null}
         {/* Spelled out rather than left to the icon's tooltip. The whole point
             of this section is the names in it, and a viewer reading a title
             and a publisher has no reason to hover a glyph to find out that
-            nothing vouched for them. */}
+            nothing vouched for them. Unreachable in practice today (Unknown
+            never clears the bar that gates this section at all) but kept as
+            the same defensive fallback OrganizationSection's validation
+            badge uses, rather than assuming the selector can never change. */}
         {section.cawg?.validationStatus === 'Unknown' ? (
           <p className="c2pa-org-section__caveat">{UNVERIFIED_IDENTITY_CAVEAT}</p>
         ) : null}

@@ -1,0 +1,15 @@
+# Trusted issuer DIDs for CAWG Identity Claims Aggregation (ICA) Verifiable
+# Credentials.
+#
+# This list is NOT read by the C2PA engine. @contentauth/c2pa-web's
+# TrustSettings/CawgTrustSettings are X.509-PEM-only; there is no DID
+# trust-anchor concept in the SDK at all. The engine only confirms an ICA
+# credential's own signature is internally valid (code
+# cawg.ica.credential_valid) - it never evaluates whether the credential's
+# issuer should be trusted. This app checks that itself, against this list,
+# entirely in app code (see src/lib/validation/policy/icaIssuerProvider.ts).
+#
+# One DID per line. Lines starting with # are comments.
+
+# Adobe's Identity Claims Aggregation issuer.
+did:web:connected-identities.identity.adobe.com
