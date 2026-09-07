@@ -16,6 +16,8 @@
 
 import { Manifest, ManifestAssertion, ManifestStore } from '@contentauth/c2pa-web';
 import { readIcaCredentialEvidence } from '@/lib/validation/evidence';
+import { meetsIdentityTrustThreshold } from '@/lib/validation/rules';
+import type { IdentityTrustMode } from '@/lib/validation';
 import type { ValidationState } from '@/lib/types/c2pa.types';
 import { CreatorIdentityGroup, CreatorSectionItem, VerifiedIdentityClaim } from '../models';
 import { CAWG_ASSERTION_LABEL, selectCawgAssertion } from './shared';
@@ -155,27 +157,44 @@ function describeIngredientSource(
  * verified-identity claims instead of provenance-history summaries), adding
  * one group per node whose ICA credential has claims worth showing.
  *
- * Unlike Copyright/AI opt-out, a node is withheld only when its credential
- * is confirmed broken (`Invalid`) - `Unknown` (nothing checked this
- * credential's signature, e.g. today's default engine) and `Valid`
- * (checked, just not on this app's trusted-issuer list) are both shown,
- * each marked with its own verdict, rather than silently disappearing. A
- * viewer who sees no Creator section at all has no way to tell "nobody
- * claimed an identity" from "someone did, but I hid it" - showing the claim
- * with an honest badge is the same choice this app already makes for a
- * declared-but-unverified organization identity.
+ * Under the default `'relaxed'` `identityTrustMode`, a node is withheld only
+ * when its credential is confirmed broken (`Invalid`) - `Unknown` (nothing
+ * checked this credential's signature, e.g. today's default engine) and
+ * `Valid` (checked, just not on this app's trusted-issuer list) are both
+ * shown, each marked with its own verdict, rather than silently
+ * disappearing. A viewer who sees no Creator section at all has no way to
+ * tell "nobody claimed an identity" from "someone did, but I hid it" -
+ * showing the claim with an honest badge is the same choice this app
+ * already makes for a declared-but-unverified organization identity. Under
+ * `'strict'`, this tightens to exactly `Trusted`, same as every other
+ * gated section - see `meetsIdentityTrustThreshold`.
+ *
+ * `visited` guards against a cyclic ingredient chain - manifest content is
+ * untrusted input by design, and an ingredient whose `active_manifest`
+ * eventually resolves back to a manifest id already on this walk would
+ * otherwise recurse forever rather than merely produce a strange result.
  */
 function walkForCreatorGroups(
     manifest: Manifest,
     manifestId: string | undefined,
     manifestStore: ManifestStore,
     trustedIcaIssuers: ReadonlySet<string>,
+    identityTrustMode: IdentityTrustMode,
     source: string,
     groups: CreatorIdentityGroup[],
+    visited: Set<string>,
 ): void {
+    if (manifestId) {
+        if (visited.has(manifestId)) {
+            return;
+        }
+
+        visited.add(manifestId);
+    }
+
     const evaluation = evaluateNode(manifest, manifestId, manifestStore, trustedIcaIssuers);
 
-    if (evaluation && evaluation.validationStatus !== 'Invalid') {
+    if (evaluation && meetsIdentityTrustThreshold(evaluation.validationStatus, identityTrustMode, true)) {
         groups.push({ source, claims: evaluation.claims, validationStatus: evaluation.validationStatus });
     }
 
@@ -192,8 +211,10 @@ function walkForCreatorGroups(
             ref ?? undefined,
             manifestStore,
             trustedIcaIssuers,
+            identityTrustMode,
             describeIngredientSource(ingredientData, index + 1),
             groups,
+            visited,
         );
     });
 }
@@ -208,12 +229,14 @@ function walkForCreatorGroups(
  * @param manifest - The active manifest to start the walk from
  * @param manifestStore - Required: resolving ingredient manifests and reading well-formedness evidence both need it
  * @param trustedIcaIssuers - This app's own trusted issuer DIDs
- * @returns Structured creator section data, or null when nothing but confirmed-invalid credentials were found anywhere in the tree
+ * @param identityTrustMode - How strict a credential's verdict must be to be shown (see `meetsIdentityTrustThreshold`)
+ * @returns Structured creator section data, or null when nothing cleared the trust threshold anywhere in the tree
  */
 export function selectCreatorSection(
     manifest: Manifest,
     manifestStore: ManifestStore,
     trustedIcaIssuers: ReadonlySet<string>,
+    identityTrustMode: IdentityTrustMode = 'relaxed',
 ): CreatorSectionItem | null {
     const groups: CreatorIdentityGroup[] = [];
 
@@ -222,8 +245,10 @@ export function selectCreatorSection(
         manifestStore.active_manifest ?? undefined,
         manifestStore,
         trustedIcaIssuers,
+        identityTrustMode,
         'Active manifest',
         groups,
+        new Set<string>(),
     );
 
     return groups.length > 0 ? { groups } : null;

@@ -136,6 +136,26 @@ describe('selectCreatorSection, ICA credential on the active manifest', () => {
     expect(section?.groups[0].claims).toHaveLength(2);
   });
 
+  it('under identityTrust=strict, still shows a Trusted credential', () => {
+    const store = storeWithIcaEvidence(adobeManifest, ADOBE_MANIFEST_ID);
+    const section = selectCreatorSection(adobeManifest, store, new Set([ADOBE_ISSUER]), 'strict');
+
+    expect(section?.groups).toHaveLength(1);
+    expect(section?.groups[0].validationStatus).toBe('Trusted');
+  });
+
+  it('under identityTrust=strict, withholds a Valid (untrusted-issuer) credential unlike the relaxed default', () => {
+    const store = storeWithIcaEvidence(adobeManifest, ADOBE_MANIFEST_ID);
+
+    expect(selectCreatorSection(adobeManifest, store, new Set(), 'strict')).toBeNull();
+  });
+
+  it('under identityTrust=strict, withholds an Unknown (unverified-by-this-engine) credential unlike the relaxed default', () => {
+    const store = storeWithNoIcaEvidence(adobeManifest, ADOBE_MANIFEST_ID);
+
+    expect(selectCreatorSection(adobeManifest, store, new Set([ADOBE_ISSUER]), 'strict')).toBeNull();
+  });
+
   it('is withheld entirely when the credential is confirmed broken (Invalid)', () => {
     const store = {
       active_manifest: ADOBE_MANIFEST_ID,
@@ -276,5 +296,24 @@ describe('selectCreatorSection, ICA credential on an ingredient', () => {
 
     expect(section?.groups[0].source).not.toContain('c2pa.ingredient.v3');
     expect(section?.groups[0].source).toBe('This content includes source content from Ingredient 1');
+  });
+
+  it('does not infinitely recurse when an ingredient chain cycles back to an already-visited manifest', () => {
+    // Manifest content is untrusted input by design - an ingredient whose
+    // own ingredient list points back to the active manifest must not hang
+    // or overflow the stack, just stop walking that cycle.
+    const cyclicAdobeManifest = {
+      ...adobeManifest,
+      ingredients: [{ relationship: 'parentOf', active_manifest: wdrManifestId }],
+    } as unknown as Manifest;
+    const store = {
+      ...fullStore(),
+      manifests: { [wdrManifestId]: activeManifest, [ADOBE_MANIFEST_ID]: cyclicAdobeManifest },
+    } as unknown as ManifestStore;
+
+    const section = selectCreatorSection(activeManifest, store, new Set([ADOBE_ISSUER]));
+
+    expect(section?.groups).toHaveLength(1);
+    expect(section?.groups[0].source).toBe('This content includes source content from Original camera clip');
   });
 });

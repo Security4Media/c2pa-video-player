@@ -16,7 +16,7 @@
 
 import type { Manifest } from '@contentauth/c2pa-web';
 import type { C2PAStatus } from '@/lib/types/c2pa.types';
-import type { AdapterKind, ValidationTimelineSegment } from '@/lib/validation';
+import type { AdapterKind, IdentityTrustMode, ValidationTimelineSegment } from '@/lib/validation';
 import type { C2PATimelineState } from '../C2PAPlayerRoot.types';
 import { readStoreEvidence } from '@/lib/validation/evidence';
 import { getActiveManifest } from '@/lib/validation/rules';
@@ -192,6 +192,8 @@ function getManifestId(activeManifest: Manifest | null, c2paStatus: C2PAStatus |
  * @param timeline - Timeline snapshot from the shared player controller
  * @param selectedSegment - A clicked timeline fragment, if any, in place of the live/current status
  * @param trustedIcaIssuers - This app's own trusted CAWG ICA issuer DIDs (see useTrustedIcaIssuers)
+ * @param identityTrustMode - How strict a cawg.identity verdict must be before its content shows (see resolveIdentityTrustMode)
+ * @param showCreativeWork - Whether to include CreativeWork-derived content (see resolveShowCreativeWork)
  * @returns Render state describing menu mode, manifest identity, and visible sections
  */
 export function buildMenuRenderState(
@@ -199,9 +201,17 @@ export function buildMenuRenderState(
     timeline: C2PATimelineState,
     selectedSegment?: ValidationTimelineSegment | null,
     trustedIcaIssuers: ReadonlySet<string> = new Set(),
+    identityTrustMode: IdentityTrustMode = 'relaxed',
+    showCreativeWork: boolean = true,
 ): C2paMenuRenderState {
     if (selectedSegment) {
-        return buildSegmentMenuRenderState(selectedSegment, c2paStatus?.adapterKind, trustedIcaIssuers);
+        return buildSegmentMenuRenderState(
+            selectedSegment,
+            c2paStatus?.adapterKind,
+            trustedIcaIssuers,
+            identityTrustMode,
+            showCreativeWork,
+        );
     }
 
     const manifestStore = c2paStatus?.manifestStore ?? null;
@@ -286,27 +296,32 @@ export function buildMenuRenderState(
                 activeManifest,
                 selectorManifestStore ?? undefined,
                 c2paStatus?.adapterKind,
+                identityTrustMode,
+                showCreativeWork,
             ),
             copyright: selectCopyrightSection(
                 activeManifest,
                 selectorManifestStore ?? undefined,
                 c2paStatus?.adapterKind,
+                identityTrustMode,
             ),
             // Ingredient-aware, like history below: needs a real manifestStore
             // to resolve ingredient manifests by id, not just to read trust
             // status off of.
             creator: selectorManifestStore
-                ? selectCreatorSection(activeManifest, selectorManifestStore, trustedIcaIssuers)
+                ? selectCreatorSection(activeManifest, selectorManifestStore, trustedIcaIssuers, identityTrustMode)
                 : null,
             work: selectWorkSection(
                 activeManifest,
                 selectorManifestStore ?? undefined,
                 c2paStatus?.adapterKind,
+                showCreativeWork,
             ),
             aiOptOut: selectAiOptOutSection(
                 activeManifest,
                 selectorManifestStore ?? undefined,
                 c2paStatus?.adapterKind,
+                identityTrustMode,
             ),
             history: selectorManifestStore
                 ? selectHistorySection(activeManifest, selectorManifestStore)
@@ -362,11 +377,18 @@ function buildSegmentAlertMessage(segment: ValidationTimelineSegment): string | 
  * segment has a manifest (`manifestRef` resolves to one); falls back to a
  * status/anomaly-only view (mode 'segment-integrity') when it doesn't - the
  * DASH VSI/integrity-only case, or any segment with no manifestRef at all.
+ *
+ * `identityTrustMode` and `showCreativeWork` are forwarded straight through
+ * to those same selectors, same meaning as in `buildMenuRenderState` above -
+ * a clicked fragment's manifest is gated on the same display policy the live
+ * status is, not a separate one.
  */
 function buildSegmentMenuRenderState(
     segment: ValidationTimelineSegment,
     adapterKind: AdapterKind | null | undefined,
     trustedIcaIssuers: ReadonlySet<string>,
+    identityTrustMode: IdentityTrustMode,
+    showCreativeWork: boolean,
 ): C2paMenuRenderState {
     const activeManifest = resolveManifestFromSource(segment.manifestRef);
     const validationStatus = segment.validationState;
@@ -425,20 +447,29 @@ function buildSegmentMenuRenderState(
                 activeManifest,
                 selectorManifestStore ?? undefined,
                 adapterKind,
+                identityTrustMode,
+                showCreativeWork,
             ),
             copyright: selectCopyrightSection(
                 activeManifest,
                 selectorManifestStore ?? undefined,
                 adapterKind,
+                identityTrustMode,
             ),
             creator: selectorManifestStore
-                ? selectCreatorSection(activeManifest, selectorManifestStore, trustedIcaIssuers)
+                ? selectCreatorSection(activeManifest, selectorManifestStore, trustedIcaIssuers, identityTrustMode)
                 : null,
-            work: selectWorkSection(activeManifest, selectorManifestStore ?? undefined, adapterKind),
+            work: selectWorkSection(
+                activeManifest,
+                selectorManifestStore ?? undefined,
+                adapterKind,
+                showCreativeWork,
+            ),
             aiOptOut: selectAiOptOutSection(
                 activeManifest,
                 selectorManifestStore ?? undefined,
                 adapterKind,
+                identityTrustMode,
             ),
             history: selectorManifestStore
                 ? selectHistorySection(activeManifest, selectorManifestStore)

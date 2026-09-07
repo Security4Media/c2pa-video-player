@@ -16,7 +16,7 @@
 
 import { describe, expect, it } from 'vitest';
 import type { Manifest, ManifestStore } from '@contentauth/c2pa-web';
-import { selectOrganizationSection } from './sectionSelectors';
+import { selectCopyrightSection, selectOrganizationSection, selectWorkSection } from './sectionSelectors';
 
 function x509Identity(referencedUrls: string[]) {
   return {
@@ -85,14 +85,40 @@ describe('selectOrganizationSection gating', () => {
     expect(selectOrganizationSection(manifest, trustedStore(manifest), 'monolithic')).not.toBeNull();
   });
 
-  it.each(['Valid', 'Invalid'] as const)(
-    'is null when the X.509 identity exists but its verdict is %s, not Trusted',
-    (state) => {
-      const manifest = { assertions: [x509Identity([])] } as unknown as Manifest;
+  it('is shown by default (relaxed) when the X.509 identity exists and its verdict is Valid, not Trusted', () => {
+    const manifest = { assertions: [x509Identity([])] } as unknown as Manifest;
 
-      expect(selectOrganizationSection(manifest, storeWithState(manifest, state), 'monolithic')).toBeNull();
-    },
-  );
+    expect(
+      selectOrganizationSection(manifest, storeWithState(manifest, 'Valid'), 'monolithic'),
+    ).not.toBeNull();
+  });
+
+  it('is withheld under identityTrust=strict when the X.509 identity exists but its verdict is Valid, not Trusted', () => {
+    const manifest = { assertions: [x509Identity([])] } as unknown as Manifest;
+
+    expect(
+      selectOrganizationSection(manifest, storeWithState(manifest, 'Valid'), 'monolithic', 'strict'),
+    ).toBeNull();
+  });
+
+  it('is null in both modes when the X.509 identity exists but its verdict is Invalid', () => {
+    const manifest = { assertions: [x509Identity([])] } as unknown as Manifest;
+    // A bare declared 'Invalid' with no failure entry doesn't actually read as
+    // an Invalid identity verdict (see identityFromFailures in evidence.ts:
+    // absence of an identity-scoped failure means "passed"), so this needs a
+    // real identity-scoped failure code to reach it.
+    const invalidStore = {
+      active_manifest: 'urn:test',
+      manifests: { 'urn:test': manifest },
+      validation_state: 'Invalid',
+      validation_status: [
+        { code: 'cawg.identity.malformed', url: 'self#jumbf=c2pa.assertions/cawg.identity' },
+      ],
+    } as unknown as ManifestStore;
+
+    expect(selectOrganizationSection(manifest, invalidStore, 'monolithic')).toBeNull();
+    expect(selectOrganizationSection(manifest, invalidStore, 'monolithic', 'strict')).toBeNull();
+  });
 
   it('is null when nothing verified the identity at all (Unknown - e.g. no manifest store, or an adapter that never checks)', () => {
     const manifest = { assertions: [x509Identity([])] } as unknown as Manifest;
@@ -157,5 +183,104 @@ describe('selectOrganizationSection title resolution', () => {
     expect(selectOrganizationSection(manifest, trustedStore(manifest), 'monolithic')?.title).toBe(
       'Publisher Identity',
     );
+  });
+});
+
+function creativeWorkAssertion(role: 'cawg.producer' | 'cawg.publisher' | 'cawg.editor' = 'cawg.producer') {
+  return {
+    x509: {
+      label: 'cawg.identity',
+      data: {
+        role,
+        signer_payload: {
+          referenced_assertions: [{ url: 'self#jumbf=c2pa.assertions/stds.schema-org.CreativeWork' }],
+          sig_type: 'cawg.x509.cose',
+        },
+      },
+    },
+    creativeWork: {
+      label: 'stds.schema-org.CreativeWork',
+      data: {
+        author: [
+          { '@type': 'Organization', name: 'Acme', url: 'https://acme.example' },
+          { '@type': 'Person', name: 'Jane Doe' },
+        ],
+      },
+    },
+  };
+}
+
+describe('showCreativeWork gating', () => {
+  it('selectOrganizationSection shows Organization Details by default', () => {
+    const { x509, creativeWork } = creativeWorkAssertion();
+    const manifest = { assertions: [x509, creativeWork] } as unknown as Manifest;
+
+    const section = selectOrganizationSection(manifest, trustedStore(manifest), 'monolithic');
+
+    expect(section?.organization?.name).toBe('Acme');
+    expect(section?.organization?.website).toBe('https://acme.example');
+  });
+
+  it('selectOrganizationSection suppresses Organization Details under showCreativeWork=false, without hiding the section itself', () => {
+    const { x509, creativeWork } = creativeWorkAssertion();
+    const manifest = { assertions: [x509, creativeWork] } as unknown as Manifest;
+
+    const section = selectOrganizationSection(
+      manifest,
+      trustedStore(manifest),
+      'monolithic',
+      'relaxed',
+      false,
+    );
+
+    expect(section).not.toBeNull();
+    expect(section?.organization).toBeNull();
+  });
+
+  it('selectWorkSection includes CreativeWork-derived authors/organization by default, keeping role regardless', () => {
+    const { x509, creativeWork } = creativeWorkAssertion('cawg.publisher');
+    const manifest = { assertions: [x509, creativeWork] } as unknown as Manifest;
+
+    const section = selectWorkSection(manifest, trustedStore(manifest), 'monolithic');
+
+    expect(section?.authors).toHaveLength(1);
+    expect(section?.authors[0].name).toBe('Jane Doe');
+    expect(section?.organizationName).toBe('Acme');
+    expect(section?.role).toBe('cawg.publisher');
+  });
+
+  it('selectWorkSection drops CreativeWork-derived authors/organization under showCreativeWork=false, keeping role', () => {
+    const { x509, creativeWork } = creativeWorkAssertion('cawg.publisher');
+    const manifest = { assertions: [x509, creativeWork] } as unknown as Manifest;
+
+    const section = selectWorkSection(manifest, trustedStore(manifest), 'monolithic', false);
+
+    expect(section?.authors).toHaveLength(0);
+    expect(section?.organizationName).toBeNull();
+    expect(section?.role).toBe('cawg.publisher');
+  });
+
+  it('selectCopyrightSection is unaffected by showCreativeWork - it is cawg.metadata-derived, not CreativeWork-derived', () => {
+    const manifest = {
+      assertions: [
+        x509Identity(['self#jumbf=c2pa.assertions/cawg.metadata']),
+        {
+          label: 'cawg.metadata',
+          data: {
+            '@context': { '@vocab': 'https://schema.org/' },
+            '@type': 'VideoObject',
+            copyrightNotice: '© Acme 2026',
+          },
+        },
+      ],
+    } as unknown as Manifest;
+
+    // selectCopyrightSection takes no showCreativeWork parameter at all - the
+    // absence of a 5th argument here is itself part of what this test
+    // demonstrates.
+    const section = selectCopyrightSection(manifest, trustedStore(manifest), 'monolithic');
+
+    expect(section?.copyright.copyrightNotice).toBe('© Acme 2026');
+    expect(section?.validationStatus).toBe('Trusted');
   });
 });

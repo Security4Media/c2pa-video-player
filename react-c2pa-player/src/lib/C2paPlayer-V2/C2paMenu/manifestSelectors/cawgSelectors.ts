@@ -16,8 +16,8 @@
 
 import { Manifest, ManifestStore } from '@contentauth/c2pa-web';
 import { readStoreEvidence } from '@/lib/validation/evidence';
-import { verifiesCawgIdentity } from '@/lib/validation/rules';
-import type { AdapterKind } from '@/lib/validation';
+import { meetsIdentityTrustThreshold, verifiesCawgIdentity } from '@/lib/validation/rules';
+import type { AdapterKind, IdentityTrustMode } from '@/lib/validation';
 import type { ValidationState } from '@/lib/types/c2pa.types';
 import { CawgOrganizationItem, ManifestCawgAssertion } from '../models';
 import { selectCawgMetadataCopyright } from './cawgMetadataCopyrightSelectors';
@@ -86,6 +86,8 @@ export function selectOrganizationIdentity(
     manifest: Manifest,
     manifestStore?: ManifestStore,
     adapterKind?: AdapterKind | null,
+    identityTrustMode: IdentityTrustMode = 'relaxed',
+    showCreativeWork: boolean = true,
 ) {
     const cawgAssertion = manifest.assertions?.find(
         assertion => assertion.label === CAWG_ASSERTION_LABEL
@@ -112,11 +114,12 @@ export function selectOrganizationIdentity(
     const referencedAssertionLabels = getReferencedAssertionLabels(cawgAssertion);
 
     // Content another assertion merely claims to be referenced is not
-    // authenticated by anything unless the identity vouching for it is
-    // itself trusted - a Valid/Unknown/Invalid identity's claimed
-    // references are exactly as unverified as the content they point to.
-    if (cawgItemBuilder.validationStatus === 'Trusted') {
-        if (referencedAssertionLabels.includes(CREATIVE_WORK_ASSERTION_LABEL)) {
+    // authenticated by anything unless the identity vouching for it clears
+    // this app's own bar (?identityTrust=, default 'relaxed': Trusted or
+    // Valid) - an identity below that bar's claimed references are exactly
+    // as unverified as the content they point to.
+    if (meetsIdentityTrustThreshold(cawgItemBuilder.validationStatus, identityTrustMode)) {
+        if (showCreativeWork && referencedAssertionLabels.includes(CREATIVE_WORK_ASSERTION_LABEL)) {
             cawgItemBuilder.creativeWork = selectCreativeWorkContent(manifest);
         }
 

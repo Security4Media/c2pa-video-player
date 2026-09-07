@@ -125,6 +125,8 @@ panel just reads and writes it.
 | `?consent=per-stream` | `whole-asset` | Asks once, the first time invalid content is actually played, and never again for that source. The overlay says outright that this is the only warning. |
 | `?consent=per-run` | `whole-asset` | Asks once per contiguous stretch of invalid content, so a second bad stretch stops the picture again. |
 | `?monolithicEngine=c2pa-web` | `nettrek` | Swaps the monolithic MP4 validation runtime from the shipped bridge-based one to an independent runtime that calls `@contentauth/c2pa-web` directly (see `runtimes/monolithicC2paWebRuntime.ts`). Has no effect on HLS/DASH. |
+| `?identityTrust=strict` | `relaxed` | Tightens Organization/Publisher Identity, Copyright, AI opt-out, and Creator so each requires an exactly `Trusted` `cawg.identity` before showing anything. The default, `relaxed`, additionally shows those sections for a `Valid` (structurally verified but not on this player's trusted-anchor list) identity; Creator alone also shows `Unknown` (nothing checked) under `relaxed`, unchanged from before this switch existed. |
+| `?showCreativeWork=off` | on | Hides everything derived from the `stds.schema-org.CreativeWork` assertion: Organization Details, About the Producer (authors/organization name), and Organization Identity's Published-on/License lines. Does not affect Copyright, which is `cawg.metadata`-derived, or `?identityTrust=`, which is orthogonal. |
 
 `?window=` and `?gate=` only ever affect a live source — both are no-ops on
 VOD (`validatedPlaybackGate.ts`, `liveResume.ts`). The demo panel disables

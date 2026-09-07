@@ -22,12 +22,15 @@ import {
   resolveConsentMode,
   resolveEnforceValidatedPlayback,
   resolveIcaTrustFixtureName,
+  resolveIdentityTrustMode,
   resolveLiveRetentionSeconds,
   resolveMonolithicEngine,
   resolveShowAuthenticityLabel,
+  resolveShowCreativeWork,
   resolveTrustFixtureName,
   type ConsentMode,
   type IcaTrustFixtureName,
+  type IdentityTrustMode,
   type MediaSourceDescriptor,
   type MonolithicEngine,
   type TrustFixtureName,
@@ -94,6 +97,10 @@ export function PlayerConfigPanel({ mediaSource, onApply }: PlayerConfigPanelPro
   const [windowSeconds, setWindowSeconds] = useState<number>(() => resolveLiveRetentionSeconds());
   const [gateEnabled, setGateEnabled] = useState<boolean>(() => resolveEnforceValidatedPlayback());
   const [engine, setEngine] = useState<MonolithicEngine>(() => resolveMonolithicEngine());
+  const [identityTrustRelaxed, setIdentityTrustRelaxed] = useState<boolean>(
+    () => resolveIdentityTrustMode() === 'relaxed'
+  );
+  const [showCreativeWork, setShowCreativeWork] = useState<boolean>(() => resolveShowCreativeWork());
 
   const adapterKind = useMemo(
     () => (mediaSource ? detectAdapterKind(mediaSource) : null),
@@ -176,6 +183,25 @@ export function PlayerConfigPanel({ mediaSource, onApply }: PlayerConfigPanelPro
     [onApply]
   );
 
+  const handleIdentityTrustChange = useCallback(
+    (checked: boolean) => {
+      setIdentityTrustRelaxed(checked);
+      const mode: IdentityTrustMode = checked ? 'relaxed' : 'strict';
+      applyParam('identityTrust', mode === 'strict' ? 'strict' : null);
+      onApply();
+    },
+    [onApply]
+  );
+
+  const handleShowCreativeWorkChange = useCallback(
+    (checked: boolean) => {
+      setShowCreativeWork(checked);
+      applyParam('showCreativeWork', checked ? null : 'off');
+      onApply();
+    },
+    [onApply]
+  );
+
   return (
     <div className="player-config-panel">
       <h3>Player Config</h3>
@@ -194,6 +220,30 @@ export function PlayerConfigPanel({ mediaSource, onApply }: PlayerConfigPanelPro
             onChange={(event) => handleLabelChange(event.target.checked)}
           />
           Authenticity label
+        </label>
+
+        <label
+          className="player-config-control player-config-control--checkbox"
+          title="Shows organization/publisher, copyright, AI opt-out, and Creator information for an identity that is only Valid (structurally verified but not on this player's trusted-anchor list), not just Trusted. On by default. Unchecking sets ?identityTrust=strict, which also tightens Creator to Trusted-only. (?identityTrust=strict when unchecked)"
+        >
+          <input
+            type="checkbox"
+            checked={identityTrustRelaxed}
+            onChange={(event) => handleIdentityTrustChange(event.target.checked)}
+          />
+          Show info for Valid (not just Trusted) identities
+        </label>
+
+        <label
+          className="player-config-control player-config-control--checkbox"
+          title="Shows information derived from the stds.schema-org.CreativeWork assertion: Organization Details, About the Producer (authors/organization name), and Organization Identity's Published-on/License lines. On by default. Does not affect Copyright, which is cawg.metadata-derived. (?showCreativeWork=off when unchecked)"
+        >
+          <input
+            type="checkbox"
+            checked={showCreativeWork}
+            onChange={(event) => handleShowCreativeWorkChange(event.target.checked)}
+          />
+          Show CreativeWork information
         </label>
 
         <label

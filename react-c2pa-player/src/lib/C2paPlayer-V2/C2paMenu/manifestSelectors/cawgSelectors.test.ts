@@ -103,8 +103,14 @@ describe('an engine that does verify it', () => {
     expect(identity?.dublinCore?.title).toBe('WDR C2PA Live Demo IBC 2026');
   });
 
-  it('withholds it when Valid but not Trusted', () => {
+  it('shows it by default (relaxed) when Valid but not Trusted', () => {
     const identity = selectOrganizationIdentity(manifest, store('Valid'), 'monolithic');
+
+    expect(identity?.dublinCore?.title).toBe('WDR C2PA Live Demo IBC 2026');
+  });
+
+  it('withholds it under identityTrust=strict when Valid but not Trusted', () => {
+    const identity = selectOrganizationIdentity(manifest, store('Valid'), 'monolithic', 'strict');
 
     expect(identity?.dublinCore).toBeNull();
   });
@@ -183,11 +189,22 @@ describe('a cawg.metadata assertion in the schema.org copyright shape', () => {
     expect(identity?.dublinCore).toBeNull();
   });
 
-  it('is withheld when the identity is only Valid', () => {
+  it('is shown by default (relaxed) when the identity is only Valid', () => {
     const identity = selectOrganizationIdentity(
       schemaOrgManifest,
       schemaOrgStore('Valid'),
       'monolithic',
+    );
+
+    expect(identity?.copyright?.copyrightNotice).toBe('© Westdeutscher Rundfunk 2026');
+  });
+
+  it('is withheld under identityTrust=strict when the identity is only Valid', () => {
+    const identity = selectOrganizationIdentity(
+      schemaOrgManifest,
+      schemaOrgStore('Valid'),
+      'monolithic',
+      'strict',
     );
 
     expect(identity?.copyright).toBeNull();

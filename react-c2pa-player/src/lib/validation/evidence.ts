@@ -123,6 +123,26 @@ function toFailures(statuses: readonly RawStatus[] | null | undefined): Validati
  * for a match. The first reusable version of a check every reader here used
  * to hand-roll separately (see `isWellFormed`/`isTrusted` below).
  */
+/**
+ * Whether `part` appears as a whole path segment of `url` - bounded by `/`,
+ * or by the start/end of the string - rather than as a bare substring.
+ *
+ * Real jumbf URLs are shaped like
+ * `self#jumbf=/c2pa/<manifestId>/c2pa.assertions/<label>`, always delimited
+ * by `/`. A bare substring check would let a short manifest id or label that
+ * happens to be a substring of a different one - more likely with short
+ * fixture ids than with real UUIDs - be mistaken for a match.
+ */
+function urlContainsSegment(url: string | null | undefined, part: string): boolean {
+  if (!url) {
+    return false;
+  }
+
+  const escaped = part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+  return new RegExp(`(^|/)${escaped}($|/)`).test(url);
+}
+
 function hasStatusCode(
   statuses: readonly RawStatus[],
   code: string,
@@ -131,7 +151,7 @@ function hasStatusCode(
   const required = urlIncludes ? (Array.isArray(urlIncludes) ? urlIncludes : [urlIncludes]) : [];
 
   return statuses.some(
-    (entry) => entry.code === code && required.every((part) => entry.url?.includes(part)),
+    (entry) => entry.code === code && required.every((part) => urlContainsSegment(entry.url, part)),
   );
 }
 
@@ -230,7 +250,16 @@ function fromCodedResults(
   // asset); the ICA shape never does, since neither engine evaluates DID
   // trust at all - it only ever emits the positive well-formed signal. Both
   // are the same claim: readable and intact, just not vouched for here.
-  if (isWellFormed) {
+  //
+  // But "well-formed" only ever speaks to the assertion's own structure, not
+  // to any *other* identity-scoped failure the engine reported alongside it
+  // (there is none known today, but nothing rules one out in a future engine
+  // version) - same rule `identityFromFailures` below already enforces for
+  // the WebCrypto shape, kept in sync here rather than letting the two
+  // readers disagree on the same input.
+  const identityFailures = failures.filter((entry) => entry.scope === 'identity');
+
+  if (isWellFormed && identityFailures.every(isUntrustedIdentity)) {
     return { state, failures, identity: 'Valid' };
   }
 
@@ -342,13 +371,25 @@ export function readIcaCredentialEvidence(
   const statuses = (manifestStore.validation_status ?? []) as RawStatus[];
   const scope = [manifestId, CAWG_IDENTITY_LABEL];
 
+  // The flat `validation_status` array is only ever the *sole* channel this
+  // credential's evidence bubbles up through in every case observed so far
+  // (see the "bubbled-up ingredient evidence" test below): it never
+  // co-occurs with coded results for the same store. Only consulting it
+  // when there is no coded channel to prefer instead means the two sources
+  // are never asked to agree on the same assertion - so a second, different
+  // code that ever lands in that flat array *alongside* coded results
+  // (e.g. some other pipeline stage's unrelated entry) cannot be
+  // misidentified as a failure for this credential.
+  const hasCoded = hasCodedResults(success, failure);
+
   const wellFormed = hasStatusCode(success, CAWG_ICA_CREDENTIAL_VALID_CODE, scope)
-    || hasStatusCode(statuses, CAWG_ICA_CREDENTIAL_VALID_CODE, scope);
+    || (!hasCoded && hasStatusCode(statuses, CAWG_ICA_CREDENTIAL_VALID_CODE, scope));
 
   const isOtherCodeForThisAssertion = (entry: RawStatus) =>
     Boolean(entry.code) && entry.code !== CAWG_ICA_CREDENTIAL_VALID_CODE
       && scope.every((part) => entry.url?.includes(part));
-  const failed = failure.some(isOtherCodeForThisAssertion) || statuses.some(isOtherCodeForThisAssertion);
+  const failed = failure.some(isOtherCodeForThisAssertion)
+    || (!hasCoded && statuses.some(isOtherCodeForThisAssertion));
 
   return { wellFormed, failed };
 }

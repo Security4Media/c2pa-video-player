@@ -58,9 +58,15 @@ describe('selectAiOptOutSection', () => {
     expect(section?.assertion.entries).toHaveLength(2);
   });
 
-  it('is withheld when the identity is only Valid', () => {
+  it('is shown by default (relaxed) when the identity is only Valid', () => {
+    const section = selectAiOptOutSection(manifest, buildStore(manifest, 'Valid'), 'monolithic');
+
+    expect(section?.assertion.label).toBe('cawg.training-mining');
+  });
+
+  it('is withheld under identityTrust=strict when the identity is only Valid', () => {
     expect(
-      selectAiOptOutSection(manifest, buildStore(manifest, 'Valid'), 'monolithic'),
+      selectAiOptOutSection(manifest, buildStore(manifest, 'Valid'), 'monolithic', 'strict'),
     ).toBeNull();
   });
 

@@ -43,15 +43,18 @@ export {
   resolveConsentMode,
   resolveEnforceValidatedPlayback,
   resolveIcaTrustFixtureName,
+  resolveIdentityTrustMode,
   resolveLiveRetentionSeconds,
   resolveMonolithicEngine,
   resolveShowAuthenticityLabel,
+  resolveShowCreativeWork,
   resolveTrustFixtureName,
   selectedIcaIssuerProvider,
   trustFixtures,
   DEFAULT_LIVE_RETENTION_SECONDS,
   MIN_LIVE_WINDOW_SECONDS,
   type IcaTrustFixtureName,
+  type IdentityTrustMode,
   type TrustFixtureName,
 } from './policy';
 export {

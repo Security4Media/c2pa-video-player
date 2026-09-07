@@ -188,6 +188,11 @@ export type { IcaIssuerProvider } from './icaIssuerProvider';
 export { icaTrustFixtures, isIcaTrustFixtureName, type IcaTrustFixtureName } from './icaTrustFixtures';
 export { resolveConsentMode, resolveShowAuthenticityLabel } from './authenticity';
 export {
+  resolveIdentityTrustMode,
+  resolveShowCreativeWork,
+  type IdentityTrustMode,
+} from './menuDisplay';
+export {
   DEFAULT_LIVE_RETENTION_SECONDS,
   MIN_LIVE_WINDOW_SECONDS,
   resolveEnforceValidatedPlayback,

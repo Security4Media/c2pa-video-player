@@ -19,20 +19,28 @@ import type { CopyrightSectionItem } from '../models';
 import { SectionToggle, WebsiteLink } from './shared';
 
 /**
- * This section only ever renders when the referencing cawg.identity is
- * Trusted (see selectOrganizationIdentity/selectCopyrightSection), so the
- * badge is a fixed confirmation rather than one of several possible states.
+ * This section only ever renders when the referencing cawg.identity clears
+ * `identityTrustMode`'s bar (see selectCopyrightSection), which never
+ * includes 'Unknown'/'Invalid' - only 'Trusted' or 'Valid' (under the
+ * default 'relaxed' mode) reach here, so those are the only two states this
+ * badge needs to distinguish.
  */
-function TrustedTag() {
+function ValidationTag({ validationStatus }: { validationStatus: CopyrightSectionItem['validationStatus'] }) {
+  const isTrusted = validationStatus === 'Trusted';
+
   return (
     <span
       className="c2pa-copyright-section__status"
-      aria-label="Copyright information status: Trusted"
-      title="Trusted: this information is referenced by a trusted organization identity."
+      aria-label={`Copyright information status: ${validationStatus}`}
+      title={
+        isTrusted
+          ? 'Trusted: this information is referenced by a trusted organization identity.'
+          : 'Valid: this information is referenced by a verified organization identity, but its signing credentials are not fully trusted.'
+      }
       data-testid="c2pa-copyright-status"
-      data-validation-state="Trusted"
+      data-validation-state={validationStatus}
     >
-      ✅
+      {isTrusted ? '✅' : '☑️'}
     </span>
   );
 }
@@ -56,7 +64,7 @@ export function CopyrightSection({
       <div className="c2pa-menu-section c2pa-copyright-section">
         <SectionToggle
           title={title}
-          badge={<TrustedTag />}
+          badge={<ValidationTag validationStatus={section.validationStatus} />}
           isExpanded={isExpanded}
           controls={panelId}
           onToggle={onToggle}
@@ -71,7 +79,10 @@ export function CopyrightSection({
             ) : copyright.copyrightHolder?.name ? (
               <div className="c2pa-menu-section__row">
                 <span className="itemName">Copyright holder:</span> {copyright.copyrightHolder.name}
-                {copyright.copyrightYear ? ` (${copyright.copyrightYear})` : ''}
+                {/* Not a truthy check: copyrightYear is number | null, and a
+                    declared year of 0 - however unlikely - is still a value,
+                    not an absence. A truthy check would drop it silently. */}
+                {copyright.copyrightYear !== null ? ` (${copyright.copyrightYear})` : ''}
               </div>
             ) : null}
             {copyright.creditText ? (

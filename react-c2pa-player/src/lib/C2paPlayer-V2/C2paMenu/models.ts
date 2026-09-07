@@ -148,6 +148,8 @@ export interface OrganizationSectionItem {
 
 export interface CopyrightSectionItem {
     copyright: CawgMetadataCopyrightItem;
+    /** The referencing identity's verdict - never below the threshold that let this section render (see selectCopyrightSection), so only 'Trusted' or 'Valid' in practice. */
+    validationStatus: ValidationState;
 }
 
 export interface WorkSectionItem {

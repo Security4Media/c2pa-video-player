@@ -15,7 +15,8 @@
  */
 
 import { Manifest, ManifestStore } from '@contentauth/c2pa-web';
-import type { AdapterKind } from '@/lib/validation';
+import type { AdapterKind, IdentityTrustMode } from '@/lib/validation';
+import { meetsIdentityTrustThreshold } from '@/lib/validation/rules';
 import {
     AiOptOutAssertionItem,
     AiOptOutEntryItem,
@@ -99,22 +100,26 @@ function mapTrainingMiningAssertion(
 /**
  * Select AI/training opt-out assertions only when they are explicitly
  * referenced by the manifest's `cawg.identity` assertion, and that identity
- * is Trusted.
+ * clears `identityTrustMode`'s bar (default `'relaxed'`: `Trusted` or
+ * `Valid`; `'strict'`: `Trusted` only).
  *
  * Same rule as the Copyright and Organization Identity sections: a
  * training-mining assertion merely being referenced is not authenticated by
- * anything unless the identity vouching for it is itself trusted - a
- * Valid/Unknown/Invalid identity's claimed references are exactly as
- * unverified as the content they point to.
+ * anything unless the identity vouching for it clears that bar - anything
+ * below it has claimed references exactly as unverified as the content they
+ * point to.
  *
  * @param manifest - The manifest containing CAWG and training-mining assertions
  * @param manifestStore - Optional manifest store used to compute CAWG validation status
- * @returns Structured AI opt-out section data, or null when not referenced by a Trusted identity
+ * @param adapterKind - Which adapter produced this result
+ * @param identityTrustMode - How strict the identity verdict must be (see `meetsIdentityTrustThreshold`)
+ * @returns Structured AI opt-out section data, or null when not referenced by a sufficiently-trusted identity
  */
 export function selectAiOptOutSection(
     manifest: Manifest,
     manifestStore?: ManifestStore,
     adapterKind?: AdapterKind | null,
+    identityTrustMode: IdentityTrustMode = 'relaxed',
 ): AiOptOutSectionItem | null {
     const cawgAssertion = selectCawgAssertion(manifest);
     if (!cawgAssertion) {
@@ -122,7 +127,7 @@ export function selectAiOptOutSection(
     }
 
     const validationStatus = selectOrganizationIdentity(manifest, manifestStore, adapterKind)?.validationStatus;
-    if (validationStatus !== 'Trusted') {
+    if (!validationStatus || !meetsIdentityTrustThreshold(validationStatus, identityTrustMode)) {
         return null;
     }
 

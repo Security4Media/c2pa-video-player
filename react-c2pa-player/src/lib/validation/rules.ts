@@ -17,7 +17,7 @@
 import type { Manifest, ManifestStore } from '@contentauth/c2pa-web';
 import type { C2paManifestHelper } from '@nettrek/c2pa-hls-bridge';
 import { readReaderEvidence } from './evidence';
-import type { AdapterKind, PlayerValidationState } from './types';
+import type { AdapterKind, IdentityTrustMode, PlayerValidationState } from './types';
 
 export function getActiveManifest(manifestStore: ManifestStore): Manifest | null {
   if (!manifestStore?.active_manifest || !manifestStore?.manifests) {
@@ -57,6 +57,40 @@ export function verifiesCawgIdentity(adapterKind: AdapterKind): boolean {
 }
 
 /**
+ * Whether a `cawg.identity` verdict clears the bar this app currently
+ * requires before showing content gated on it.
+ *
+ * Every section that used to hand-roll `validationStatus === 'Trusted'`
+ * calls this instead, so `?identityTrust=strict` (see
+ * `policy/menuDisplay.ts`) tightens all of them - Organization/Publisher
+ * Identity, Copyright, AI opt-out, and Creator - from one place, rather than
+ * needing the same comparison kept in sync across four files.
+ *
+ * `allowUnknown` exists only for Creator, whose relaxed policy was already
+ * more permissive than the others before this config existed (`Trusted`/
+ * `Valid`/`Unknown`, hiding only `Invalid` - the default engine explicitly
+ * never checks the ICA credential form at all, so treating that silence as a
+ * failure would be dishonest). It stays that way under `'relaxed'`; under
+ * `'strict'` every caller converges on exactly `Trusted`, `allowUnknown` or
+ * not.
+ */
+export function meetsIdentityTrustThreshold(
+  status: PlayerValidationState,
+  mode: IdentityTrustMode,
+  allowUnknown: boolean = false,
+): boolean {
+  if (mode === 'strict') {
+    return status === 'Trusted';
+  }
+
+  if (allowUnknown) {
+    return status !== 'Invalid';
+  }
+
+  return status === 'Trusted' || status === 'Valid';
+}
+
+/**
  * What to say about an identity nothing checked.
  *
  * Copy in a rules module is a small layering compromise, taken deliberately:
@@ -69,20 +103,6 @@ export function verifiesCawgIdentity(adapterKind: AdapterKind): boolean {
  */
 export const UNVERIFIED_IDENTITY_CAVEAT =
   'Declared in the stream; this player did not verify who signed it.';
-
-/**
- * What to say when an identity's referenced content (title, publisher,
- * copyright, credit) is being withheld rather than shown-with-a-caveat.
- *
- * Applies to any verdict short of Trusted: Valid (verified but not to a
- * trusted anchor), Unknown (nothing checked) and Invalid (checked and
- * failed) all withhold the content the identity vouches for, not just
- * re-badge it - showing a declared title or publisher next to a cross or a
- * question mark still reads as "here is who made this", which the player
- * cannot support unless the credentials are actually trusted.
- */
-export const REFERENCED_CONTENT_HIDDEN_NOTE =
-  "Details this identity declares (title, publisher, copyright) are not shown until its signing credentials are trusted.";
 
 /**
  * @svta/cml-c2pa (behind @qualabs/c2pa-live-dashjs-plugin) only performs
