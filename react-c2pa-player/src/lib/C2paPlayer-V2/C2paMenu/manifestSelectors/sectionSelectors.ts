@@ -18,6 +18,7 @@ import { Manifest, ManifestStore } from '@contentauth/c2pa-web';
 import type { AdapterKind, IdentityTrustMode } from '@/lib/validation';
 import { meetsIdentityTrustThreshold } from '@/lib/validation/rules';
 import {
+    AiOptOutSectionItem,
     ClaimGeneratorSectionItem,
     CopyrightSectionItem,
     HistorySectionItem,
@@ -26,22 +27,15 @@ import {
     WorkSectionItem,
 } from '../models';
 import { hasPublishedAction, selectActionsAssertion } from './actionsSelectors';
-import { readIdentityStatus, selectOrganizationIdentity } from './cawgSelectors';
+import { selectAiOptOutSection } from './aiOptOutSelectors';
+import { selectOrganizationIdentity } from './cawgSelectors';
 import { selectClaimGenerator } from './claimGeneratorSelectors';
 import {
     selectCreativeWorkAuthors,
     selectCreativeWorkOrganization,
 } from './creativeWorkSelectors';
 import { selectIngredients } from './ingredientSelectors';
-import {
-    CAWG_METADATA_ASSERTION_LABEL,
-    CAWG_TRAINING_MINING_ASSERTION_LABEL,
-    CREATIVE_WORK_ASSERTION_LABEL,
-    C2PA_TRAINING_MINING_ASSERTION_LABEL,
-    getReferencedAssertionLabels,
-    selectCawgAssertion,
-    selectX509CawgAssertion,
-} from './shared';
+import { getReferencedAssertionLabels, selectX509CawgAssertion } from './shared';
 
 /**
  * Select the claim-generator section model for the menu.
@@ -259,56 +253,54 @@ export function selectWorkSection(
  * `showUnverifiedIdentity` setting is keeping off screen - so the menu can
  * say *something* is being withheld without saying what.
  *
- * Not three separate "would selectOrganizationSection/selectCopyrightSection/
- * selectAiOptOutSection return non-null" checks: all three gate on the same
- * `cawg.identity` verdict for one manifest, so whether any of them has
- * withheld content reduces to one question about that verdict - is it
- * exactly the kind `showUnverifiedIdentity` would newly admit - and whether
- * it references any content those sections would otherwise show.
+ * Asks the same three selectors that build those sections, rather than
+ * keeping a second, hand-rolled copy of when they apply: `organizationSection`/
+ * `copyrightSection`/`aiOptOutSection` are what the caller already computed
+ * under the real settings (so passed in rather than recomputed here), and if
+ * all three came back null, this calls the same selectors once more with
+ * `showUnverifiedIdentity` forced to `true`. Whatever that second pass would
+ * show is exactly what the first pass is withholding, and it can never
+ * disagree with what those selectors actually gate on - there is no separate
+ * rule to fall out of sync with theirs if any one of them changes later.
  *
  * @param manifest - The manifest containing CAWG assertions
+ * @param organizationSection - What `selectOrganizationSection` already returned under the real settings
+ * @param copyrightSection - What `selectCopyrightSection` already returned under the real settings
+ * @param aiOptOutSection - What `selectAiOptOutSection` already returned under the real settings
  * @param manifestStore - Optional manifest store used to compute the CAWG verdict
  * @param adapterKind - Which adapter produced this result
  * @param identityTrustMode - How strict the identity verdict must be (see `meetsIdentityTrustThreshold`)
+ * @param showCreativeWork - Whether to include CreativeWork-derived organization details (see `selectOrganizationSection`)
  * @param showUnverifiedIdentity - The current setting; the hint only appears while this is `false`
  * @returns Whether to show the "unverified info exists" hint
  */
 export function selectWithheldIdentityHint(
     manifest: Manifest,
+    organizationSection: OrganizationSectionItem | null,
+    copyrightSection: CopyrightSectionItem | null,
+    aiOptOutSection: AiOptOutSectionItem | null,
     manifestStore?: ManifestStore,
     adapterKind?: AdapterKind | null,
     identityTrustMode: IdentityTrustMode = 'relaxed',
+    showCreativeWork: boolean = true,
     showUnverifiedIdentity: boolean = false,
 ): boolean {
-    if (showUnverifiedIdentity) {
+    // Already showing under the real settings, or the flag is already on -
+    // either way there is nothing left to withhold.
+    if (showUnverifiedIdentity || organizationSection || copyrightSection || aiOptOutSection) {
         return false;
     }
-
-    const cawgAssertion = selectCawgAssertion(manifest);
-
-    if (!cawgAssertion) {
-        return false;
-    }
-
-    const status = readIdentityStatus(manifestStore, adapterKind);
-
-    // Would clear the bar if the flag were on, but doesn't today - the exact
-    // condition under which this flag makes a difference. (Always false under
-    // `'strict'`, which never admits `'Unknown'` either way.)
-    const withheldByFlag =
-        meetsIdentityTrustThreshold(status, identityTrustMode, true) &&
-        !meetsIdentityTrustThreshold(status, identityTrustMode, showUnverifiedIdentity);
-
-    if (!withheldByFlag) {
-        return false;
-    }
-
-    const referencedAssertionLabels = getReferencedAssertionLabels(cawgAssertion);
 
     return (
-        referencedAssertionLabels.includes(CREATIVE_WORK_ASSERTION_LABEL) ||
-        referencedAssertionLabels.includes(CAWG_METADATA_ASSERTION_LABEL) ||
-        referencedAssertionLabels.includes(CAWG_TRAINING_MINING_ASSERTION_LABEL) ||
-        referencedAssertionLabels.includes(C2PA_TRAINING_MINING_ASSERTION_LABEL)
+        selectOrganizationSection(
+            manifest,
+            manifestStore,
+            adapterKind,
+            identityTrustMode,
+            showCreativeWork,
+            true,
+        ) !== null ||
+        selectCopyrightSection(manifest, manifestStore, adapterKind, identityTrustMode, true) !== null ||
+        selectAiOptOutSection(manifest, manifestStore, adapterKind, identityTrustMode, true) !== null
     );
 }

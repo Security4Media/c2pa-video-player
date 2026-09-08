@@ -42,7 +42,7 @@
  */
 
 import type { AdapterKind } from '@/lib/validation';
-import { UNVERIFIED_IDENTITY_CAVEAT } from '@/lib/validation/rules';
+import { UNVERIFIED_IDENTITY_CAVEAT, WITHHELD_IDENTITY_INFO_CAVEAT } from '@/lib/validation/rules';
 import type { C2PATimelineSegmentUpdate } from '@/lib/types/c2pa.types';
 import {
     buildSegmentPreview,
@@ -238,10 +238,12 @@ function renderPreview(preview: SegmentPreview): string {
             );
         }
     } else if (preview.metadataWithheld) {
-        // Says something is being withheld without saying what - same
-        // reasoning as the menu's WithheldIdentityHint, for the same content.
+        // Same wording as the menu's WithheldIdentityHint, for the same
+        // content - naming which field (title/publisher/rights) is behind it
+        // here while staying vague there would leak exactly what the menu's
+        // phrasing is deliberately withholding.
         parts.push(
-            `<p class="${PREVIEW_CLASS}__caveat">Unverified publisher info available for this segment.</p>`,
+            `<p class="${PREVIEW_CLASS}__caveat">${escapeHtml(WITHHELD_IDENTITY_INFO_CAVEAT)}</p>`,
         );
     }
 

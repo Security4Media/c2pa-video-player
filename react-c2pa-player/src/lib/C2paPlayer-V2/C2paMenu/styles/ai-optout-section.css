@@ -30,3 +30,13 @@
   font-size: 0.9em;
   line-height: 1.4;
 }
+
+/* Same treatment as CopyrightSection's own header badge. */
+.vjs-menu li.vjs-menu-item .c2pa-ai-optout-section__status {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.15rem;
+  line-height: 1;
+  cursor: help;
+}

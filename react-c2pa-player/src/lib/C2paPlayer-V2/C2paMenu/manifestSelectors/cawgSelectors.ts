@@ -58,14 +58,7 @@ import {
  * 'Unknown' is the honest answer, and it is the same word the timeline's grey
  * means everywhere else in this player: nobody checked.
  */
-/**
- * Exported for `selectWithheldIdentityHint`, which needs the same verdict to
- * decide whether Organization/Copyright/AI opt-out have content sitting
- * behind an `'Unknown'` identity - without re-deriving it, and without
- * triggering `selectOrganizationIdentity`'s "references neither known
- * content type" warning for manifests where that's expected.
- */
-export function readIdentityStatus(
+function readIdentityStatus(
     manifestStore: ManifestStore | undefined,
     adapterKind: AdapterKind | null | undefined,
 ): ValidationState {

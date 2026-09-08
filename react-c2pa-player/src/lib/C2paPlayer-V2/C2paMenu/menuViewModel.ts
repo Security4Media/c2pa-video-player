@@ -283,6 +283,34 @@ export function buildMenuRenderState(
         };
     }
 
+    // The adapter reaches the identity selector because whether the engine
+    // verified the identity at all is not something the manifest or the store
+    // can say. Computed once here (rather than inline in `sections` below) so
+    // `selectWithheldIdentityHint` can ask "did any of these already show?"
+    // without recomputing them.
+    const organization = selectOrganizationSection(
+        activeManifest,
+        selectorManifestStore ?? undefined,
+        c2paStatus?.adapterKind,
+        identityTrustMode,
+        showCreativeWork,
+        showUnverifiedIdentity,
+    );
+    const copyright = selectCopyrightSection(
+        activeManifest,
+        selectorManifestStore ?? undefined,
+        c2paStatus?.adapterKind,
+        identityTrustMode,
+        showUnverifiedIdentity,
+    );
+    const aiOptOut = selectAiOptOutSection(
+        activeManifest,
+        selectorManifestStore ?? undefined,
+        c2paStatus?.adapterKind,
+        identityTrustMode,
+        showUnverifiedIdentity,
+    );
+
     return {
         mode: 'ready',
         manifestId,
@@ -295,24 +323,8 @@ export function buildMenuRenderState(
                 alert: buildAlertMessage(timeline, c2paStatus),
             },
             claimGenerator: selectClaimGeneratorSection(activeManifest),
-            // The adapter reaches the identity selector because whether the
-            // engine verified the identity at all is not something the
-            // manifest or the store can say. See readIdentityStatus.
-            organization: selectOrganizationSection(
-                activeManifest,
-                selectorManifestStore ?? undefined,
-                c2paStatus?.adapterKind,
-                identityTrustMode,
-                showCreativeWork,
-                showUnverifiedIdentity,
-            ),
-            copyright: selectCopyrightSection(
-                activeManifest,
-                selectorManifestStore ?? undefined,
-                c2paStatus?.adapterKind,
-                identityTrustMode,
-                showUnverifiedIdentity,
-            ),
+            organization,
+            copyright,
             // Ingredient-aware, like history below: needs a real manifestStore
             // to resolve ingredient manifests by id, not just to read trust
             // status off of.
@@ -325,21 +337,19 @@ export function buildMenuRenderState(
                 c2paStatus?.adapterKind,
                 showCreativeWork,
             ),
-            aiOptOut: selectAiOptOutSection(
-                activeManifest,
-                selectorManifestStore ?? undefined,
-                c2paStatus?.adapterKind,
-                identityTrustMode,
-                showUnverifiedIdentity,
-            ),
+            aiOptOut,
             history: selectorManifestStore
                 ? selectHistorySection(activeManifest, selectorManifestStore)
                 : null,
             withheldIdentityHint: selectWithheldIdentityHint(
                 activeManifest,
+                organization,
+                copyright,
+                aiOptOut,
                 selectorManifestStore ?? undefined,
                 c2paStatus?.adapterKind,
                 identityTrustMode,
+                showCreativeWork,
                 showUnverifiedIdentity,
             ),
         },
@@ -450,6 +460,29 @@ function buildSegmentMenuRenderState(
         ? resolveManifestStoreFromSource(segment.manifestRef, manifestId, validationStatus)
         : null;
 
+    const organization = selectOrganizationSection(
+        activeManifest,
+        selectorManifestStore ?? undefined,
+        adapterKind,
+        identityTrustMode,
+        showCreativeWork,
+        showUnverifiedIdentity,
+    );
+    const copyright = selectCopyrightSection(
+        activeManifest,
+        selectorManifestStore ?? undefined,
+        adapterKind,
+        identityTrustMode,
+        showUnverifiedIdentity,
+    );
+    const aiOptOut = selectAiOptOutSection(
+        activeManifest,
+        selectorManifestStore ?? undefined,
+        adapterKind,
+        identityTrustMode,
+        showUnverifiedIdentity,
+    );
+
     return {
         mode: 'ready',
         manifestId,
@@ -462,21 +495,8 @@ function buildSegmentMenuRenderState(
                 alert,
             },
             claimGenerator: selectClaimGeneratorSection(activeManifest),
-            organization: selectOrganizationSection(
-                activeManifest,
-                selectorManifestStore ?? undefined,
-                adapterKind,
-                identityTrustMode,
-                showCreativeWork,
-                showUnverifiedIdentity,
-            ),
-            copyright: selectCopyrightSection(
-                activeManifest,
-                selectorManifestStore ?? undefined,
-                adapterKind,
-                identityTrustMode,
-                showUnverifiedIdentity,
-            ),
+            organization,
+            copyright,
             creator: selectorManifestStore
                 ? selectCreatorSection(activeManifest, selectorManifestStore, trustedIcaIssuers, identityTrustMode)
                 : null,
@@ -486,21 +506,19 @@ function buildSegmentMenuRenderState(
                 adapterKind,
                 showCreativeWork,
             ),
-            aiOptOut: selectAiOptOutSection(
-                activeManifest,
-                selectorManifestStore ?? undefined,
-                adapterKind,
-                identityTrustMode,
-                showUnverifiedIdentity,
-            ),
+            aiOptOut,
             history: selectorManifestStore
                 ? selectHistorySection(activeManifest, selectorManifestStore)
                 : null,
             withheldIdentityHint: selectWithheldIdentityHint(
                 activeManifest,
+                organization,
+                copyright,
+                aiOptOut,
                 selectorManifestStore ?? undefined,
                 adapterKind,
                 identityTrustMode,
+                showCreativeWork,
                 showUnverifiedIdentity,
             ),
         },

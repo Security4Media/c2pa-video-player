@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+import { WITHHELD_IDENTITY_INFO_CAVEAT } from '@/lib/validation/rules';
+
 /**
  * Says that Organization Identity, Copyright or AI opt-out have content this
  * player is withholding, without saying what - the content itself is exactly
@@ -21,6 +23,11 @@
  * Rendered in place of those sections (see `selectWithheldIdentityHint`),
  * never alongside them: once the flag is on, this disappears and they carry
  * their own `'Unknown'` badge instead.
+ *
+ * Shares its wording with the timeline hover's equivalent caveat (see
+ * `WITHHELD_IDENTITY_INFO_CAVEAT`) - naming a specific category on one surface
+ * while staying vague on the other would leak exactly what this hint exists to
+ * keep from being said.
  */
 export function WithheldIdentityHint() {
   return (
@@ -28,8 +35,7 @@ export function WithheldIdentityHint() {
       <div className="c2pa-menu-section c2pa-withheld-hint">
         <p className="c2pa-withheld-hint__text">
           <span aria-hidden="true">❔ </span>
-          This stream declares organization, copyright, or usage information
-          that could not be verified, so it isn't shown here.
+          {WITHHELD_IDENTITY_INFO_CAVEAT}
         </p>
       </div>
     </li>

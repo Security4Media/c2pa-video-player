@@ -148,7 +148,7 @@ export interface OrganizationSectionItem {
 
 export interface CopyrightSectionItem {
     copyright: CawgMetadataCopyrightItem;
-    /** The referencing identity's verdict - never below the threshold that let this section render (see selectCopyrightSection), so only 'Trusted' or 'Valid' in practice. */
+    /** The referencing identity's verdict - never below the threshold that let this section render (see selectCopyrightSection): 'Trusted' or 'Valid' always, plus 'Unknown' whenever `showUnverifiedIdentity` let it through. */
     validationStatus: ValidationState;
 }
 
