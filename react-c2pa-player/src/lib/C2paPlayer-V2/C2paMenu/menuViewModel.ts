@@ -496,8 +496,6 @@ function buildSegmentMenuRenderState(
             history: selectorManifestStore
                 ? selectHistorySection(activeManifest, selectorManifestStore)
                 : null,
-            // Not relevant to a single-segment detail view - that list is
-            // about anomalies across the whole timeline, not this fragment.
             withheldIdentityHint: selectWithheldIdentityHint(
                 activeManifest,
                 selectorManifestStore ?? undefined,
