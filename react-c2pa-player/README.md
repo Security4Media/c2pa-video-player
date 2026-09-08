@@ -307,6 +307,10 @@ certificate reads as Valid rather than Trusted. That is what `trust/tsa/` is
 for. TSA trust is anchor-only and gated on `id-kp-timeStamping`, so a
 timestamp authority cannot be allow-listed into trust, only anchored.
 
+## Credits
+
+Manifest validation is provided by third-party engines, each covering the source kind described in [Architecture](#architecture) above: [`@qualabs/c2pa-live-dashjs-plugin`](https://www.npmjs.com/package/@qualabs/c2pa-live-dashjs-plugin?activeTab=versions) (Qualabs) for live DASH, [`@nettrek/c2pa-hls-bridge`](https://www.npmjs.com/package/@nettrek/c2pa-hls-bridge) and [`@nettrek/c2pa-web-crypto`](https://www.npmjs.com/package/@nettrek/c2pa-web-crypto) (Nettrek) for HLS and the default monolithic MP4 engine, and [`@contentauth/c2pa-web`](https://www.npmjs.com/package/@contentauth/c2pa-web) (Content Authenticity Initiative) for the alternate monolithic MP4 engine (`?monolithicEngine=c2pa-web`).
+
 ## License
 
 Apache License 2.0. Part of the EBU C2PA Player project.
