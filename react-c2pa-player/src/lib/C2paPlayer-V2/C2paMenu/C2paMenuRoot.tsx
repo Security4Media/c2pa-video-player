@@ -20,7 +20,11 @@ import { buildMenuRenderState, c2paMenuSectionTitles } from './menuViewModel';
 import { useTrustedIcaIssuers } from './useTrustedIcaIssuers';
 import { C2PAStatus } from '@/lib/types/c2pa.types';
 import type { ValidationTimelineSegment } from '@/lib/validation';
-import { resolveIdentityTrustMode, resolveShowCreativeWork } from '@/lib/validation/policy';
+import {
+  resolveIdentityTrustMode,
+  resolveShowCreativeWork,
+  resolveShowUnverifiedIdentity,
+} from '@/lib/validation/policy';
 
 interface C2paMenuRootProps {
   c2paStatus: C2PAStatus | null;
@@ -42,6 +46,8 @@ export function C2paMenuRoot({ c2paStatus, timeline, resetKey, selectedSegment, 
   // keeps them current with no extra effect/staleness to reason about.
   const identityTrustMode = resolveIdentityTrustMode();
   const showCreativeWork = resolveShowCreativeWork();
+  // Live by default, on-demand off by default - see resolveShowUnverifiedIdentity.
+  const showUnverifiedIdentity = resolveShowUnverifiedIdentity(c2paStatus?.isLive ?? false);
   const renderState = buildMenuRenderState(
     c2paStatus,
     timeline,
@@ -49,6 +55,7 @@ export function C2paMenuRoot({ c2paStatus, timeline, resetKey, selectedSegment, 
     trustedIcaIssuers,
     identityTrustMode,
     showCreativeWork,
+    showUnverifiedIdentity,
   );
   // Two different segments can resolve to the same manifestId (e.g. distinct
   // DASH integrity-only segments always resolve to the literal 'segment', or

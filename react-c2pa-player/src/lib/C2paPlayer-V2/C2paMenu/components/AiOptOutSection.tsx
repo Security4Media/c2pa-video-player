@@ -15,6 +15,7 @@
  */
 
 import { useId } from 'react';
+import { UNVERIFIED_IDENTITY_CAVEAT } from '@/lib/validation/rules';
 import type { AiOptOutSectionItem } from '../models';
 import { SectionToggle } from './shared';
 
@@ -84,6 +85,15 @@ export function AiOptOutSection({
           className={`c2pa-menu-section__content ${isExpanded ? 'expanded' : ''}`}
         >
           <div className="c2pa-menu-section__content-inner c2pa-ai-optout-section__assertion">
+            {/* Only reachable when `showUnverifiedIdentity` let an 'Unknown'
+                identity through (see selectAiOptOutSection) - without this, a
+                usage restriction nobody checked would read as flat fact. */}
+            {section.validationStatus === 'Unknown' ? (
+              <p className="c2pa-ai-optout-section__caveat">
+                <span aria-hidden="true">❔ </span>
+                {UNVERIFIED_IDENTITY_CAVEAT}
+              </p>
+            ) : null}
             {policyParts.map((part, index) => (
               <div key={`${section.assertion.label}-${index}`} className="c2pa-menu-section__row">
                 {part}

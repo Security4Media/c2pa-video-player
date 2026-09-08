@@ -22,3 +22,11 @@
   gap: 0.75rem;
   margin-top: 0.5rem;
 }
+
+/* Same muted treatment as OrganizationSection's/CopyrightSection's caveat. */
+.vjs-menu li.vjs-menu-item .c2pa-ai-optout-section__caveat {
+  margin: 0;
+  opacity: 0.7;
+  font-size: 0.9em;
+  line-height: 1.4;
+}

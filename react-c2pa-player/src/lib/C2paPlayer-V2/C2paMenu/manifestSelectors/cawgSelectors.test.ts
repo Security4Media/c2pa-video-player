@@ -89,6 +89,33 @@ describe('an engine that verifies nothing about the identity', () => {
 
     expect(identity?.dublinCore).toBeNull();
   });
+
+  it('shows the metadata, marked Unknown, once showUnverifiedIdentity opts into it', () => {
+    const identity = selectOrganizationIdentity(
+      manifest,
+      store('Valid'),
+      'dash-fragmented-fmp4',
+      'relaxed',
+      true,
+      true,
+    );
+
+    expect(identity?.validationStatus).toBe('Unknown');
+    expect(identity?.dublinCore?.title).toBe('WDR C2PA Live Demo IBC 2026');
+  });
+
+  it('still withholds it under identityTrust=strict even with showUnverifiedIdentity on', () => {
+    const identity = selectOrganizationIdentity(
+      manifest,
+      store('Valid'),
+      'dash-fragmented-fmp4',
+      'strict',
+      true,
+      true,
+    );
+
+    expect(identity?.dublinCore).toBeNull();
+  });
 });
 
 describe('an engine that does verify it', () => {

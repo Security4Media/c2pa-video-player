@@ -195,10 +195,8 @@ export function OrganizationSection({
         {/* Spelled out rather than left to the icon's tooltip. The whole point
             of this section is the names in it, and a viewer reading a title
             and a publisher has no reason to hover a glyph to find out that
-            nothing vouched for them. Unreachable in practice today (Unknown
-            never clears the bar that gates this section at all) but kept as
-            the same defensive fallback OrganizationSection's validation
-            badge uses, rather than assuming the selector can never change. */}
+            nothing vouched for them. Reached whenever `showUnverifiedIdentity`
+            let an 'Unknown' verdict clear the bar (see selectOrganizationSection). */}
         {section.cawg?.validationStatus === 'Unknown' ? (
           <p className="c2pa-org-section__caveat">{UNVERIFIED_IDENTITY_CAVEAT}</p>
         ) : null}

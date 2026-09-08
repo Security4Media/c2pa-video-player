@@ -21,6 +21,7 @@ export { CreatorSection } from './CreatorSection';
 export { HistoryDetailView, HistorySection } from './HistorySection';
 export { OrganizationSection } from './OrganizationSection';
 export { SummarySection } from './SummarySection';
+export { WithheldIdentityHint } from './WithheldIdentityHint';
 export { WorkSection } from './WorkSection';
 export {
   AlertItem,

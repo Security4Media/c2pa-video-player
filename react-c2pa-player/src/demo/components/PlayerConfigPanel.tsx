@@ -28,6 +28,7 @@ import {
   resolveMonolithicEngine,
   resolveShowAuthenticityLabel,
   resolveShowCreativeWork,
+  resolveShowUnverifiedIdentity,
   resolveTrustFixtureName,
   type ConsentMode,
   type IcaTrustFixtureName,
@@ -102,6 +103,15 @@ export function PlayerConfigPanel({ mediaSource, onApply }: PlayerConfigPanelPro
     () => resolveIdentityTrustMode() === 'relaxed'
   );
   const [showCreativeWork, setShowCreativeWork] = useState<boolean>(() => resolveShowCreativeWork());
+  // Not live-aware at mount, unlike the resolver it mirrors: `mediaSource`
+  // only tells us the format, and this panel's own `isLiveCapableFormat`
+  // below (computed from the same source) is itself an approximation, not
+  // "is playback live right now". Defaulting to unchecked keeps the control
+  // honest about what it actually knows; the query string, once touched,
+  // still overrides the real (live-aware) default wherever it's read.
+  const [showUnverifiedIdentity, setShowUnverifiedIdentity] = useState<boolean>(
+    () => resolveShowUnverifiedIdentity(false)
+  );
   const [issuerColors, setIssuerColors] = useState<boolean>(() => resolveColorizeTimelineByIssuer());
 
   const adapterKind = useMemo(
@@ -204,6 +214,15 @@ export function PlayerConfigPanel({ mediaSource, onApply }: PlayerConfigPanelPro
     [onApply]
   );
 
+  const handleShowUnverifiedIdentityChange = useCallback(
+    (checked: boolean) => {
+      setShowUnverifiedIdentity(checked);
+      applyParam('showUnverifiedIdentity', checked ? 'on' : 'off');
+      onApply();
+    },
+    [onApply]
+  );
+
   const handleIssuerColorsChange = useCallback(
     (checked: boolean) => {
       setIssuerColors(checked);
@@ -255,6 +274,18 @@ export function PlayerConfigPanel({ mediaSource, onApply }: PlayerConfigPanelPro
             onChange={(event) => handleShowCreativeWorkChange(event.target.checked)}
           />
           Show CreativeWork information
+        </label>
+
+        <label
+          className="player-config-control player-config-control--checkbox"
+          title="Shows organization/publisher identity, copyright, and AI-usage information for identities this player could not verify (e.g., live DASH via the Qualabs plugin, which performs no trust-anchor check). On by default for live streams, off for on-demand. (?showUnverifiedIdentity=on/off)"
+        >
+          <input
+            type="checkbox"
+            checked={showUnverifiedIdentity}
+            onChange={(event) => handleShowUnverifiedIdentityChange(event.target.checked)}
+          />
+          Show unverified organization/copyright info
         </label>
 
         <label

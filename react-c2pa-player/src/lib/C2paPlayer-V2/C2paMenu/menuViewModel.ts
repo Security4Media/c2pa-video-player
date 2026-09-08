@@ -31,6 +31,7 @@ import {
     selectOrganizationSection,
     selectSignatureIssuer,
     selectSignatureTime,
+    selectWithheldIdentityHint,
     selectWorkSection,
 } from './manifestSelectors';
 import type {
@@ -79,6 +80,8 @@ export interface C2paMenuSections {
     work: WorkSectionItem | null;
     aiOptOut: AiOptOutSectionItem | null;
     history: HistorySectionItem | null;
+    /** Whether organization/copyright/AI-usage info exists but is withheld by `showUnverifiedIdentity` (see selectWithheldIdentityHint). */
+    withheldIdentityHint: boolean;
 }
 
 export interface C2paMenuRenderState {
@@ -194,6 +197,7 @@ function getManifestId(activeManifest: Manifest | null, c2paStatus: C2PAStatus |
  * @param trustedIcaIssuers - This app's own trusted CAWG ICA issuer DIDs (see useTrustedIcaIssuers)
  * @param identityTrustMode - How strict a cawg.identity verdict must be before its content shows (see resolveIdentityTrustMode)
  * @param showCreativeWork - Whether to include CreativeWork-derived content (see resolveShowCreativeWork)
+ * @param showUnverifiedIdentity - Whether an `'Unknown'` cawg.identity verdict also clears the bar (see resolveShowUnverifiedIdentity)
  * @returns Render state describing menu mode, manifest identity, and visible sections
  */
 export function buildMenuRenderState(
@@ -203,6 +207,7 @@ export function buildMenuRenderState(
     trustedIcaIssuers: ReadonlySet<string> = new Set(),
     identityTrustMode: IdentityTrustMode = 'relaxed',
     showCreativeWork: boolean = true,
+    showUnverifiedIdentity: boolean = false,
 ): C2paMenuRenderState {
     if (selectedSegment) {
         return buildSegmentMenuRenderState(
@@ -211,6 +216,7 @@ export function buildMenuRenderState(
             trustedIcaIssuers,
             identityTrustMode,
             showCreativeWork,
+            showUnverifiedIdentity,
         );
     }
 
@@ -298,12 +304,14 @@ export function buildMenuRenderState(
                 c2paStatus?.adapterKind,
                 identityTrustMode,
                 showCreativeWork,
+                showUnverifiedIdentity,
             ),
             copyright: selectCopyrightSection(
                 activeManifest,
                 selectorManifestStore ?? undefined,
                 c2paStatus?.adapterKind,
                 identityTrustMode,
+                showUnverifiedIdentity,
             ),
             // Ingredient-aware, like history below: needs a real manifestStore
             // to resolve ingredient manifests by id, not just to read trust
@@ -322,10 +330,18 @@ export function buildMenuRenderState(
                 selectorManifestStore ?? undefined,
                 c2paStatus?.adapterKind,
                 identityTrustMode,
+                showUnverifiedIdentity,
             ),
             history: selectorManifestStore
                 ? selectHistorySection(activeManifest, selectorManifestStore)
                 : null,
+            withheldIdentityHint: selectWithheldIdentityHint(
+                activeManifest,
+                selectorManifestStore ?? undefined,
+                c2paStatus?.adapterKind,
+                identityTrustMode,
+                showUnverifiedIdentity,
+            ),
         },
     };
 }
@@ -352,6 +368,7 @@ function buildInvalidOnlySections(alert: string | null): C2paMenuSections {
         work: null,
         aiOptOut: null,
         history: null,
+        withheldIdentityHint: false,
     };
 }
 
@@ -378,10 +395,10 @@ function buildSegmentAlertMessage(segment: ValidationTimelineSegment): string | 
  * status/anomaly-only view (mode 'segment-integrity') when it doesn't - the
  * DASH VSI/integrity-only case, or any segment with no manifestRef at all.
  *
- * `identityTrustMode` and `showCreativeWork` are forwarded straight through
- * to those same selectors, same meaning as in `buildMenuRenderState` above -
- * a clicked fragment's manifest is gated on the same display policy the live
- * status is, not a separate one.
+ * `identityTrustMode`, `showCreativeWork` and `showUnverifiedIdentity` are
+ * forwarded straight through to those same selectors, same meaning as in
+ * `buildMenuRenderState` above - a clicked fragment's manifest is gated on the
+ * same display policy the live status is, not a separate one.
  */
 function buildSegmentMenuRenderState(
     segment: ValidationTimelineSegment,
@@ -389,6 +406,7 @@ function buildSegmentMenuRenderState(
     trustedIcaIssuers: ReadonlySet<string>,
     identityTrustMode: IdentityTrustMode,
     showCreativeWork: boolean,
+    showUnverifiedIdentity: boolean,
 ): C2paMenuRenderState {
     const activeManifest = resolveManifestFromSource(segment.manifestRef);
     const validationStatus = segment.validationState;
@@ -413,6 +431,7 @@ function buildSegmentMenuRenderState(
                 work: null,
                 aiOptOut: null,
                 history: null,
+                withheldIdentityHint: false,
             },
         };
     }
@@ -449,12 +468,14 @@ function buildSegmentMenuRenderState(
                 adapterKind,
                 identityTrustMode,
                 showCreativeWork,
+                showUnverifiedIdentity,
             ),
             copyright: selectCopyrightSection(
                 activeManifest,
                 selectorManifestStore ?? undefined,
                 adapterKind,
                 identityTrustMode,
+                showUnverifiedIdentity,
             ),
             creator: selectorManifestStore
                 ? selectCreatorSection(activeManifest, selectorManifestStore, trustedIcaIssuers, identityTrustMode)
@@ -470,12 +491,20 @@ function buildSegmentMenuRenderState(
                 selectorManifestStore ?? undefined,
                 adapterKind,
                 identityTrustMode,
+                showUnverifiedIdentity,
             ),
             history: selectorManifestStore
                 ? selectHistorySection(activeManifest, selectorManifestStore)
                 : null,
             // Not relevant to a single-segment detail view - that list is
             // about anomalies across the whole timeline, not this fragment.
+            withheldIdentityHint: selectWithheldIdentityHint(
+                activeManifest,
+                selectorManifestStore ?? undefined,
+                adapterKind,
+                identityTrustMode,
+                showUnverifiedIdentity,
+            ),
         },
     };
 }

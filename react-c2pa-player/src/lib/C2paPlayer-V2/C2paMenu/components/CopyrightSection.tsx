@@ -15,17 +15,31 @@
  */
 
 import { useId } from 'react';
+import { UNVERIFIED_IDENTITY_CAVEAT } from '@/lib/validation/rules';
 import type { CopyrightSectionItem } from '../models';
 import { SectionToggle, WebsiteLink } from './shared';
 
 /**
- * This section only ever renders when the referencing cawg.identity clears
- * `identityTrustMode`'s bar (see selectCopyrightSection), which never
- * includes 'Unknown'/'Invalid' - only 'Trusted' or 'Valid' (under the
- * default 'relaxed' mode) reach here, so those are the only two states this
- * badge needs to distinguish.
+ * `'Invalid'`/`'Absent'` never reach here (see selectCopyrightSection).
+ * `'Unknown'` does, but only when `showUnverifiedIdentity` opted into it -
+ * same wording and icon as OrganizationSection's own `'Unknown'` badge, so
+ * the two surfaces agree on what an unverified claim looks like.
  */
 function ValidationTag({ validationStatus }: { validationStatus: CopyrightSectionItem['validationStatus'] }) {
+  if (validationStatus === 'Unknown') {
+    return (
+      <span
+        className="c2pa-copyright-section__status"
+        aria-label="Copyright information status: Unknown"
+        title={`Not verified: ${UNVERIFIED_IDENTITY_CAVEAT}`}
+        data-testid="c2pa-copyright-status"
+        data-validation-state="Unknown"
+      >
+        ❔
+      </span>
+    );
+  }
+
   const isTrusted = validationStatus === 'Trusted';
 
   return (

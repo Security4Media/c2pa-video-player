@@ -32,6 +32,7 @@ export {
     selectCopyrightSection,
     selectHistorySection,
     selectOrganizationSection,
+    selectWithheldIdentityHint,
     selectWorkSection,
 } from './sectionSelectors';
 export { selectSignatureIssuer, selectSignatureTime } from './signatureSelectors';

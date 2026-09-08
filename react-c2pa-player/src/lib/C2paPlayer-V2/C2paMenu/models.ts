@@ -172,6 +172,8 @@ export interface AiOptOutAssertionItem {
 
 export interface AiOptOutSectionItem {
     assertion: AiOptOutAssertionItem;
+    /** The referencing identity's verdict - `'Trusted'`/`'Valid'`, or `'Unknown'` only when `showUnverifiedIdentity` let it through (see selectAiOptOutSection). */
+    validationStatus: ValidationState;
 }
 
 /**
