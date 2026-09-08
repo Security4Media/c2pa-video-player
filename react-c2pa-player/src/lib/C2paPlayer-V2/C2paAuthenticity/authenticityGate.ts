@@ -23,7 +23,7 @@
  * store write and a class name; every rule worth arguing about is in this file
  * and is covered by its own test.
  *
- * The two are independently switchable (`?label=on`, `?consent=`),
+ * The two are independently switchable (`?label=`, `?consent=`),
  * because a deployment may want to tell viewers what they are watching without
  * interrupting them, or interrupt without a permanent badge on the picture. So
  * each half must work with the other off, which is why `askConsent` is computed
@@ -52,7 +52,7 @@ import type { PlayheadVerdict } from '../C2paTimeline/playheadVerdict';
  * warning the viewer can miss.
  *
  * The timer restarts on any change to what the label says - a new verdict,
- * or (for Valid) a new issuer under `?issuerColors=on` - so a viewer who has
+ * or (for Valid) a new issuer under `?issuerColors=` - so a viewer who has
  * stopped looking gets a fresh five seconds to notice each one, and the
  * pill's own CSS transitions (authenticity-label.css) carry the re-expand
  * and re-collapse smoothly rather than jumping.
@@ -158,20 +158,21 @@ export type AuthenticityGateEvent = 'tick' | 'consent-accepted' | 'label-clicked
 export interface AuthenticityGateInputs {
   event: AuthenticityGateEvent;
   verdict: PlayheadVerdict;
-  /** `?label=on`. */
+  /** `?label=` (on by default). */
   labelEnabled: boolean;
   /** `?consent=`. `whole-asset` leaves this gate doing nothing. */
   consentMode: ConsentMode;
   /**
    * The colour the timeline is painting the playhead's segment under
-   * `?issuerColors=on`, or null when that doesn't apply (feature off, not
+   * `?issuerColors=` (on by default), or null when that doesn't apply (feature off, not
    * live, Invalid/Unknown, or no resolvable issuer). The caller resolves
    * this from the same segment `verdict` already carries, using the same
    * assigner the timeline itself paints from - see main.ts.
    */
   issuerAccentColor: string | null;
   /**
-   * The issuer signing the playhead's segment under `?issuerColors=on`, or
+   * The issuer signing the playhead's segment under `?issuerColors=` (on by
+   * default), or
    * null when that doesn't apply - same conditions as `issuerAccentColor`,
    * resolved by the same caller. Only ever named in the label for a Valid
    * verdict (see the text-building logic below); carried for every state so
@@ -207,7 +208,7 @@ export interface AuthenticityLabelView {
   glowing: boolean;
   /**
    * Overrides the verdict's usual colour to match the timeline under
-   * `?issuerColors=on`, or null to use the shared per-state colour as
+   * `?issuerColors=` (on by default), or null to use the shared per-state colour as
    * before. See `AuthenticityGateInputs.issuerAccentColor`.
    */
   accentColor: string | null;

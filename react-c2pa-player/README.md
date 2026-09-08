@@ -121,13 +121,13 @@ panel just reads and writes it.
 | `?trust=<profile>` | `full-prod` | Swaps the trust material for one of the profiles in `policy/trustFixtures.ts`, so trusted / valid / untrusted outcomes can be shown on one file. Unrecognised values fall back to the shipped policy, which is the safe direction: a typo loses the diagnostic, never the trust policy. See the table below. |
 | `?window=<seconds>` | 300 | How much of a live stream the player remembers: the width of the timeline window, the retained validation history, and the failure retention in the validation log. Values under 60 are ignored. Live only — see note below. |
 | `?gate=off` | on | Turns off the validated-playback gate, which otherwise holds the picture rather than show live content whose verdict has not arrived. Only the exact value `off` disables it, since a switch that fails open on a typo is the wrong way round for a protection. Live only — see note below. |
-| `?label=on` | off | Shows the authenticity label in the top-right of the picture, stating the provenance of the moment on screen. Green "Authenticity established" and blue "Valid" collapse to a dot after five seconds; red "Invalid Authenticity" and grey "Unknown provenance" stay expanded and pulse. Clicking it pauses and opens the Content Credentials panel. |
+| `?label=off` | on | Shows the authenticity label in the top-right of the picture, stating the provenance of the moment on screen. Green "Authenticity established" and blue "Valid" collapse to a dot after five seconds; red "Invalid Authenticity" and grey "Unknown provenance" stay expanded and pulse. Clicking it pauses and opens the Content Credentials panel. |
 | `?consent=per-stream` | `whole-asset` | Asks once, the first time invalid content is actually played, and never again for that source. The overlay says outright that this is the only warning. |
 | `?consent=per-run` | `whole-asset` | Asks once per contiguous stretch of invalid content, so a second bad stretch stops the picture again. |
 | `?monolithicEngine=c2pa-web` | `nettrek` | Swaps the monolithic MP4 validation runtime from the shipped bridge-based one to an independent runtime that calls `@contentauth/c2pa-web` directly (see `runtimes/monolithicC2paWebRuntime.ts`). Has no effect on HLS/DASH. |
 | `?identityTrust=strict` | `relaxed` | Tightens Organization/Publisher Identity, Copyright, AI opt-out, and Creator so each requires an exactly `Trusted` `cawg.identity` before showing anything. The default, `relaxed`, additionally shows those sections for a `Valid` (structurally verified but not on this player's trusted-anchor list) identity; Creator alone also shows `Unknown` (nothing checked) under `relaxed`, unchanged from before this switch existed. |
 | `?showCreativeWork=off` | on | Hides everything derived from the `stds.schema-org.CreativeWork` assertion: Organization Details, About the Producer (authors/organization name), and Organization Identity's Published-on/License lines. Does not affect Copyright, which is `cawg.metadata`-derived, or `?identityTrust=`, which is orthogonal. |
-| `?issuerColors=on` | off | Paints each valid timeline segment (and the authenticity label, when shown) by which issuer signed it, instead of the shared Valid/Trusted colour — so a stream that rotates between signers is easy to tell apart at a glance. Issuers get a colour from a small blue-ish palette in the order they're first seen this session; invalid stays red and unknown provenance stays grey regardless. Live only — see note below. |
+| `?issuerColors=off` | on | Paints each valid timeline segment (and the authenticity label, when shown) by which issuer signed it, instead of the shared Valid/Trusted colour — so a stream that rotates between signers is easy to tell apart at a glance. Issuers get a colour from a small blue-ish palette in the order they're first seen this session; invalid stays red and unknown provenance stays grey regardless. Live only — see note below. |
 
 `?window=`, `?gate=` and `?issuerColors=` only ever affect a live source —
 all are no-ops on VOD (`validatedPlaybackGate.ts`, `liveResume.ts`, a VOD
@@ -213,7 +213,7 @@ retains, after which that stretch is never asked about again (otherwise
 withdrawing at a live edge still inside the bad content would ask and withdraw
 forever).
 
-`?label=on` and `?consent=` are independent. A deployment may want to state
+`?label=` and `?consent=` are independent. A deployment may want to state
 provenance continuously without interrupting the viewer, or interrupt on bad
 content without leaving a permanent badge over live output; those are different
 editorial decisions and neither implies the other.

@@ -82,7 +82,7 @@ const ICA_TRUST_PROFILES: { value: IcaTrustFixtureName | 'full-prod'; label: str
 // default" count and to drive "Reset to defaults" - not read anywhere else,
 // so keeping this list in sync with the README's "Runtime parameters" table
 // is only load-bearing for those two things.
-const DEFAULT_LABEL = false;
+const DEFAULT_LABEL = true;
 const DEFAULT_IDENTITY_TRUST_RELAXED = true;
 const DEFAULT_SHOW_CREATIVE_WORK = true;
 const DEFAULT_CONSENT: ConsentMode = 'whole-asset';
@@ -90,7 +90,7 @@ const DEFAULT_TRUST: TrustFixtureName | 'full-prod' = 'full-prod';
 const DEFAULT_ICA_TRUST: IcaTrustFixtureName | 'full-prod' = 'full-prod';
 const DEFAULT_ENGINE: MonolithicEngine = 'nettrek';
 const DEFAULT_GATE_ENABLED = true;
-const DEFAULT_ISSUER_COLORS = false;
+const DEFAULT_ISSUER_COLORS = true;
 
 /**
  * Visual controls for the query-string switches documented in the top-level
@@ -137,7 +137,7 @@ export function PlayerConfigPanel({ mediaSource, onApply }: PlayerConfigPanelPro
   const handleLabelChange = useCallback(
     (checked: boolean) => {
       setLabel(checked);
-      applyParam('label', checked ? 'on' : null);
+      applyParam('label', checked ? null : 'off');
       onApply();
     },
     [onApply]
@@ -222,7 +222,7 @@ export function PlayerConfigPanel({ mediaSource, onApply }: PlayerConfigPanelPro
   const handleIssuerColorsChange = useCallback(
     (checked: boolean) => {
       setIssuerColors(checked);
-      applyParam('issuerColors', checked ? 'on' : null);
+      applyParam('issuerColors', checked ? null : 'off');
       onApply();
     },
     [onApply]
@@ -311,7 +311,7 @@ export function PlayerConfigPanel({ mediaSource, onApply }: PlayerConfigPanelPro
         <div className="player-config-grid">
           <label
             className="player-config-control player-config-control--checkbox"
-            title="Shows the authenticity label in the top-right of the picture, stating the provenance of the moment on screen. Off by default. (?label=on)"
+            title="Shows the authenticity label in the top-right of the picture, stating the provenance of the moment on screen. On by default. (?label=off when unchecked)"
           >
             <input
               type="checkbox"
@@ -495,7 +495,7 @@ export function PlayerConfigPanel({ mediaSource, onApply }: PlayerConfigPanelPro
 
           <label
             className="player-config-control player-config-control--checkbox"
-            title="Paints each valid segment by which issuer signed it, instead of the shared Valid/Trusted colour - so a stream that rotates between signers is easy to tell apart at a glance. Issuers get a colour in the order they're first seen this session. Invalid stays red and unknown provenance stays grey either way. Off by default. Only applies to a live HLS/DASH source. (?issuerColors=on)"
+            title="Paints each valid segment by which issuer signed it, instead of the shared Valid/Trusted colour - so a stream that rotates between signers is easy to tell apart at a glance. Issuers get a colour in the order they're first seen this session. Invalid stays red and unknown provenance stays grey either way. On by default. Only applies to a live HLS/DASH source. (?issuerColors=off when unchecked)"
           >
             <input
               type="checkbox"
