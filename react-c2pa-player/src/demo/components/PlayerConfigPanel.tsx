@@ -77,6 +77,21 @@ const ICA_TRUST_PROFILES: { value: IcaTrustFixtureName | 'full-prod'; label: str
   { value: 'wrong-issuer', label: 'wrong-issuer' },
 ];
 
+// The shipped defaults for every switch below, i.e. what a deployment gets
+// with no query string at all. Used only to compute the "changed from
+// default" count and to drive "Reset to defaults" - not read anywhere else,
+// so keeping this list in sync with the README's "Runtime parameters" table
+// is only load-bearing for those two things.
+const DEFAULT_LABEL = false;
+const DEFAULT_IDENTITY_TRUST_RELAXED = true;
+const DEFAULT_SHOW_CREATIVE_WORK = true;
+const DEFAULT_CONSENT: ConsentMode = 'whole-asset';
+const DEFAULT_TRUST: TrustFixtureName | 'full-prod' = 'full-prod';
+const DEFAULT_ICA_TRUST: IcaTrustFixtureName | 'full-prod' = 'full-prod';
+const DEFAULT_ENGINE: MonolithicEngine = 'nettrek';
+const DEFAULT_GATE_ENABLED = true;
+const DEFAULT_ISSUER_COLORS = false;
+
 /**
  * Visual controls for the query-string switches documented in the top-level
  * README's "Runtime parameters" table. Previously URL-only - see that table
@@ -213,13 +228,84 @@ export function PlayerConfigPanel({ mediaSource, onApply }: PlayerConfigPanelPro
     [onApply]
   );
 
+  // Resets every switch to the shipped default in one go: all ten local
+  // states, all ten URL params, one single onApply() (not ten) so the
+  // current video reloads once rather than repeatedly.
+  const handleResetAll = useCallback(() => {
+    setLabel(DEFAULT_LABEL);
+    setIdentityTrustRelaxed(DEFAULT_IDENTITY_TRUST_RELAXED);
+    setShowCreativeWork(DEFAULT_SHOW_CREATIVE_WORK);
+    setConsent(DEFAULT_CONSENT);
+    setTrust(DEFAULT_TRUST);
+    setIcaTrust(DEFAULT_ICA_TRUST);
+    setEngine(DEFAULT_ENGINE);
+    setWindowSeconds(DEFAULT_LIVE_RETENTION_SECONDS);
+    setGateEnabled(DEFAULT_GATE_ENABLED);
+    setIssuerColors(DEFAULT_ISSUER_COLORS);
+
+    applyParam('label', null);
+    applyParam('identityTrust', null);
+    applyParam('showCreativeWork', null);
+    applyParam('consent', null);
+    applyParam('trust', null);
+    applyParam('icaTrust', null);
+    applyParam('monolithicEngine', null);
+    applyParam('window', null);
+    applyParam('gate', null);
+    applyParam('issuerColors', null);
+
+    onApply();
+  }, [onApply]);
+
+  const changedCount = useMemo(() => {
+    let count = 0;
+    if (label !== DEFAULT_LABEL) count += 1;
+    if (identityTrustRelaxed !== DEFAULT_IDENTITY_TRUST_RELAXED) count += 1;
+    if (showCreativeWork !== DEFAULT_SHOW_CREATIVE_WORK) count += 1;
+    if (consent !== DEFAULT_CONSENT) count += 1;
+    if (trust !== DEFAULT_TRUST) count += 1;
+    if (icaTrust !== DEFAULT_ICA_TRUST) count += 1;
+    if (engine !== DEFAULT_ENGINE) count += 1;
+    if (windowSeconds !== DEFAULT_LIVE_RETENTION_SECONDS) count += 1;
+    if (gateEnabled !== DEFAULT_GATE_ENABLED) count += 1;
+    if (issuerColors !== DEFAULT_ISSUER_COLORS) count += 1;
+    return count;
+  }, [
+    label,
+    identityTrustRelaxed,
+    showCreativeWork,
+    consent,
+    trust,
+    icaTrust,
+    engine,
+    windowSeconds,
+    gateEnabled,
+    issuerColors,
+  ]);
+
   return (
     <div className="player-config-panel">
-      <h3>Player Config</h3>
-      <p className="player-config-panel__hint">
-        Diagnostic switches from the README&apos;s &quot;Runtime parameters&quot; table. Hover a
-        control for details. Changing one reloads the current video.
-      </p>
+      <div className="player-config-panel__header">
+        <div>
+          <h3>Player Config</h3>
+          <p className="player-config-panel__hint">
+            Each control mirrors a query-string switch from the README&apos;s &quot;Runtime
+            parameters&quot; table. Hover a control for the full detail. Changing one reloads the
+            current video.
+          </p>
+        </div>
+        {changedCount > 0 && (
+          <div className="player-config-panel__status">
+            <span>
+              {changedCount} {changedCount === 1 ? 'setting' : 'settings'} changed from default
+            </span>
+            <button type="button" onClick={handleResetAll}>
+              Reset to defaults
+            </button>
+          </div>
+        )}
+      </div>
+
       <div className="player-config-section">
         <h4 className="player-config-section__heading">Display</h4>
         <div className="player-config-grid">
@@ -232,7 +318,12 @@ export function PlayerConfigPanel({ mediaSource, onApply }: PlayerConfigPanelPro
               checked={label}
               onChange={(event) => handleLabelChange(event.target.checked)}
             />
-            Authenticity label
+            <span className="player-config-control__text">
+              <span className="player-config-control__label">Authenticity label</span>
+              <span className="player-config-control__hint">
+                Shows a provenance badge over the picture.
+              </span>
+            </span>
           </label>
 
           <label
@@ -244,7 +335,14 @@ export function PlayerConfigPanel({ mediaSource, onApply }: PlayerConfigPanelPro
               checked={identityTrustRelaxed}
               onChange={(event) => handleIdentityTrustChange(event.target.checked)}
             />
-            Show info for Valid (not just Trusted) identities
+            <span className="player-config-control__text">
+              <span className="player-config-control__label">
+                Show info for Valid (not just Trusted) identities
+              </span>
+              <span className="player-config-control__hint">
+                Also shows identity details for structurally valid, not just trusted, signers.
+              </span>
+            </span>
           </label>
 
           <label
@@ -256,19 +354,30 @@ export function PlayerConfigPanel({ mediaSource, onApply }: PlayerConfigPanelPro
               checked={showCreativeWork}
               onChange={(event) => handleShowCreativeWorkChange(event.target.checked)}
             />
-            Show CreativeWork information
+            <span className="player-config-control__text">
+              <span className="player-config-control__label">Show CreativeWork information</span>
+              <span className="player-config-control__hint">
+                Shows organization, producer and license details from the asset.
+              </span>
+            </span>
           </label>
         </div>
       </div>
 
-      <div className="player-config-section">
+      <div className="player-config-section player-config-section--elevated">
         <h4 className="player-config-section__heading">Trust &amp; validation</h4>
+        <p className="player-config-section__note">
+          These change what counts as a valid or trusted signer, not just what&apos;s shown.
+        </p>
         <div className="player-config-grid">
           <label
             className="player-config-control"
             title="Where the consent question is raised: once per source, only if already known bad (whole-asset, default); the first time invalid content plays (per-stream); or once per contiguous invalid stretch (per-run). (?consent=)"
           >
-            Consent mode
+            <span className="player-config-control__label">Consent mode</span>
+            <span className="player-config-control__hint">
+              When to ask before playing unverified content.
+            </span>
             <select
               value={consent}
               onChange={(event) => handleConsentChange(event.target.value as ConsentMode)}
@@ -283,7 +392,8 @@ export function PlayerConfigPanel({ mediaSource, onApply }: PlayerConfigPanelPro
             className="player-config-control"
             title="Swaps the trust material for one of these profiles, so trusted / valid / untrusted outcomes can be shown on the same file. Unrecognised values fall back to full-prod. (?trust=)"
           >
-            Trust profile
+            <span className="player-config-control__label">Trust profile</span>
+            <span className="player-config-control__hint">Which certificates count as trusted.</span>
             <select
               value={trust}
               onChange={(event) =>
@@ -302,7 +412,10 @@ export function PlayerConfigPanel({ mediaSource, onApply }: PlayerConfigPanelPro
             className="player-config-control"
             title="Which DIDs this player trusts as issuers of CAWG Identity Claims Aggregation (ICA) credentials - a separate, app-level trust list, since the C2PA engine has no DID trust-anchor concept of its own. Unrecognised values fall back to full-prod. (?icaTrust=)"
           >
-            ICA issuer trust profile
+            <span className="player-config-control__label">ICA issuer trust profile</span>
+            <span className="player-config-control__hint">
+              Which issuers this player trusts for identity credentials.
+            </span>
             <select
               value={icaTrust}
               onChange={(event) =>
@@ -321,7 +434,8 @@ export function PlayerConfigPanel({ mediaSource, onApply }: PlayerConfigPanelPro
             className="player-config-control"
             title="Which runtime validates a monolithic MP4 file. 'nettrek' (default) is the shipped bridge-based runtime, also used for HLS. 'c2pa-web' is an independent runtime that calls @contentauth/c2pa-web directly. Only applies to a monolithic (MP4) source. (?monolithicEngine=)"
           >
-            Monolithic engine
+            <span className="player-config-control__label">Monolithic engine</span>
+            <span className="player-config-control__hint">Which engine validates MP4 files.</span>
             <select
               value={engine}
               disabled={!isMonolithicFormat}
@@ -338,12 +452,20 @@ export function PlayerConfigPanel({ mediaSource, onApply }: PlayerConfigPanelPro
         <legend title="These only take effect on a live HLS/DASH source. Enabled here by format, not by confirmed liveness: whether a loaded HLS/DASH file actually is live is only known once its manifest is parsed.">
           Live-only settings
         </legend>
+        {!isLiveCapableFormat && (
+          <p className="player-config-subsection__note">
+            Load a live HLS or DASH stream to use these.
+          </p>
+        )}
         <div className="player-config-grid">
           <label
             className="player-config-control"
             title={`How much of a live stream the player remembers: the timeline window, retained validation history, and failure log retention, in seconds. Values under ${MIN_LIVE_WINDOW_SECONDS} are ignored. Only applies to a live HLS/DASH source. (?window=)`}
           >
-            Live retention window (s)
+            <span className="player-config-control__label">Live retention window (s)</span>
+            <span className="player-config-control__hint">
+              How much of the live stream the player remembers.
+            </span>
             <input
               type="number"
               min={MIN_LIVE_WINDOW_SECONDS}
@@ -363,7 +485,12 @@ export function PlayerConfigPanel({ mediaSource, onApply }: PlayerConfigPanelPro
               disabled={!isLiveCapableFormat}
               onChange={(event) => handleGateChange(event.target.checked)}
             />
-            Validated-playback gate
+            <span className="player-config-control__text">
+              <span className="player-config-control__label">Validated-playback gate</span>
+              <span className="player-config-control__hint">
+                Holds the picture until a live segment&apos;s verdict arrives.
+              </span>
+            </span>
           </label>
 
           <label
@@ -376,7 +503,12 @@ export function PlayerConfigPanel({ mediaSource, onApply }: PlayerConfigPanelPro
               disabled={!isLiveCapableFormat}
               onChange={(event) => handleIssuerColorsChange(event.target.checked)}
             />
-            Colorize by issuer
+            <span className="player-config-control__text">
+              <span className="player-config-control__label">Colorize by issuer</span>
+              <span className="player-config-control__hint">
+                Paints each valid segment by which issuer signed it.
+              </span>
+            </span>
           </label>
         </div>
       </fieldset>
