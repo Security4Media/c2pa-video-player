@@ -104,14 +104,14 @@ async function selectEngine(value) {
 }
 
 // ---------------------------------------------------------------------------
-console.log('=== 1. panel renders with all 10 controls ===');
+console.log('=== 1. panel renders with all 11 controls ===');
 // ---------------------------------------------------------------------------
 {
   await page.goto(BASE, { waitUntil: 'domcontentloaded' });
   const state = await readControls();
   console.log(`   ${JSON.stringify(state)}`);
   check('panel is present', state.panelPresent);
-  check('all 10 controls render', state.controlCount === 10, String(state.controlCount));
+  check('all 11 controls render', state.controlCount === 11, String(state.controlCount));
   check('window tooltip mentions the seconds grammar', /window=/.test(state.windowTitle ?? ''));
 }
 

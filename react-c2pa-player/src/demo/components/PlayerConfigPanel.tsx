@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   DEFAULT_LIVE_RETENTION_SECONDS,
   MIN_LIVE_WINDOW_SECONDS,
@@ -86,12 +86,12 @@ const ICA_TRUST_PROFILES: { value: IcaTrustFixtureName | 'full-prod'; label: str
 const DEFAULT_LABEL = true;
 const DEFAULT_IDENTITY_TRUST_RELAXED = true;
 const DEFAULT_SHOW_CREATIVE_WORK = true;
-// The panel's own mount-time baseline, not the real (live-aware) default -
-// see the state initializer's comment above for why: the panel doesn't know
-// true liveness, only format. Resetting clears the URL param instead of
-// forcing this value, so actual behaviour elsewhere still resolves via the
-// real live status once the override is gone.
-const DEFAULT_SHOW_UNVERIFIED_IDENTITY = false;
+// Demo-only default, deliberately not the shipped library default (which is
+// live-vs-VOD dependent - see resolveShowUnverifiedIdentity). The demo wants
+// unverified identity info visible from the start regardless of source, so
+// the panel seeds ?showUnverifiedIdentity=on on mount unless something has
+// already set it explicitly - see the effect below.
+const DEFAULT_SHOW_UNVERIFIED_IDENTITY = true;
 const DEFAULT_CONSENT: ConsentMode = 'whole-asset';
 const DEFAULT_TRUST: TrustFixtureName | 'full-prod' = 'full-prod';
 const DEFAULT_ICA_TRUST: IcaTrustFixtureName | 'full-prod' = 'full-prod';
@@ -127,9 +127,9 @@ export function PlayerConfigPanel({ mediaSource, onApply }: PlayerConfigPanelPro
   // Not live-aware at mount, unlike the resolver it mirrors: `mediaSource`
   // only tells us the format, and this panel's own `isLiveCapableFormat`
   // below (computed from the same source) is itself an approximation, not
-  // "is playback live right now". Defaulting to unchecked keeps the control
-  // honest about what it actually knows; the query string, once touched,
-  // still overrides the real (live-aware) default wherever it's read.
+  // "is playback live right now". Starts honest about what it actually knows
+  // (the library's real live-vs-VOD default); the mount effect below then
+  // seeds the demo's own always-on preference unless already overridden.
   const [showUnverifiedIdentity, setShowUnverifiedIdentity] = useState<boolean>(
     () => resolveShowUnverifiedIdentity(false)
   );
@@ -149,6 +149,19 @@ export function PlayerConfigPanel({ mediaSource, onApply }: PlayerConfigPanelPro
   // The engine choice only matters for monolithic MP4 - HLS/DASH keep their
   // own runtimes regardless of this setting.
   const isMonolithicFormat = adapterKind === 'monolithic';
+
+  // Demo-only default: seeds ?showUnverifiedIdentity=on once, on mount, but
+  // only if nothing has set it yet - an explicit ?showUnverifiedIdentity=off
+  // in the URL (or a shared link) still wins, same as any other override.
+  // Runs once; not meant to react to later changes, which the handler below
+  // already owns.
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('showUnverifiedIdentity') === null) {
+      setShowUnverifiedIdentity(true);
+      applyParam('showUnverifiedIdentity', 'on');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleLabelChange = useCallback(
     (checked: boolean) => {
@@ -272,7 +285,10 @@ export function PlayerConfigPanel({ mediaSource, onApply }: PlayerConfigPanelPro
     applyParam('label', null);
     applyParam('identityTrust', null);
     applyParam('showCreativeWork', null);
-    applyParam('showUnverifiedIdentity', null);
+    // Explicit 'on', not a clear: the demo's own default (see
+    // DEFAULT_SHOW_UNVERIFIED_IDENTITY above), not the shipped library's
+    // live-vs-VOD default that a cleared param would fall back to.
+    applyParam('showUnverifiedIdentity', 'on');
     applyParam('consent', null);
     applyParam('trust', null);
     applyParam('icaTrust', null);
@@ -393,7 +409,7 @@ export function PlayerConfigPanel({ mediaSource, onApply }: PlayerConfigPanelPro
 
           <label
             className="player-config-control player-config-control--checkbox"
-            title="Shows organization/publisher identity, copyright, and AI-usage information for identities this player could not verify (e.g., live DASH via the Qualabs plugin, which performs no trust-anchor check). On by default for live streams, off for on-demand. (?showUnverifiedIdentity=on/off)"
+            title="Shows organization/publisher identity, copyright, and AI-usage information for identities this player could not verify (e.g., live DASH via the Qualabs plugin, which performs no trust-anchor check). On by default in this demo, for both live and on-demand sources - the shipped library instead defaults live: on, VOD: off (see the README). (?showUnverifiedIdentity=on/off)"
           >
             <input
               type="checkbox"
