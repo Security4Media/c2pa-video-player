@@ -26,7 +26,7 @@ import '@/lib/styles/design-tokens.css';
 import './StandalonePlayerPage.css';
 import s4mLogo from '../assets/logos/s4m-logo.png';
 import ebuLogo from '../assets/logos/ebu-logo-white.svg';
-import cbcLogo from '../assets/logos/cbc.png';
+import cbcLogo from '../assets/logos/cbc-radio-canada-logo.svg';
 import wdrLogo from '../assets/logos/wdr.png';
 import unifiedStreamingLogo from '../assets/logos/unified-streaming.png';
 import qualabsLogo from '../assets/logos/qualabs.png';
