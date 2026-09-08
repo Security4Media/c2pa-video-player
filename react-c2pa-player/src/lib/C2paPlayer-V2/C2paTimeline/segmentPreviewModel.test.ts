@@ -284,7 +284,7 @@ describe('an unverified segment', () => {
     ).toBe('No verified content credentials were found for this fragment.');
   });
 
-  it('still shows the metadata it has, marked unverified', () => {
+  it('shows the metadata it has, marked unverified, when showUnverifiedIdentity is on', () => {
     // Credentials present but unchecked is worth showing, and the caveat is
     // what keeps it honest.
     const preview = buildSegmentPreview(
@@ -299,10 +299,32 @@ describe('an unverified segment', () => {
         },
       }),
       'dash-fragmented-fmp4',
+      true,
     );
 
     expect(preview.metadata?.title).toBe('Unchecked but declared');
     expect(preview.metadataVerified).toBe(false);
+    expect(preview.metadataWithheld).toBe(false);
+  });
+
+  it('withholds the metadata it has when showUnverifiedIdentity is off (the default)', () => {
+    const preview = buildSegmentPreview(
+      segment({
+        validationState: 'Unknown',
+        manifestRef: {
+          kind: 'single-manifest',
+          manifest: manifestWithDublinCore({ 'dc:title': 'Unchecked but declared' }),
+          manifests: {},
+          validationState: 'Unknown',
+          validationErrors: [],
+        },
+      }),
+      'dash-fragmented-fmp4',
+    );
+
+    expect(preview.metadata).toBeNull();
+    expect(preview.metadataVerified).toBe(false);
+    expect(preview.metadataWithheld).toBe(true);
   });
 });
 

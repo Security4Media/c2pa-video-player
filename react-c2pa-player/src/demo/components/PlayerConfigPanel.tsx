@@ -28,6 +28,7 @@ import {
   resolveMonolithicEngine,
   resolveShowAuthenticityLabel,
   resolveShowCreativeWork,
+  resolveShowUnverifiedIdentity,
   resolveTrustFixtureName,
   type ConsentMode,
   type IcaTrustFixtureName,
@@ -85,6 +86,12 @@ const ICA_TRUST_PROFILES: { value: IcaTrustFixtureName | 'full-prod'; label: str
 const DEFAULT_LABEL = true;
 const DEFAULT_IDENTITY_TRUST_RELAXED = true;
 const DEFAULT_SHOW_CREATIVE_WORK = true;
+// The panel's own mount-time baseline, not the real (live-aware) default -
+// see the state initializer's comment above for why: the panel doesn't know
+// true liveness, only format. Resetting clears the URL param instead of
+// forcing this value, so actual behaviour elsewhere still resolves via the
+// real live status once the override is gone.
+const DEFAULT_SHOW_UNVERIFIED_IDENTITY = false;
 const DEFAULT_CONSENT: ConsentMode = 'whole-asset';
 const DEFAULT_TRUST: TrustFixtureName | 'full-prod' = 'full-prod';
 const DEFAULT_ICA_TRUST: IcaTrustFixtureName | 'full-prod' = 'full-prod';
@@ -117,6 +124,15 @@ export function PlayerConfigPanel({ mediaSource, onApply }: PlayerConfigPanelPro
     () => resolveIdentityTrustMode() === 'relaxed'
   );
   const [showCreativeWork, setShowCreativeWork] = useState<boolean>(() => resolveShowCreativeWork());
+  // Not live-aware at mount, unlike the resolver it mirrors: `mediaSource`
+  // only tells us the format, and this panel's own `isLiveCapableFormat`
+  // below (computed from the same source) is itself an approximation, not
+  // "is playback live right now". Defaulting to unchecked keeps the control
+  // honest about what it actually knows; the query string, once touched,
+  // still overrides the real (live-aware) default wherever it's read.
+  const [showUnverifiedIdentity, setShowUnverifiedIdentity] = useState<boolean>(
+    () => resolveShowUnverifiedIdentity(false)
+  );
   const [issuerColors, setIssuerColors] = useState<boolean>(() => resolveColorizeTimelineByIssuer());
 
   const adapterKind = useMemo(
@@ -219,6 +235,15 @@ export function PlayerConfigPanel({ mediaSource, onApply }: PlayerConfigPanelPro
     [onApply]
   );
 
+  const handleShowUnverifiedIdentityChange = useCallback(
+    (checked: boolean) => {
+      setShowUnverifiedIdentity(checked);
+      applyParam('showUnverifiedIdentity', checked ? 'on' : 'off');
+      onApply();
+    },
+    [onApply]
+  );
+
   const handleIssuerColorsChange = useCallback(
     (checked: boolean) => {
       setIssuerColors(checked);
@@ -228,13 +253,14 @@ export function PlayerConfigPanel({ mediaSource, onApply }: PlayerConfigPanelPro
     [onApply]
   );
 
-  // Resets every switch to the shipped default in one go: all ten local
-  // states, all ten URL params, one single onApply() (not ten) so the
+  // Resets every switch to the shipped default in one go: all eleven local
+  // states, all eleven URL params, one single onApply() (not eleven) so the
   // current video reloads once rather than repeatedly.
   const handleResetAll = useCallback(() => {
     setLabel(DEFAULT_LABEL);
     setIdentityTrustRelaxed(DEFAULT_IDENTITY_TRUST_RELAXED);
     setShowCreativeWork(DEFAULT_SHOW_CREATIVE_WORK);
+    setShowUnverifiedIdentity(DEFAULT_SHOW_UNVERIFIED_IDENTITY);
     setConsent(DEFAULT_CONSENT);
     setTrust(DEFAULT_TRUST);
     setIcaTrust(DEFAULT_ICA_TRUST);
@@ -246,6 +272,7 @@ export function PlayerConfigPanel({ mediaSource, onApply }: PlayerConfigPanelPro
     applyParam('label', null);
     applyParam('identityTrust', null);
     applyParam('showCreativeWork', null);
+    applyParam('showUnverifiedIdentity', null);
     applyParam('consent', null);
     applyParam('trust', null);
     applyParam('icaTrust', null);
@@ -262,6 +289,7 @@ export function PlayerConfigPanel({ mediaSource, onApply }: PlayerConfigPanelPro
     if (label !== DEFAULT_LABEL) count += 1;
     if (identityTrustRelaxed !== DEFAULT_IDENTITY_TRUST_RELAXED) count += 1;
     if (showCreativeWork !== DEFAULT_SHOW_CREATIVE_WORK) count += 1;
+    if (showUnverifiedIdentity !== DEFAULT_SHOW_UNVERIFIED_IDENTITY) count += 1;
     if (consent !== DEFAULT_CONSENT) count += 1;
     if (trust !== DEFAULT_TRUST) count += 1;
     if (icaTrust !== DEFAULT_ICA_TRUST) count += 1;
@@ -274,6 +302,7 @@ export function PlayerConfigPanel({ mediaSource, onApply }: PlayerConfigPanelPro
     label,
     identityTrustRelaxed,
     showCreativeWork,
+    showUnverifiedIdentity,
     consent,
     trust,
     icaTrust,
@@ -358,6 +387,26 @@ export function PlayerConfigPanel({ mediaSource, onApply }: PlayerConfigPanelPro
               <span className="player-config-control__label">Show CreativeWork information</span>
               <span className="player-config-control__hint">
                 Shows organization, producer and license details from the asset.
+              </span>
+            </span>
+          </label>
+
+          <label
+            className="player-config-control player-config-control--checkbox"
+            title="Shows organization/publisher identity, copyright, and AI-usage information for identities this player could not verify (e.g., live DASH via the Qualabs plugin, which performs no trust-anchor check). On by default for live streams, off for on-demand. (?showUnverifiedIdentity=on/off)"
+          >
+            <input
+              type="checkbox"
+              checked={showUnverifiedIdentity}
+              onChange={(event) => handleShowUnverifiedIdentityChange(event.target.checked)}
+            />
+            <span className="player-config-control__text">
+              <span className="player-config-control__label">
+                Show unverified organization/copyright info
+              </span>
+              <span className="player-config-control__hint">
+                Shows identity details even when they couldn&apos;t be checked against a trust
+                anchor.
               </span>
             </span>
           </label>

@@ -15,7 +15,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { resolveIdentityTrustMode, resolveShowCreativeWork } from './menuDisplay';
+import { resolveIdentityTrustMode, resolveShowCreativeWork, resolveShowUnverifiedIdentity } from './menuDisplay';
 
 describe('resolveIdentityTrustMode', () => {
   it('is relaxed with no query string at all', () => {
@@ -56,5 +56,34 @@ describe('resolveShowCreativeWork', () => {
   it('stays on for anything it does not recognise, including a typo', () => {
     expect(resolveShowCreativeWork('?showCreativeWork=false')).toBe(true);
     expect(resolveShowCreativeWork('?showCreativeWork=OFF')).toBe(true);
+  });
+});
+
+describe('resolveShowUnverifiedIdentity', () => {
+  it('defaults to isLive with no query string at all', () => {
+    expect(resolveShowUnverifiedIdentity(true, undefined)).toBe(true);
+    expect(resolveShowUnverifiedIdentity(false, undefined)).toBe(false);
+    expect(resolveShowUnverifiedIdentity(true, '')).toBe(true);
+    expect(resolveShowUnverifiedIdentity(false, '')).toBe(false);
+  });
+
+  it('defaults to isLive when the query string says nothing about it', () => {
+    expect(resolveShowUnverifiedIdentity(true, '?window=300')).toBe(true);
+    expect(resolveShowUnverifiedIdentity(false, '?window=300')).toBe(false);
+  });
+
+  it('is on for the exact value regardless of isLive', () => {
+    expect(resolveShowUnverifiedIdentity(false, '?showUnverifiedIdentity=on')).toBe(true);
+    expect(resolveShowUnverifiedIdentity(true, '?showUnverifiedIdentity=on')).toBe(true);
+  });
+
+  it('is off for the exact value regardless of isLive', () => {
+    expect(resolveShowUnverifiedIdentity(true, '?showUnverifiedIdentity=off')).toBe(false);
+    expect(resolveShowUnverifiedIdentity(false, '?showUnverifiedIdentity=off')).toBe(false);
+  });
+
+  it('falls back to isLive on anything it does not recognise, including a typo', () => {
+    expect(resolveShowUnverifiedIdentity(true, '?showUnverifiedIdentity=On')).toBe(true);
+    expect(resolveShowUnverifiedIdentity(false, '?showUnverifiedIdentity=On')).toBe(false);
   });
 });

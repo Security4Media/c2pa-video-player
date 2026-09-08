@@ -59,3 +59,44 @@ export function resolveShowCreativeWork(
 
   return new URLSearchParams(search).get('showCreativeWork') !== 'off';
 }
+
+/**
+ * Reads `?showUnverifiedIdentity=on`/`=off`.
+ *
+ * Controls whether Organization/Publisher Identity, Copyright and AI opt-out
+ * may render for a `cawg.identity` verdict of `'Unknown'` - declared but never
+ * checked, which is every verdict live DASH produces (`@qualabs/c2pa-live-dashjs-plugin`
+ * performs no identity/trust check at all - see `verifiesCawgIdentity`) and is
+ * otherwise a transient pre-verdict state elsewhere. Passed as `allowUnknown` to
+ * `meetsIdentityTrustThreshold`.
+ *
+ * Unlike this file's other switches, absence isn't one fixed default: whether a
+ * viewer should see an unverified claim by default depends on whether there was
+ * ever going to be a better one. A live stream's identity will never firm up
+ * beyond `Unknown` under this engine, so withholding it by default would hide
+ * real content forever; a VOD asset's engine does check trust, so an `Unknown`
+ * there is exactly the passing state a stricter verdict should be trusted over,
+ * and showing it by default would undersell what verification is actually
+ * available. Hence `isLive` decides the default, and the query string - explicit
+ * `on`/`off` - always overrides it either way.
+ */
+export function resolveShowUnverifiedIdentity(
+  isLive: boolean,
+  search: string | undefined = currentSearch(),
+): boolean {
+  if (!search) {
+    return isLive;
+  }
+
+  const raw = new URLSearchParams(search).get('showUnverifiedIdentity');
+
+  if (raw === 'on') {
+    return true;
+  }
+
+  if (raw === 'off') {
+    return false;
+  }
+
+  return isLive;
+}

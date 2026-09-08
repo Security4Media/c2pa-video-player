@@ -105,6 +105,20 @@ export const UNVERIFIED_IDENTITY_CAVEAT =
   'Declared in the stream; this player did not verify who signed it.';
 
 /**
+ * What to say when `showUnverifiedIdentity` is withholding content, rather
+ * than showing it marked.
+ *
+ * Deliberately vague about which category (organization, copyright, AI
+ * opt-out) applies - naming the specific one would defeat the point of
+ * withholding it. Shared between the menu's `WithheldIdentityHint` and the
+ * timeline hover's equivalent caveat for the same reason `UNVERIFIED_IDENTITY_CAVEAT`
+ * is shared above: the two surfaces have to agree, and a sentence next to the
+ * rule that decides when it applies is the one place it cannot drift apart.
+ */
+export const WITHHELD_IDENTITY_INFO_CAVEAT =
+  'This stream declares organization, copyright, or usage information that could not be verified, so it isn\'t shown here.';
+
+/**
  * @svta/cml-c2pa (behind @qualabs/c2pa-live-dashjs-plugin) only performs
  * cryptographic/structural validation (COSE signature, hash, continuity) —
  * it does not check the signing certificate against a trust anchor list.

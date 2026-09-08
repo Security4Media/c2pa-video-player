@@ -42,7 +42,7 @@
  */
 
 import type { AdapterKind } from '@/lib/validation';
-import { UNVERIFIED_IDENTITY_CAVEAT } from '@/lib/validation/rules';
+import { UNVERIFIED_IDENTITY_CAVEAT, WITHHELD_IDENTITY_INFO_CAVEAT } from '@/lib/validation/rules';
 import type { C2PATimelineSegmentUpdate } from '@/lib/types/c2pa.types';
 import {
     buildSegmentPreview,
@@ -60,6 +60,8 @@ export interface TimelinePreviewController {
     attach(progressControl: HTMLElement): void;
     /** Which engine produced the verdicts, so metadata can be marked honestly. */
     setAdapterKind(adapterKind: AdapterKind | null): void;
+    /** Whether unverified metadata may be shown at all (see resolveShowUnverifiedIdentity). */
+    setShowUnverifiedIdentity(showUnverifiedIdentity: boolean): void;
     dispose(): void;
 }
 
@@ -235,6 +237,14 @@ function renderPreview(preview: SegmentPreview): string {
                 `<p class="${PREVIEW_CLASS}__caveat">${escapeHtml(UNVERIFIED_IDENTITY_CAVEAT)}</p>`,
             );
         }
+    } else if (preview.metadataWithheld) {
+        // Same wording as the menu's WithheldIdentityHint, for the same
+        // content - naming which field (title/publisher/rights) is behind it
+        // here while staying vague there would leak exactly what the menu's
+        // phrasing is deliberately withholding.
+        parts.push(
+            `<p class="${PREVIEW_CLASS}__caveat">${escapeHtml(WITHHELD_IDENTITY_INFO_CAVEAT)}</p>`,
+        );
     }
 
     // No raw failure codes here. A hover is a glance, and a viewer being told
@@ -242,7 +252,7 @@ function renderPreview(preview: SegmentPreview): string {
     // `assertion.bmffHash.mismatch` to act on it - the sentence above is the
     // whole message. The codes belong in the debug console, where someone has
     // chosen to look at engine output; the model no longer carries them.
-    if (!preview.reason && !preview.metadata) {
+    if (!preview.reason && !preview.metadata && !preview.metadataWithheld) {
         parts.push(
             `<p class="${PREVIEW_CLASS}__caveat">No per-segment metadata in this stream.</p>`,
         );
@@ -255,6 +265,7 @@ export function createTimelinePreview(): TimelinePreviewController {
     let progressControl: HTMLElement | null = null;
     let element: HTMLDivElement | null = null;
     let adapterKind: AdapterKind | null = null;
+    let showUnverifiedIdentity = false;
     /**
      * What the panel currently says, as markup.
      *
@@ -295,7 +306,7 @@ export function createTimelinePreview(): TimelinePreviewController {
         const match = findSegmentAtFraction(segments, fraction);
         const source = match?.__c2paSegment ?? null;
         const html = source
-            ? renderPreview(buildSegmentPreview(source, adapterKind))
+            ? renderPreview(buildSegmentPreview(source, adapterKind, showUnverifiedIdentity))
             : renderGap(segments, fraction);
 
         if (!html) {
@@ -380,6 +391,16 @@ export function createTimelinePreview(): TimelinePreviewController {
 
             adapterKind = kind;
             // The next move rebuilds against the new adapter's honesty rules.
+            shownHtml = null;
+        },
+
+        setShowUnverifiedIdentity(value: boolean) {
+            if (value === showUnverifiedIdentity) {
+                return;
+            }
+
+            showUnverifiedIdentity = value;
+            // The next move rebuilds against the new withholding rule.
             shownHtml = null;
         },
 

@@ -18,6 +18,7 @@ import { Manifest, ManifestStore } from '@contentauth/c2pa-web';
 import type { AdapterKind, IdentityTrustMode } from '@/lib/validation';
 import { meetsIdentityTrustThreshold } from '@/lib/validation/rules';
 import {
+    AiOptOutSectionItem,
     ClaimGeneratorSectionItem,
     CopyrightSectionItem,
     HistorySectionItem,
@@ -26,6 +27,7 @@ import {
     WorkSectionItem,
 } from '../models';
 import { hasPublishedAction, selectActionsAssertion } from './actionsSelectors';
+import { selectAiOptOutSection } from './aiOptOutSelectors';
 import { selectOrganizationIdentity } from './cawgSelectors';
 import { selectClaimGenerator } from './claimGeneratorSelectors';
 import {
@@ -127,6 +129,7 @@ function resolveOrganizationTitle(
  * @param adapterKind - Which adapter produced this result
  * @param identityTrustMode - How strict the identity verdict must be (see `meetsIdentityTrustThreshold`)
  * @param showCreativeWork - Whether to include CreativeWork-derived organization details
+ * @param showUnverifiedIdentity - Whether an `'Unknown'` verdict also clears the bar (see `resolveShowUnverifiedIdentity`)
  * @returns Structured organization section data, or null unless a sufficiently-trusted X.509 cawg.identity is present
  */
 export function selectOrganizationSection(
@@ -135,6 +138,7 @@ export function selectOrganizationSection(
     adapterKind?: AdapterKind | null,
     identityTrustMode: IdentityTrustMode = 'relaxed',
     showCreativeWork: boolean = true,
+    showUnverifiedIdentity: boolean = false,
 ): OrganizationSectionItem | null {
     const x509Assertion = selectX509CawgAssertion(manifest);
 
@@ -148,9 +152,10 @@ export function selectOrganizationSection(
         adapterKind,
         identityTrustMode,
         showCreativeWork,
+        showUnverifiedIdentity,
     );
 
-    if (!cawg || !meetsIdentityTrustThreshold(cawg.validationStatus, identityTrustMode)) {
+    if (!cawg || !meetsIdentityTrustThreshold(cawg.validationStatus, identityTrustMode, showUnverifiedIdentity)) {
         return null;
     }
 
@@ -177,6 +182,7 @@ export function selectOrganizationSection(
  * @param manifestStore - Optional manifest store used to compute CAWG validation status
  * @param adapterKind - Which adapter produced this result
  * @param identityTrustMode - How strict the identity verdict must be (see `meetsIdentityTrustThreshold`)
+ * @param showUnverifiedIdentity - Whether an `'Unknown'` verdict also clears the bar (see `resolveShowUnverifiedIdentity`)
  * @returns Structured copyright section data, or null when absent or below the trust threshold
  */
 export function selectCopyrightSection(
@@ -184,8 +190,16 @@ export function selectCopyrightSection(
     manifestStore?: ManifestStore,
     adapterKind?: AdapterKind | null,
     identityTrustMode: IdentityTrustMode = 'relaxed',
+    showUnverifiedIdentity: boolean = false,
 ): CopyrightSectionItem | null {
-    const cawg = selectOrganizationIdentity(manifest, manifestStore, adapterKind, identityTrustMode);
+    const cawg = selectOrganizationIdentity(
+        manifest,
+        manifestStore,
+        adapterKind,
+        identityTrustMode,
+        true,
+        showUnverifiedIdentity,
+    );
 
     if (!cawg?.copyright) {
         return null;
@@ -231,4 +245,62 @@ export function selectWorkSection(
         role,
         organizationName: organization?.name ?? null,
     };
+}
+
+/**
+ * Whether Organization Identity, Copyright or AI opt-out have real content
+ * sitting behind an `'Unknown'` `cawg.identity` verdict that the current
+ * `showUnverifiedIdentity` setting is keeping off screen - so the menu can
+ * say *something* is being withheld without saying what.
+ *
+ * Asks the same three selectors that build those sections, rather than
+ * keeping a second, hand-rolled copy of when they apply: `organizationSection`/
+ * `copyrightSection`/`aiOptOutSection` are what the caller already computed
+ * under the real settings (so passed in rather than recomputed here), and if
+ * all three came back null, this calls the same selectors once more with
+ * `showUnverifiedIdentity` forced to `true`. Whatever that second pass would
+ * show is exactly what the first pass is withholding, and it can never
+ * disagree with what those selectors actually gate on - there is no separate
+ * rule to fall out of sync with theirs if any one of them changes later.
+ *
+ * @param manifest - The manifest containing CAWG assertions
+ * @param organizationSection - What `selectOrganizationSection` already returned under the real settings
+ * @param copyrightSection - What `selectCopyrightSection` already returned under the real settings
+ * @param aiOptOutSection - What `selectAiOptOutSection` already returned under the real settings
+ * @param manifestStore - Optional manifest store used to compute the CAWG verdict
+ * @param adapterKind - Which adapter produced this result
+ * @param identityTrustMode - How strict the identity verdict must be (see `meetsIdentityTrustThreshold`)
+ * @param showCreativeWork - Whether to include CreativeWork-derived organization details (see `selectOrganizationSection`)
+ * @param showUnverifiedIdentity - The current setting; the hint only appears while this is `false`
+ * @returns Whether to show the "unverified info exists" hint
+ */
+export function selectWithheldIdentityHint(
+    manifest: Manifest,
+    organizationSection: OrganizationSectionItem | null,
+    copyrightSection: CopyrightSectionItem | null,
+    aiOptOutSection: AiOptOutSectionItem | null,
+    manifestStore?: ManifestStore,
+    adapterKind?: AdapterKind | null,
+    identityTrustMode: IdentityTrustMode = 'relaxed',
+    showCreativeWork: boolean = true,
+    showUnverifiedIdentity: boolean = false,
+): boolean {
+    // Already showing under the real settings, or the flag is already on -
+    // either way there is nothing left to withhold.
+    if (showUnverifiedIdentity || organizationSection || copyrightSection || aiOptOutSection) {
+        return false;
+    }
+
+    return (
+        selectOrganizationSection(
+            manifest,
+            manifestStore,
+            adapterKind,
+            identityTrustMode,
+            showCreativeWork,
+            true,
+        ) !== null ||
+        selectCopyrightSection(manifest, manifestStore, adapterKind, identityTrustMode, true) !== null ||
+        selectAiOptOutSection(manifest, manifestStore, adapterKind, identityTrustMode, true) !== null
+    );
 }

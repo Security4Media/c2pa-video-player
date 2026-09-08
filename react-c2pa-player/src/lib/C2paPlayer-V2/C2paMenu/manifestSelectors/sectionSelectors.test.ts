@@ -16,7 +16,12 @@
 
 import { describe, expect, it } from 'vitest';
 import type { Manifest, ManifestStore } from '@contentauth/c2pa-web';
-import { selectCopyrightSection, selectOrganizationSection, selectWorkSection } from './sectionSelectors';
+import {
+  selectCopyrightSection,
+  selectOrganizationSection,
+  selectWithheldIdentityHint,
+  selectWorkSection,
+} from './sectionSelectors';
 
 function x509Identity(referencedUrls: string[]) {
   return {
@@ -275,12 +280,162 @@ describe('showCreativeWork gating', () => {
       ],
     } as unknown as Manifest;
 
-    // selectCopyrightSection takes no showCreativeWork parameter at all - the
-    // absence of a 5th argument here is itself part of what this test
-    // demonstrates.
+    // selectCopyrightSection takes no showCreativeWork parameter at all -
+    // what it renders is cawg.metadata-derived, not CreativeWork-derived.
     const section = selectCopyrightSection(manifest, trustedStore(manifest), 'monolithic');
 
     expect(section?.copyright.copyrightNotice).toBe('© Acme 2026');
     expect(section?.validationStatus).toBe('Trusted');
+  });
+});
+
+describe('showUnverifiedIdentity gating', () => {
+  it('selectOrganizationSection is withheld by default for an Unknown identity, shown when the flag is on', () => {
+    const manifest = { assertions: [x509Identity([])] } as unknown as Manifest;
+
+    expect(
+      selectOrganizationSection(manifest, trustedStore(manifest), 'dash-fragmented-fmp4'),
+    ).toBeNull();
+
+    const section = selectOrganizationSection(
+      manifest,
+      trustedStore(manifest),
+      'dash-fragmented-fmp4',
+      'relaxed',
+      true,
+      true,
+    );
+
+    expect(section).not.toBeNull();
+    expect(section?.cawg?.validationStatus).toBe('Unknown');
+  });
+
+  it('selectOrganizationSection stays withheld under identityTrust=strict even with the flag on', () => {
+    const manifest = { assertions: [x509Identity([])] } as unknown as Manifest;
+
+    expect(
+      selectOrganizationSection(manifest, trustedStore(manifest), 'dash-fragmented-fmp4', 'strict', true, true),
+    ).toBeNull();
+  });
+
+  it('selectCopyrightSection is withheld by default for an Unknown identity, shown when the flag is on', () => {
+    const manifest = {
+      assertions: [
+        x509Identity(['self#jumbf=c2pa.assertions/cawg.metadata']),
+        {
+          label: 'cawg.metadata',
+          data: {
+            '@context': { '@vocab': 'https://schema.org/' },
+            '@type': 'VideoObject',
+            copyrightNotice: '© Acme 2026',
+          },
+        },
+      ],
+    } as unknown as Manifest;
+
+    expect(
+      selectCopyrightSection(manifest, trustedStore(manifest), 'dash-fragmented-fmp4'),
+    ).toBeNull();
+
+    const section = selectCopyrightSection(
+      manifest,
+      trustedStore(manifest),
+      'dash-fragmented-fmp4',
+      'relaxed',
+      true,
+    );
+
+    expect(section?.copyright.copyrightNotice).toBe('© Acme 2026');
+    expect(section?.validationStatus).toBe('Unknown');
+  });
+});
+
+describe('selectWithheldIdentityHint', () => {
+  it('is true when an Unknown identity references known content and the flag is off', () => {
+    const manifest = {
+      assertions: [x509Identity(['self#jumbf=c2pa.assertions/cawg.metadata'])],
+    } as unknown as Manifest;
+
+    // Under the real (flag-off) settings none of the three sections show -
+    // matching what a caller like menuViewModel would actually pass in.
+    expect(
+      selectWithheldIdentityHint(manifest, null, null, null, trustedStore(manifest), 'dash-fragmented-fmp4'),
+    ).toBe(true);
+  });
+
+  it('is false once the flag is on', () => {
+    const manifest = {
+      assertions: [x509Identity(['self#jumbf=c2pa.assertions/cawg.metadata'])],
+    } as unknown as Manifest;
+
+    expect(
+      selectWithheldIdentityHint(
+        manifest,
+        null,
+        null,
+        null,
+        trustedStore(manifest),
+        'dash-fragmented-fmp4',
+        'relaxed',
+        true,
+        true,
+      ),
+    ).toBe(false);
+  });
+
+  it('is true even when the identity references no known content, since forcing the flag on would still surface the bare identity Organization Identity normally hides', () => {
+    const manifest = { assertions: [x509Identity([])] } as unknown as Manifest;
+
+    // selectOrganizationSection itself is gated only on "X.509 identity
+    // present + trust threshold cleared", not on any referenced content (an
+    // HLS Trusted identity with no CreativeWork/metadata still shows issuer
+    // info) - so asking it directly, rather than re-deriving a separate
+    // "does it reference known content" rule, means a content-free Unknown
+    // identity is honestly reported as something the flag would reveal too.
+    expect(
+      selectWithheldIdentityHint(manifest, null, null, null, trustedStore(manifest), 'dash-fragmented-fmp4'),
+    ).toBe(true);
+  });
+
+  it('is false when there is no cawg.identity at all', () => {
+    const manifest = { assertions: [] } as unknown as Manifest;
+
+    expect(
+      selectWithheldIdentityHint(manifest, null, null, null, trustedStore(manifest), 'dash-fragmented-fmp4'),
+    ).toBe(false);
+  });
+
+  it('is false when the identity is already Trusted - nothing is being withheld', () => {
+    const manifest = {
+      assertions: [x509Identity(['self#jumbf=c2pa.assertions/cawg.metadata'])],
+    } as unknown as Manifest;
+    const store = trustedStore(manifest);
+    // 'monolithic' verifies identity for real, so this store's 'Trusted'
+    // verdict clears the bar without the flag - selectOrganizationSection
+    // already shows under the real settings, exactly as menuViewModel would
+    // compute and pass in.
+    const organizationSection = selectOrganizationSection(manifest, store, 'monolithic');
+
+    expect(
+      selectWithheldIdentityHint(manifest, organizationSection, null, null, store, 'monolithic'),
+    ).toBe(false);
+  });
+
+  it('is false under identityTrust=strict, which never admits Unknown either way', () => {
+    const manifest = {
+      assertions: [x509Identity(['self#jumbf=c2pa.assertions/cawg.metadata'])],
+    } as unknown as Manifest;
+
+    expect(
+      selectWithheldIdentityHint(
+        manifest,
+        null,
+        null,
+        null,
+        trustedStore(manifest),
+        'dash-fragmented-fmp4',
+        'strict',
+      ),
+    ).toBe(false);
   });
 });

@@ -47,6 +47,13 @@ export interface SegmentPreview {
    */
   metadataVerified: boolean;
   /**
+   * True when metadata exists but `showUnverifiedIdentity` is keeping it off
+   * screen - `metadata` is `null` in that case too, but for a different
+   * reason than "this segment has none at all", and the two read differently
+   * to a viewer (see C2paTimelinePreview.ts's renderPreview).
+   */
+  metadataWithheld: boolean;
+  /**
    * One sentence a viewer can act on, when the segment failed or was not
    * verified. Never null for those two cases: an unexplained colour is worse
    * than a general explanation.
@@ -283,6 +290,7 @@ export function buildUnverifiedPreview(
     validationState: 'Unknown',
     metadata: null,
     metadataVerified: false,
+    metadataWithheld: false,
     reason: stillArriving ? NOT_YET_SENTENCE : NOTHING_VERIFIED_SENTENCE,
   };
 }
@@ -339,10 +347,17 @@ function readUnknownReason(segment: C2PATimelineSegmentUpdate): string {
  *    for a neighbour told a viewer that a Trusted stretch had a hash mismatch,
  *    which is both wrong and precisely the accusation this player must not
  *    make carelessly.
+ *
+ * `showUnverifiedIdentity` decides what happens when metadata exists but
+ * `metadataVerified` would be false: `true` shows it marked, same as always;
+ * `false` withholds it (`metadata: null`, `metadataWithheld: true`) so the
+ * hover panel matches the menu, which withholds the same content for the same
+ * reason (see `selectOrganizationSection`/`selectWithheldIdentityHint`).
  */
 export function buildSegmentPreview(
   segment: C2PATimelineSegmentUpdate,
   adapterKind: AdapterKind | null,
+  showUnverifiedIdentity: boolean = false,
 ): SegmentPreview {
   const timeRange = formatSegmentRange(segment.startTime, segment.endTime);
   const state = segment.pending ? 'Unknown' : segment.validationState;
@@ -355,16 +370,19 @@ export function buildSegmentPreview(
       validationState: 'Invalid',
       metadata: null,
       metadataVerified: false,
+      metadataWithheld: false,
       reason: readReason(segment.manifestRef, codes) ?? GENERIC_FAILURE_SENTENCE,
     };
   }
 
-  const metadata = readMetadata(segment.manifestRef);
+  const rawMetadata = readMetadata(segment.manifestRef);
   // Only claim the metadata is verified when something verified it. For DASH
   // the underlying library performs no identity or trust check at all, so its
   // Dublin Core is shown and marked rather than presented as attested.
   const metadataVerified =
-    metadata !== null && adapterKind !== null && verifiesCawgIdentity(adapterKind);
+    rawMetadata !== null && adapterKind !== null && verifiesCawgIdentity(adapterKind);
+  const metadataWithheld = rawMetadata !== null && !metadataVerified && !showUnverifiedIdentity;
+  const metadata = metadataWithheld ? null : rawMetadata;
 
   if (state === 'Unknown') {
     return {
@@ -372,9 +390,10 @@ export function buildSegmentPreview(
       validationState: 'Unknown',
       metadata,
       metadataVerified,
+      metadataWithheld,
       reason: readUnknownReason(segment),
     };
   }
 
-  return { timeRange, validationState: state, metadata, metadataVerified, reason: null };
+  return { timeRange, validationState: state, metadata, metadataVerified, metadataWithheld, reason: null };
 }

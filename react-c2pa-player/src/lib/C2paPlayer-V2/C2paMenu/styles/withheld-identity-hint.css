@@ -14,15 +14,11 @@
  * limitations under the License.
  */
 
-@import './menu-shell.css';
-@import './menu-shared.css';
-@import './section-shared.css';
-@import './organization-section.css';
-@import './copyright-section.css';
-@import './creator-section.css';
-@import './history-section.css';
-@import './work-section.css';
-@import './ai-optout-section.css';
-@import './claim-generator-section.css';
-@import './summary-section.css';
-@import './withheld-identity-hint.css';
+/* Same muted treatment as OrganizationSection's/CreatorSection's caveat, so
+   this reads as the same kind of remark rather than a new kind of notice. */
+.vjs-menu li.vjs-menu-item .c2pa-withheld-hint__text {
+  margin: 0;
+  opacity: 0.7;
+  font-size: 0.9em;
+  line-height: 1.4;
+}
