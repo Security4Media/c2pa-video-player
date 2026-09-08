@@ -28,44 +28,95 @@
   font-family: var(--font-family-base);
   background: var(--color-background);
   min-height: 100vh;
-  padding: var(--space-lg);
   color: var(--color-foreground);
 }
 
-/* Header Section */
-.standalone-player-page .header {
+/* Hero Band - full-bleed dark surface showcasing the Security4Media mark
+   and its supporting members/vendors, above the white workspace card. */
+.hero {
+  background: var(--color-ink);
+  color: var(--color-ink-foreground);
+  padding: var(--space-2xl) var(--space-lg);
+}
+
+.hero__inner {
+  max-width: 1100px;
+  margin: 0 auto;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  margin-bottom: var(--space-2xl);
+  text-align: center;
   gap: var(--space-lg);
 }
 
-.standalone-player-page .logos {
+.hero__logo {
+  height: 220px;
+  width: auto;
+  max-width: 100%;
+  object-fit: contain;
+}
+
+.hero__tagline {
+  font-family: var(--font-family-display);
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-ink-foreground);
+  max-width: 620px;
+}
+
+.hero__partners {
   display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-xl) var(--space-2xl);
+  width: 100%;
+  margin-top: var(--space-md);
+  padding-top: var(--space-lg);
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.hero__partner-group {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.hero__partner-group-label {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-ink-foreground-muted);
+}
+
+.hero__partner-row {
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: center;
-  gap: var(--space-2xl);
-  width: 100%;
-  max-width: 900px;
-  padding: var(--space-xl);
-  border-radius: var(--radius-lg);
-  background: var(--color-background);
-  box-shadow: var(--shadow-lg);
+  gap: var(--space-xl);
 }
 
-.standalone-player-page .logos .ebu-logo {
-  height: 80px;
+.hero__partner-logo {
+  height: 40px;
   width: auto;
+  max-width: 100%;
   object-fit: contain;
 }
 
-.standalone-player-page .logos .nab-logo {
-  height: 110px;
-  width: auto;
-  object-fit: contain;
-  padding-top: var(--space-lg);
+/* Spacing between the full-bleed hero and the viewport edges/workspace card */
+.page-content {
+  padding: var(--space-lg);
+}
+
+/* Main Container */
+.standalone-player-page .container {
+  max-width: 1500px;
+  margin: 0 auto;
+  background: var(--color-surface);
+  border-radius: var(--radius-xl);
+  padding: var(--space-2xl);
+  box-shadow: var(--shadow-xl);
+  border: 1px solid var(--color-border);
 }
 
 .standalone-player-page h1 {
@@ -81,33 +132,47 @@
   text-align: center;
 }
 
-/* Main Container */
-.standalone-player-page .container {
-  max-width: 1500px;
-  margin: 0 auto;
-  background: var(--color-surface);
-  border-radius: var(--radius-xl);
-  padding: var(--space-2xl);
-  box-shadow: var(--shadow-xl);
-  border: 1px solid var(--color-border);
-}
-
 /* Responsive Design */
 @media (max-width: 768px) {
-  .standalone-player-page {
+  .hero {
+    padding: var(--space-xl) var(--space-md);
+  }
+
+  .hero__logo {
+    height: 140px;
+  }
+
+  .hero__tagline {
+    font-size: var(--font-size-lg);
+  }
+
+  .hero__partners {
+    gap: var(--space-lg);
+  }
+
+  .page-content {
     padding: var(--space-md);
   }
-  
+
   .standalone-player-page .container {
     padding: var(--space-lg);
   }
-  
+
   .standalone-player-page h1 {
     font-size: var(--font-size-2xl);
   }
-  
+
   .standalone-player-page h2 {
     font-size: var(--font-size-xl);
   }
 }
 
+@media (max-width: 400px) {
+  .hero__logo {
+    height: 110px;
+  }
+
+  .hero__partner-logo {
+    height: 32px;
+  }
+}

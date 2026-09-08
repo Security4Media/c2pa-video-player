@@ -24,8 +24,12 @@ import { VideoModeSwitcher } from '../../lib/components/VideoModeSwitcher';
 import { PlayerConfigPanel } from '../components/PlayerConfigPanel';
 import '@/lib/styles/design-tokens.css';
 import './StandalonePlayerPage.css';
-import ebuLogo from '../assets/logos/ebu-logo-dark.svg';
-import nabLogo from '../assets/logos/nab-logo.png';
+import s4mLogo from '../assets/logos/s4m-logo.png';
+import ebuLogo from '../assets/logos/ebu-logo-white.png';
+import cbcLogo from '../assets/logos/cbc.png';
+import wdrLogo from '../assets/logos/wdr.png';
+import unifiedStreamingLogo from '../assets/logos/unified-streaming.png';
+import qualabsLogo from '../assets/logos/qualabs.png';
 import { PlayerStatus, VideoMode } from '@/lib/types/player.types';
 import {
   createMediaSourceDescriptor,
@@ -315,61 +319,86 @@ export function StandalonePlayerPage() {
 
   return (
     <div className="standalone-player-page">
-      <div className="container">
-        <div className="header">
-          <div className="logos">
-            <img src={ebuLogo} alt="EBU Logo" className="ebu-logo" />
-            <img src={nabLogo} alt="NAB Show Logo" className="nab-logo" />
+      <header className="hero">
+        <div className="hero__inner">
+          <img src={s4mLogo} alt="Security4Media" className="hero__logo" />
+          <p className="hero__tagline">
+            A C2PA &amp; CAWG validation player for verifying content authenticity, live or on
+            demand.
+          </p>
+
+          <div className="hero__partners">
+            <div className="hero__partner-group">
+              <span className="hero__partner-group-label">Members</span>
+              <div className="hero__partner-row">
+                <img src={ebuLogo} alt="EBU" className="hero__partner-logo" />
+                <img src={cbcLogo} alt="CBC/Radio-Canada" className="hero__partner-logo" />
+                <img src={wdrLogo} alt="WDR" className="hero__partner-logo" />
+              </div>
+            </div>
+            <div className="hero__partner-group">
+              <span className="hero__partner-group-label">Live-streaming vendors</span>
+              <div className="hero__partner-row">
+                <img
+                  src={unifiedStreamingLogo}
+                  alt="Unified Streaming"
+                  className="hero__partner-logo"
+                />
+                <img src={qualabsLogo} alt="Qualabs" className="hero__partner-logo" />
+              </div>
+            </div>
           </div>
-          <h2>C2PA & CAWG validation player</h2>
-          <h2>NAB SHOW 2026</h2>
         </div>
+      </header>
 
-        <PlayerConfigPanel mediaSource={mediaSource} onApply={handleConfigApplied} />
+      <div className="page-content">
+        <div className="container">
+          <PlayerConfigPanel mediaSource={mediaSource} onApply={handleConfigApplied} />
 
-        <VideoLoader
-          mp4Url={mp4Url}
-          selectedVideo={selectedVideo}
-          availableVideos={filteredVideos}
-          onMp4UrlChange={setMp4Url}
-          onVideoLoad={loadVideo}
-          onError={handleError}
-          onStatusUpdate={updateStreamInfo}
-          onVideoListLoad={handleVideoListLoad}
-          onLoadVideoList={loadVideoList}
-          onClearPlayer={clearPlayer}
-          onExposeNavigate={handleExposeNavigate}
-        />
-
-        <VideoModeSwitcher
-          currentMode={videoMode}
-          onToggle={handleToggleMode}
-          hasServerVideos={hasServerVideos}
-          hasLocalVideos={hasLocalVideos}
-        />
-
-        <VideoPlayerSection
-          videoJsOptions={videoJsOptions}
-          mediaSource={mediaSource}
-          onTimeUpdate={handleTimeUpdate}
-          onDurationChange={handleDurationChange}
-          onStatusUpdate={updateStatus}
-          onStreamInfo={updateStreamInfo}
-          reloadToken={reloadToken}
-        >
-          <VideoNavigationControls
-            availableVideos={filteredVideos}
+          <VideoLoader
+            mp4Url={mp4Url}
             selectedVideo={selectedVideo}
-            onNavigate={handleVideoNavigate}
+            availableVideos={filteredVideos}
+            onMp4UrlChange={setMp4Url}
+            onVideoLoad={loadVideo}
+            onError={handleError}
+            onStatusUpdate={updateStreamInfo}
+            onVideoListLoad={handleVideoListLoad}
+            onLoadVideoList={loadVideoList}
+            onClearPlayer={clearPlayer}
+            onExposeNavigate={handleExposeNavigate}
           />
-        </VideoPlayerSection>
 
-        <PlayerStats
-          playerStatus={playerStatus}
-          statusMessage={statusMessage}
-          streamInfos={streamInfos}
-          playerStats={playerStats}
-        />
+          <VideoModeSwitcher
+            currentMode={videoMode}
+            onToggle={handleToggleMode}
+            hasServerVideos={hasServerVideos}
+            hasLocalVideos={hasLocalVideos}
+          />
+
+          <VideoPlayerSection
+            videoJsOptions={videoJsOptions}
+            mediaSource={mediaSource}
+            onTimeUpdate={handleTimeUpdate}
+            onDurationChange={handleDurationChange}
+            onStatusUpdate={updateStatus}
+            onStreamInfo={updateStreamInfo}
+            reloadToken={reloadToken}
+          >
+            <VideoNavigationControls
+              availableVideos={filteredVideos}
+              selectedVideo={selectedVideo}
+              onNavigate={handleVideoNavigate}
+            />
+          </VideoPlayerSection>
+
+          <PlayerStats
+            playerStatus={playerStatus}
+            statusMessage={statusMessage}
+            streamInfos={streamInfos}
+            playerStats={playerStats}
+          />
+        </div>
       </div>
     </div>
   );

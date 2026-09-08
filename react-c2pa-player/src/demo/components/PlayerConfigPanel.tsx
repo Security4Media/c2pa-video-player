@@ -220,110 +220,118 @@ export function PlayerConfigPanel({ mediaSource, onApply }: PlayerConfigPanelPro
         Diagnostic switches from the README&apos;s &quot;Runtime parameters&quot; table. Hover a
         control for details. Changing one reloads the current video.
       </p>
-      <div className="player-config-grid">
-        <label
-          className="player-config-control player-config-control--checkbox"
-          title="Shows the authenticity label in the top-right of the picture, stating the provenance of the moment on screen. Off by default. (?label=on)"
-        >
-          <input
-            type="checkbox"
-            checked={label}
-            onChange={(event) => handleLabelChange(event.target.checked)}
-          />
-          Authenticity label
-        </label>
-
-        <label
-          className="player-config-control player-config-control--checkbox"
-          title="Shows organization/publisher, copyright, AI opt-out, and Creator information for an identity that is only Valid (structurally verified but not on this player's trusted-anchor list), not just Trusted. On by default. Unchecking sets ?identityTrust=strict, which also tightens Creator to Trusted-only. (?identityTrust=strict when unchecked)"
-        >
-          <input
-            type="checkbox"
-            checked={identityTrustRelaxed}
-            onChange={(event) => handleIdentityTrustChange(event.target.checked)}
-          />
-          Show info for Valid (not just Trusted) identities
-        </label>
-
-        <label
-          className="player-config-control player-config-control--checkbox"
-          title="Shows information derived from the stds.schema-org.CreativeWork assertion: Organization Details, About the Producer (authors/organization name), and Organization Identity's Published-on/License lines. On by default. Does not affect Copyright, which is cawg.metadata-derived. (?showCreativeWork=off when unchecked)"
-        >
-          <input
-            type="checkbox"
-            checked={showCreativeWork}
-            onChange={(event) => handleShowCreativeWorkChange(event.target.checked)}
-          />
-          Show CreativeWork information
-        </label>
-
-        <label
-          className="player-config-control"
-          title="Where the consent question is raised: once per source, only if already known bad (whole-asset, default); the first time invalid content plays (per-stream); or once per contiguous invalid stretch (per-run). (?consent=)"
-        >
-          Consent mode
-          <select
-            value={consent}
-            onChange={(event) => handleConsentChange(event.target.value as ConsentMode)}
+      <div className="player-config-section">
+        <h4 className="player-config-section__heading">Display</h4>
+        <div className="player-config-grid">
+          <label
+            className="player-config-control player-config-control--checkbox"
+            title="Shows the authenticity label in the top-right of the picture, stating the provenance of the moment on screen. Off by default. (?label=on)"
           >
-            <option value="whole-asset">whole-asset (default)</option>
-            <option value="per-stream">per-stream</option>
-            <option value="per-run">per-run</option>
-          </select>
-        </label>
+            <input
+              type="checkbox"
+              checked={label}
+              onChange={(event) => handleLabelChange(event.target.checked)}
+            />
+            Authenticity label
+          </label>
 
-        <label
-          className="player-config-control"
-          title="Swaps the trust material for one of these profiles, so trusted / valid / untrusted outcomes can be shown on the same file. Unrecognised values fall back to full-prod. (?trust=)"
-        >
-          Trust profile
-          <select
-            value={trust}
-            onChange={(event) =>
-              handleTrustChange(event.target.value as TrustFixtureName | 'full-prod')
-            }
+          <label
+            className="player-config-control player-config-control--checkbox"
+            title="Shows organization/publisher, copyright, AI opt-out, and Creator information for an identity that is only Valid (structurally verified but not on this player's trusted-anchor list), not just Trusted. On by default. Unchecking sets ?identityTrust=strict, which also tightens Creator to Trusted-only. (?identityTrust=strict when unchecked)"
           >
-            {TRUST_PROFILES.map((profile) => (
-              <option key={profile.value} value={profile.value}>
-                {profile.label}
-              </option>
-            ))}
-          </select>
-        </label>
+            <input
+              type="checkbox"
+              checked={identityTrustRelaxed}
+              onChange={(event) => handleIdentityTrustChange(event.target.checked)}
+            />
+            Show info for Valid (not just Trusted) identities
+          </label>
 
-        <label
-          className="player-config-control"
-          title="Which DIDs this player trusts as issuers of CAWG Identity Claims Aggregation (ICA) credentials - a separate, app-level trust list, since the C2PA engine has no DID trust-anchor concept of its own. Unrecognised values fall back to full-prod. (?icaTrust=)"
-        >
-          ICA issuer trust profile
-          <select
-            value={icaTrust}
-            onChange={(event) =>
-              handleIcaTrustChange(event.target.value as IcaTrustFixtureName | 'full-prod')
-            }
+          <label
+            className="player-config-control player-config-control--checkbox"
+            title="Shows information derived from the stds.schema-org.CreativeWork assertion: Organization Details, About the Producer (authors/organization name), and Organization Identity's Published-on/License lines. On by default. Does not affect Copyright, which is cawg.metadata-derived. (?showCreativeWork=off when unchecked)"
           >
-            {ICA_TRUST_PROFILES.map((profile) => (
-              <option key={profile.value} value={profile.value}>
-                {profile.label}
-              </option>
-            ))}
-          </select>
-        </label>
+            <input
+              type="checkbox"
+              checked={showCreativeWork}
+              onChange={(event) => handleShowCreativeWorkChange(event.target.checked)}
+            />
+            Show CreativeWork information
+          </label>
+        </div>
+      </div>
 
-        <label
-          className="player-config-control"
-          title="Which runtime validates a monolithic MP4 file. 'nettrek' (default) is the shipped bridge-based runtime, also used for HLS. 'c2pa-web' is an independent runtime that calls @contentauth/c2pa-web directly. Only applies to a monolithic (MP4) source. (?monolithicEngine=)"
-        >
-          Monolithic engine
-          <select
-            value={engine}
-            disabled={!isMonolithicFormat}
-            onChange={(event) => handleEngineChange(event.target.value as MonolithicEngine)}
+      <div className="player-config-section">
+        <h4 className="player-config-section__heading">Trust &amp; validation</h4>
+        <div className="player-config-grid">
+          <label
+            className="player-config-control"
+            title="Where the consent question is raised: once per source, only if already known bad (whole-asset, default); the first time invalid content plays (per-stream); or once per contiguous invalid stretch (per-run). (?consent=)"
           >
-            <option value="nettrek">nettrek (default)</option>
-            <option value="c2pa-web">c2pa-web (standalone)</option>
-          </select>
-        </label>
+            Consent mode
+            <select
+              value={consent}
+              onChange={(event) => handleConsentChange(event.target.value as ConsentMode)}
+            >
+              <option value="whole-asset">whole-asset (default)</option>
+              <option value="per-stream">per-stream</option>
+              <option value="per-run">per-run</option>
+            </select>
+          </label>
+
+          <label
+            className="player-config-control"
+            title="Swaps the trust material for one of these profiles, so trusted / valid / untrusted outcomes can be shown on the same file. Unrecognised values fall back to full-prod. (?trust=)"
+          >
+            Trust profile
+            <select
+              value={trust}
+              onChange={(event) =>
+                handleTrustChange(event.target.value as TrustFixtureName | 'full-prod')
+              }
+            >
+              {TRUST_PROFILES.map((profile) => (
+                <option key={profile.value} value={profile.value}>
+                  {profile.label}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label
+            className="player-config-control"
+            title="Which DIDs this player trusts as issuers of CAWG Identity Claims Aggregation (ICA) credentials - a separate, app-level trust list, since the C2PA engine has no DID trust-anchor concept of its own. Unrecognised values fall back to full-prod. (?icaTrust=)"
+          >
+            ICA issuer trust profile
+            <select
+              value={icaTrust}
+              onChange={(event) =>
+                handleIcaTrustChange(event.target.value as IcaTrustFixtureName | 'full-prod')
+              }
+            >
+              {ICA_TRUST_PROFILES.map((profile) => (
+                <option key={profile.value} value={profile.value}>
+                  {profile.label}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label
+            className="player-config-control"
+            title="Which runtime validates a monolithic MP4 file. 'nettrek' (default) is the shipped bridge-based runtime, also used for HLS. 'c2pa-web' is an independent runtime that calls @contentauth/c2pa-web directly. Only applies to a monolithic (MP4) source. (?monolithicEngine=)"
+          >
+            Monolithic engine
+            <select
+              value={engine}
+              disabled={!isMonolithicFormat}
+              onChange={(event) => handleEngineChange(event.target.value as MonolithicEngine)}
+            >
+              <option value="nettrek">nettrek (default)</option>
+              <option value="c2pa-web">c2pa-web (standalone)</option>
+            </select>
+          </label>
+        </div>
       </div>
 
       <fieldset className="player-config-subsection" disabled={!isLiveCapableFormat}>

@@ -24,6 +24,7 @@
 }
 
 .player-config-panel h3 {
+  font-family: var(--font-family-display);
   font-size: var(--font-size-lg);
   font-weight: var(--font-weight-semibold);
   color: var(--color-foreground);
@@ -34,6 +35,21 @@
   font-size: var(--font-size-sm);
   color: var(--color-foreground-muted);
   margin-bottom: var(--space-lg);
+}
+
+.player-config-section {
+  margin-top: var(--space-lg);
+}
+
+.player-config-section:first-of-type {
+  margin-top: var(--space-md);
+}
+
+.player-config-section__heading {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-foreground-muted);
+  margin-bottom: var(--space-sm);
 }
 
 .player-config-grid {
@@ -87,6 +103,7 @@
   width: 20px;
   height: 20px;
   cursor: pointer;
+  accent-color: var(--color-primary);
 }
 
 .player-config-control--checkbox input[type='checkbox']:disabled {
@@ -95,9 +112,10 @@
 }
 
 .player-config-subsection {
-  margin: var(--space-lg) 0 0;
+  margin: var(--space-xl) 0 0;
   padding: var(--space-lg);
   border: 1px solid var(--color-border);
+  border-left: 3px solid var(--color-primary);
   border-radius: var(--radius-md);
   background: var(--color-surface);
 }
@@ -106,9 +124,7 @@
   padding: 0 var(--space-sm);
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-semibold);
-  color: var(--color-foreground-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
+  color: var(--color-foreground);
 }
 
 .player-config-subsection .player-config-grid {
