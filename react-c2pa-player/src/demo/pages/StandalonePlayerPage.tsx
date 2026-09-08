@@ -25,7 +25,7 @@ import { PlayerConfigPanel } from '../components/PlayerConfigPanel';
 import '@/lib/styles/design-tokens.css';
 import './StandalonePlayerPage.css';
 import s4mLogo from '../assets/logos/s4m-logo.png';
-import ebuLogo from '../assets/logos/ebu-logo-white.png';
+import ebuLogo from '../assets/logos/ebu-logo-white.svg';
 import cbcLogo from '../assets/logos/cbc.png';
 import wdrLogo from '../assets/logos/wdr.png';
 import unifiedStreamingLogo from '../assets/logos/unified-streaming.png';
@@ -337,7 +337,7 @@ export function StandalonePlayerPage() {
               </div>
             </div>
             <div className="hero__partner-group">
-              <span className="hero__partner-group-label">Live-streaming vendors</span>
+              <span className="hero__partner-group-label">Livestreaming-partners</span>
               <div className="hero__partner-row">
                 <img
                   src={unifiedStreamingLogo}
