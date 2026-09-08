@@ -203,3 +203,99 @@ describe('a clicked fragment', () => {
         expect(messages(state)).toBe('No content credentials are attached to this moment.');
     });
 });
+
+/** An X.509 cawg.identity referencing cawg.metadata's schema.org copyright shape. */
+const x509IdentityManifest = {
+    assertions: [
+        {
+            label: 'cawg.identity',
+            data: {
+                signer_payload: {
+                    referenced_assertions: [{ url: 'self#jumbf=c2pa.assertions/cawg.metadata' }],
+                    sig_type: 'cawg.x509.cose',
+                },
+            },
+        },
+        {
+            label: 'cawg.metadata',
+            data: {
+                '@context': { '@vocab': 'https://schema.org/' },
+                '@type': 'VideoObject',
+                copyrightNotice: '© Acme 2026',
+            },
+        },
+    ],
+} as unknown as Manifest;
+
+describe('showUnverifiedIdentity threading (live status)', () => {
+    // No manifestStore, and `status()`'s default adapterKind ('dash-fragmented-fmp4')
+    // never verifies identity either way - both reasons this reads 'Unknown'.
+    const withheldStatus = status({
+        normalizedResult: {
+            manifestStore: null,
+            validationState: 'Valid',
+            activeManifest: x509IdentityManifest,
+        },
+    });
+
+    it('hides organization/copyright but flags the withheld hint by default', () => {
+        const state = buildMenuRenderState(withheldStatus, timeline());
+
+        expect(state.sections?.organization).toBeNull();
+        expect(state.sections?.copyright).toBeNull();
+        expect(state.sections?.withheldIdentityHint).toBe(true);
+    });
+
+    it('reveals them and drops the hint once showUnverifiedIdentity is on', () => {
+        const state = buildMenuRenderState(
+            withheldStatus,
+            timeline(),
+            undefined,
+            new Set(),
+            'relaxed',
+            true,
+            true,
+        );
+
+        expect(state.sections?.organization).not.toBeNull();
+        expect(state.sections?.copyright?.copyright.copyrightNotice).toBe('© Acme 2026');
+        expect(state.sections?.withheldIdentityHint).toBe(false);
+    });
+});
+
+describe('showUnverifiedIdentity threading (a clicked segment)', () => {
+    const segmentWithIdentity = segment({
+        validationState: 'Valid',
+        manifestRef: {
+            kind: 'single-manifest',
+            manifest: x509IdentityManifest,
+            manifests: {},
+            validationState: 'Valid',
+            validationErrors: [],
+        },
+    });
+
+    it('hides organization/copyright but flags the withheld hint by default', () => {
+        const state = buildMenuRenderState(status(), timeline(), segmentWithIdentity);
+
+        expect(state.sections?.organization).toBeNull();
+        expect(state.sections?.copyright).toBeNull();
+        expect(state.sections?.withheldIdentityHint).toBe(true);
+    });
+
+    it('reveals them and drops the hint once showUnverifiedIdentity is on', () => {
+        const state = buildMenuRenderState(
+            status(),
+            timeline(),
+            segmentWithIdentity,
+            new Set(),
+            'relaxed',
+            true,
+            true,
+        );
+
+        expect(state.sections?.organization).not.toBeNull();
+        expect(state.sections?.copyright?.copyright.copyrightNotice).toBe('© Acme 2026');
+        expect(state.sections?.withheldIdentityHint).toBe(false);
+    });
+});

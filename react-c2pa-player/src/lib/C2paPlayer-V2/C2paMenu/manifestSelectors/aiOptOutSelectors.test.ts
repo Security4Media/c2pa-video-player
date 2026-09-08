@@ -78,6 +78,25 @@ describe('selectAiOptOutSection', () => {
     ).toBeNull();
   });
 
+  it('is shown for an Unknown identity once showUnverifiedIdentity is on, carrying that status', () => {
+    const section = selectAiOptOutSection(
+      manifest,
+      buildStore(manifest, 'Valid'),
+      'dash-fragmented-fmp4',
+      'relaxed',
+      true,
+    );
+
+    expect(section?.assertion.label).toBe('cawg.training-mining');
+    expect(section?.validationStatus).toBe('Unknown');
+  });
+
+  it('stays withheld under identityTrust=strict even with showUnverifiedIdentity on', () => {
+    expect(
+      selectAiOptOutSection(manifest, buildStore(manifest, 'Valid'), 'dash-fragmented-fmp4', 'strict', true),
+    ).toBeNull();
+  });
+
   it('is withheld when there is no manifest store to read a verdict from', () => {
     expect(selectAiOptOutSection(manifest, undefined, 'monolithic')).toBeNull();
   });

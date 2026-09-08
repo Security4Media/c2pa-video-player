@@ -23,7 +23,7 @@ import type {
     ValidationStatusSnapshot,
     ValidationTimelineSegment,
 } from '../validation';
-import { createC2PAStatusFromSnapshot } from '../validation';
+import { createC2PAStatusFromSnapshot, resolveShowUnverifiedIdentity } from '../validation';
 import { initializeC2PAControlBar } from './C2paControlBar/C2paControlBarFunctions';
 import {
     initializeC2PADebugButton,
@@ -569,6 +569,9 @@ export const C2PAPlayer = function (
             // against a window at the live edge instead of against zero.
             const isLive = Boolean(snapshot?.isLive);
             sourceIsLive = isLive;
+            // Live by default, on-demand off by default - the query string can
+            // still override either way (see resolveShowUnverifiedIdentity).
+            timelinePreview.setShowUnverifiedIdentity(resolveShowUnverifiedIdentity(isLive));
             // The adapter's own retention, so the bar cannot show a stretch
             // whose verdicts have already been pruned behind it.
             const retentionSeconds = snapshot?.liveRetentionSeconds;

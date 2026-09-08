@@ -194,6 +194,7 @@ export { resolveColorizeTimelineByIssuer } from './issuerColors';
 export {
   resolveIdentityTrustMode,
   resolveShowCreativeWork,
+  resolveShowUnverifiedIdentity,
   type IdentityTrustMode,
 } from './menuDisplay';
 export {

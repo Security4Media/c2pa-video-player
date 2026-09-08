@@ -113,6 +113,7 @@ function mapTrainingMiningAssertion(
  * @param manifestStore - Optional manifest store used to compute CAWG validation status
  * @param adapterKind - Which adapter produced this result
  * @param identityTrustMode - How strict the identity verdict must be (see `meetsIdentityTrustThreshold`)
+ * @param showUnverifiedIdentity - Whether an `'Unknown'` verdict also clears the bar (see `resolveShowUnverifiedIdentity`)
  * @returns Structured AI opt-out section data, or null when not referenced by a sufficiently-trusted identity
  */
 export function selectAiOptOutSection(
@@ -120,6 +121,7 @@ export function selectAiOptOutSection(
     manifestStore?: ManifestStore,
     adapterKind?: AdapterKind | null,
     identityTrustMode: IdentityTrustMode = 'relaxed',
+    showUnverifiedIdentity: boolean = false,
 ): AiOptOutSectionItem | null {
     const cawgAssertion = selectCawgAssertion(manifest);
     if (!cawgAssertion) {
@@ -127,7 +129,7 @@ export function selectAiOptOutSection(
     }
 
     const validationStatus = selectOrganizationIdentity(manifest, manifestStore, adapterKind)?.validationStatus;
-    if (!validationStatus || !meetsIdentityTrustThreshold(validationStatus, identityTrustMode)) {
+    if (!validationStatus || !meetsIdentityTrustThreshold(validationStatus, identityTrustMode, showUnverifiedIdentity)) {
         return null;
     }
 
@@ -150,5 +152,6 @@ export function selectAiOptOutSection(
 
     return {
         assertion,
+        validationStatus,
     };
 }

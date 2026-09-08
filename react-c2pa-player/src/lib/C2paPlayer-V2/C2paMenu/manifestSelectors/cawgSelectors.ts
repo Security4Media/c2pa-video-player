@@ -88,6 +88,7 @@ export function selectOrganizationIdentity(
     adapterKind?: AdapterKind | null,
     identityTrustMode: IdentityTrustMode = 'relaxed',
     showCreativeWork: boolean = true,
+    showUnverifiedIdentity: boolean = false,
 ) {
     const cawgAssertion = manifest.assertions?.find(
         assertion => assertion.label === CAWG_ASSERTION_LABEL
@@ -116,9 +117,11 @@ export function selectOrganizationIdentity(
     // Content another assertion merely claims to be referenced is not
     // authenticated by anything unless the identity vouching for it clears
     // this app's own bar (?identityTrust=, default 'relaxed': Trusted or
-    // Valid) - an identity below that bar's claimed references are exactly
-    // as unverified as the content they point to.
-    if (meetsIdentityTrustThreshold(cawgItemBuilder.validationStatus, identityTrustMode)) {
+    // Valid, or 'Unknown' too when `showUnverifiedIdentity` opts into it -
+    // see `resolveShowUnverifiedIdentity`) - an identity below that bar's
+    // claimed references are exactly as unverified as the content they
+    // point to.
+    if (meetsIdentityTrustThreshold(cawgItemBuilder.validationStatus, identityTrustMode, showUnverifiedIdentity)) {
         if (showCreativeWork && referencedAssertionLabels.includes(CREATIVE_WORK_ASSERTION_LABEL)) {
             cawgItemBuilder.creativeWork = selectCreativeWorkContent(manifest);
         }

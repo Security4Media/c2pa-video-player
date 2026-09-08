@@ -49,6 +49,7 @@ export {
   resolveMonolithicEngine,
   resolveShowAuthenticityLabel,
   resolveShowCreativeWork,
+  resolveShowUnverifiedIdentity,
   resolveTrustFixtureName,
   selectedIcaIssuerProvider,
   trustFixtures,

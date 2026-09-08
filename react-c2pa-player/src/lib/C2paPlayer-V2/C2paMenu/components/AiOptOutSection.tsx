@@ -15,8 +15,34 @@
  */
 
 import { useId } from 'react';
+import { UNVERIFIED_IDENTITY_CAVEAT } from '@/lib/validation/rules';
 import type { AiOptOutSectionItem } from '../models';
 import { SectionToggle } from './shared';
+
+/**
+ * Only reachable when `showUnverifiedIdentity` let an 'Unknown' identity
+ * through (see selectAiOptOutSection) - `'Trusted'`/`'Valid'` render no badge
+ * at all, unchanged from before this option existed.
+ *
+ * Same icon/tooltip as CopyrightSection's own 'Unknown' badge, in the same
+ * header-badge slot, so a viewer scanning collapsed section titles gets the
+ * same visual cue for both - a usage restriction nobody checked is at least
+ * as consequential a claim as an unverified copyright line, and previously
+ * showed no signal at all until the section was expanded.
+ */
+function UnverifiedBadge() {
+  return (
+    <span
+      className="c2pa-ai-optout-section__status"
+      aria-label="AI opt-out information status: Unknown"
+      title={`Not verified: ${UNVERIFIED_IDENTITY_CAVEAT}`}
+      data-testid="c2pa-ai-optout-status"
+      data-validation-state="Unknown"
+    >
+      ❔
+    </span>
+  );
+}
 
 function formatLabelList(labels: string[]) {
   if (labels.length === 0) {
@@ -75,6 +101,7 @@ export function AiOptOutSection({
       <div className="c2pa-menu-section c2pa-ai-optout-section">
         <SectionToggle
           title={title}
+          badge={section.validationStatus === 'Unknown' ? <UnverifiedBadge /> : null}
           isExpanded={isExpanded}
           controls={panelId}
           onToggle={onToggle}
@@ -84,6 +111,15 @@ export function AiOptOutSection({
           className={`c2pa-menu-section__content ${isExpanded ? 'expanded' : ''}`}
         >
           <div className="c2pa-menu-section__content-inner c2pa-ai-optout-section__assertion">
+            {/* Only reachable when `showUnverifiedIdentity` let an 'Unknown'
+                identity through (see selectAiOptOutSection) - without this, a
+                usage restriction nobody checked would read as flat fact. */}
+            {section.validationStatus === 'Unknown' ? (
+              <p className="c2pa-ai-optout-section__caveat">
+                <span aria-hidden="true">❔ </span>
+                {UNVERIFIED_IDENTITY_CAVEAT}
+              </p>
+            ) : null}
             {policyParts.map((part, index) => (
               <div key={`${section.assertion.label}-${index}`} className="c2pa-menu-section__row">
                 {part}

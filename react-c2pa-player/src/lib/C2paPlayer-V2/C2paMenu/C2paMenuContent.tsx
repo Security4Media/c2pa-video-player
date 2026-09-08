@@ -34,6 +34,7 @@ import {
   NoManifestState,
   OrganizationSection,
   SummarySection,
+  WithheldIdentityHint,
   WorkSection,
 } from './components';
 
@@ -211,6 +212,8 @@ export function C2paMenuContent({
         ) : null}
         {sections.organization ? (
           <OrganizationSection section={sections.organization} />
+        ) : sections.withheldIdentityHint ? (
+          <WithheldIdentityHint />
         ) : null}
         {sections.copyright ? (
           <CopyrightSection
