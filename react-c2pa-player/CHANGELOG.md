@@ -1,5 +1,32 @@
 # Changelog
 
+## [2.0.0](https://github.com/Security4Media/c2pa-video-player/compare/v1.2.0...v2.0.0) (2026-09-09)
+
+
+### ⚠ BREAKING CHANGES
+
+* `resolveShowAuthenticityLabel` and `resolveColorizeTimelineByIssuer` now default to `true` instead of `false`. Every existing deployment of @security4media/c2pa-player will start showing the authenticity label and colorizing live timeline segments by issuer without any query-string change on their part.
+
+### Features
+
+* add a curated "Live" video-source filter for DASH live streams ([f8501f1](https://github.com/Security4Media/c2pa-video-player/commit/f8501f13293d82d9a82e388b9baaa91b99089931))
+* add a curated Live video-source filter for DASH live streams ([dff2d6c](https://github.com/Security4Media/c2pa-video-player/commit/dff2d6c5344af81e65cc01d26e413e7587c19dc4))
+* default "show unverified identity" to on in the demo only ([68f32fd](https://github.com/Security4Media/c2pa-video-player/commit/68f32fd302ca05d22cc919c33b33dcaa7c7f0ac4))
+* default authenticity label and issuer colorization to on ([bab14ec](https://github.com/Security4Media/c2pa-video-player/commit/bab14ec649a7567ad3aab6027e0d620a72e3d389))
+* rebrand demo app and README around Security4Media ([cac9154](https://github.com/Security4Media/c2pa-video-player/commit/cac9154c52653ae3ed22cb378918d9dd3443f23f))
+* rebrand demo app from NAB Show 2026 to Security4Media ([c1b34c8](https://github.com/Security4Media/c2pa-video-player/commit/c1b34c89a7b1239085c639e5f0ea2a160bbe599f))
+* redesign Player Config panel for usability ([42e7229](https://github.com/Security4Media/c2pa-video-player/commit/42e722973e2f17f171d731120bba0acbebb62184))
+* show unverified organization/copyright/AI-usage info via showUnverifiedIdentity ([c92b396](https://github.com/Security4Media/c2pa-video-player/commit/c92b39699ce9744f41fb9b82ba6eff689aa6bf3d))
+* use Security4Media favicon/tab title, switch CBC credit to its SVG mark ([5fdea4a](https://github.com/Security4Media/c2pa-video-player/commit/5fdea4a4f57ed14064036891660eadb5c6b5e3a6))
+
+
+### Bug Fixes
+
+* address code review findings on showUnverifiedIdentity ([8f77883](https://github.com/Security4Media/c2pa-video-player/commit/8f77883826316753a65b98e69004bb2fd7a50c7f))
+* polish hero credits (EBU SVG mark, trimmed Unified Streaming logo, relabel partners row) ([92a9cc4](https://github.com/Security4Media/c2pa-video-player/commit/92a9cc4f35cda6106960842294393fe676889213))
+* populate server video dropdown via runtime manifest in Docker image ([47311f9](https://github.com/Security4Media/c2pa-video-player/commit/47311f913c44117aaf713b4fcf065802b734f303))
+* remove stray comment contradicting withheldIdentityHint in segment view ([8ea1732](https://github.com/Security4Media/c2pa-video-player/commit/8ea1732241edda10c343a2332c15d7d0a7a59791))
+
 ## [1.2.0](https://github.com/Security4Media/c2pa-video-player/compare/v1.1.0...v1.2.0) (2026-09-07)
 
 
