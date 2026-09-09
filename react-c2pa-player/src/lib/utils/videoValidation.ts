@@ -16,6 +16,8 @@
 
 // Video validation constants and utilities
 
+import type { VideoMode } from '../types/player.types';
+
 export const VIDEO_FORMATS = {
   MP4: 'video/mp4',
   WEBM: 'video/webm',
@@ -117,6 +119,19 @@ export function parseVideoSelection(value: string): { filename: string; source: 
 /**
  * Builds video selection value (format: "filename|source")
  */
-export function buildVideoSelectionValue(filename: string, source: 'local' | 'server'): string {
+export function buildVideoSelectionValue(filename: string, source: VideoMode): string {
   return `${filename}|${source}`;
+}
+
+const SOURCE_ICONS: Record<VideoMode, string> = {
+  local: '📁 ',
+  server: '🌐 ',
+  live: '🔴 ',
+};
+
+/**
+ * Returns the emoji prefix used to denote a video's source in lists/labels
+ */
+export function getSourceIcon(source: VideoMode): string {
+  return SOURCE_ICONS[source] ?? '';
 }

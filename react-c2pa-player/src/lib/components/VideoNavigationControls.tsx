@@ -16,6 +16,7 @@
 
 import { memo, useMemo } from 'react';
 import type { VideoItem } from './VideoLoader';
+import { getSourceIcon } from '../utils/videoValidation';
 import './VideoNavigationControls.css';
 
 interface VideoNavigationControlsProps {
@@ -84,7 +85,7 @@ export const VideoNavigationControls = memo(function VideoNavigationControls({
           <span className="nav-label">Previous</span>
           {previousVideo && (
             <span className="nav-video-name">
-              {previousVideo.source === 'local' ? '📁 ' : '🌐 '}
+              {getSourceIcon(previousVideo.source)}
               {previousVideo.name}
             </span>
           )}
@@ -101,7 +102,7 @@ export const VideoNavigationControls = memo(function VideoNavigationControls({
           <span className="nav-label">Next</span>
           {nextVideo && (
             <span className="nav-video-name">
-              {nextVideo.source === 'local' ? '📁 ' : '🌐 '}
+              {getSourceIcon(nextVideo.source)}
               {nextVideo.name}
             </span>
           )}

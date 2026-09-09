@@ -15,46 +15,52 @@
  */
 
 import { memo } from 'react';
+import type { VideoMode } from '../types/player.types';
 import './VideoModeSwitcher.css';
 
 interface VideoModeSwitcherProps {
-  currentMode: 'server' | 'local';
-  onToggle: () => void;
+  currentMode: VideoMode;
+  onSelect: (mode: VideoMode) => void;
   hasServerVideos: boolean;
   hasLocalVideos: boolean;
+  hasLiveVideos: boolean;
 }
 
+const TABS: Array<{ mode: VideoMode; label: string }> = [
+  { mode: 'server', label: '🌐 Server' },
+  { mode: 'local', label: '📁 Local' },
+  { mode: 'live', label: '🔴 Live' },
+];
+
 /**
- * Toggle switch for switching between server and local video modes
- * Only shows when both modes have available videos
+ * Switcher between server, local, and live video modes.
+ * A tab is disabled (not hidden) once its mode has no available videos.
  */
 export const VideoModeSwitcher = memo(function VideoModeSwitcher({
   currentMode,
-  onToggle,
+  onSelect,
   hasServerVideos,
   hasLocalVideos,
+  hasLiveVideos,
 }: VideoModeSwitcherProps) {
-  // Only show if both modes have videos
-  if (!hasServerVideos || !hasLocalVideos) {
-    return null;
-  }
+  const availability: Record<VideoMode, boolean> = {
+    server: hasServerVideos,
+    local: hasLocalVideos,
+    live: hasLiveVideos,
+  };
 
   return (
     <div className="video-mode-switcher">
-      <button
-        className={`mode-btn ${currentMode === 'server' ? 'active' : ''}`}
-        onClick={currentMode === 'local' ? onToggle : undefined}
-        disabled={currentMode === 'server'}
-      >
-        🌐 Server Videos
-      </button>
-      <button
-        className={`mode-btn ${currentMode === 'local' ? 'active' : ''}`}
-        onClick={currentMode === 'server' ? onToggle : undefined}
-        disabled={currentMode === 'local'}
-      >
-        📁 Local Videos
-      </button>
+      {TABS.map(({ mode, label }) => (
+        <button
+          key={mode}
+          className={`mode-btn ${currentMode === mode ? 'active' : ''}`}
+          onClick={currentMode === mode ? undefined : () => onSelect(mode)}
+          disabled={currentMode === mode || !availability[mode]}
+        >
+          {label}
+        </button>
+      ))}
     </div>
   );
 });
