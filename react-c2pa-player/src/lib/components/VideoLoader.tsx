@@ -16,11 +16,13 @@
 
 import { memo, useCallback, useEffect } from 'react';
 import { useVideoUpload } from '../hooks/useVideoUpload';
+import type { VideoMode } from '../types/player.types';
+import { getSourceIcon } from '../utils/videoValidation';
 import './VideoLoader.css';
 
 export interface VideoItem {
   name: string;
-  source: 'local' | 'server';
+  source: VideoMode;
 }
 
 interface VideoLoaderProps {
@@ -280,7 +282,7 @@ export const VideoLoader = memo(function VideoLoader({
           <option value="">Select a video...</option>
           {availableVideos.map((video) => (
             <option key={`${video.name}|${video.source}`} value={`${video.name}|${video.source}`}>
-              {video.source === 'local' ? '📁 ' : '🌐 '}
+              {getSourceIcon(video.source)}
               {video.name}
             </option>
           ))}

@@ -57,6 +57,10 @@
   cursor: default;
 }
 
+.mode-btn:disabled:not(.active) {
+  opacity: 0.45;
+}
+
 /* Responsive Design */
 @media (max-width: 768px) {
   .mode-btn {

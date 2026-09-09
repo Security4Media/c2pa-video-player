@@ -24,6 +24,7 @@ import {
   parseVideoSelection,
   UPLOAD_CONFIG,
 } from '../utils/videoValidation';
+import { LIVE_STREAMS } from '../constants/liveStreams';
 
 interface UploadProgress {
   isLoading: boolean;
@@ -213,6 +214,16 @@ export function useVideoUpload({
         const blobUrl = createBlobUrl(file);
         const displayName = getVideoDisplayLabel(file);
         onVideoLoad(blobUrl, displayName, videoKey);
+      } else if (source === 'live') {
+        // Load from the curated live-stream list
+        const stream = LIVE_STREAMS.find((entry) => entry.name === filename);
+
+        if (!stream) {
+          onError(`Live stream "${filename}" not found`);
+          return;
+        }
+
+        onVideoLoad(stream.url, stream.url, videoKey);
       } else {
         // Load from server
         const serverPath = `${import.meta.env.BASE_URL}/mp4s/${filename}`;
