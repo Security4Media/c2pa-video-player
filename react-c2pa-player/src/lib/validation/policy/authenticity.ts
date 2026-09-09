@@ -24,14 +24,14 @@
  * permanent badge over live output. Those are different editorial decisions and
  * neither implies the other, so they are read independently.
  *
- * Both default off, so no existing deployment changes behaviour by upgrading.
- * Query string only, following `?trust=`, `?window=` and `?gate=`: there is no
- * UI surface for any of those, and adding one for these would be the first.
+ * The label defaults on; consent mode defaults to `whole-asset`, unchanged
+ * from before either switch existed. Query string only, following `?trust=`,
+ * `?window=` and `?gate=`: there is no UI surface for any of those, and
+ * adding one for these would be the first.
  *
- * Unlike `?gate=off`, which fails *closed* on a typo because it disables a
- * protection, these fail closed by defaulting off: a mistyped value leaves the
- * player as it is today rather than putting something unexpected over the
- * picture.
+ * Like `?gate=off`, `?label=off` fails *closed* on a typo: only the exact
+ * value `off` disables the label, so a mistyped value leaves it showing
+ * rather than silently hiding it.
  */
 
 import type { ConsentMode } from '../types';
@@ -40,19 +40,19 @@ const currentSearch = () =>
   typeof window === 'undefined' ? undefined : window.location.search;
 
 /**
- * Reads `?label=on`.
+ * Reads `?label=off`.
  *
- * Only `on` enables it. Anything else, including a typo, leaves the picture
- * clear.
+ * On by default. Only the exact value `off` disables it, since a mistyped
+ * value should leave the label showing rather than silently hide it.
  */
 export function resolveShowAuthenticityLabel(
   search: string | undefined = currentSearch(),
 ): boolean {
   if (!search) {
-    return false;
+    return true;
   }
 
-  return new URLSearchParams(search).get('label') === 'on';
+  return new URLSearchParams(search).get('label') !== 'off';
 }
 
 /**

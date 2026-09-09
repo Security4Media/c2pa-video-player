@@ -121,14 +121,14 @@ panel just reads and writes it.
 | `?trust=<profile>` | `full-prod` | Swaps the trust material for one of the profiles in `policy/trustFixtures.ts`, so trusted / valid / untrusted outcomes can be shown on one file. Unrecognised values fall back to the shipped policy, which is the safe direction: a typo loses the diagnostic, never the trust policy. See the table below. |
 | `?window=<seconds>` | 300 | How much of a live stream the player remembers: the width of the timeline window, the retained validation history, and the failure retention in the validation log. Values under 60 are ignored. Live only — see note below. |
 | `?gate=off` | on | Turns off the validated-playback gate, which otherwise holds the picture rather than show live content whose verdict has not arrived. Only the exact value `off` disables it, since a switch that fails open on a typo is the wrong way round for a protection. Live only — see note below. |
-| `?label=on` | off | Shows the authenticity label in the top-right of the picture, stating the provenance of the moment on screen. Green "Authenticity established" and blue "Valid" collapse to a dot after five seconds; red "Invalid Authenticity" and grey "Unknown provenance" stay expanded and pulse. Clicking it pauses and opens the Content Credentials panel. |
+| `?label=off` | on | Shows the authenticity label in the top-right of the picture, stating the provenance of the moment on screen. Green "Authenticity established" and blue "Valid" collapse to a dot after five seconds; red "Invalid Authenticity" and grey "Unknown provenance" stay expanded and pulse. Clicking it pauses and opens the Content Credentials panel. |
 | `?consent=per-stream` | `whole-asset` | Asks once, the first time invalid content is actually played, and never again for that source. The overlay says outright that this is the only warning. |
 | `?consent=per-run` | `whole-asset` | Asks once per contiguous stretch of invalid content, so a second bad stretch stops the picture again. |
 | `?monolithicEngine=c2pa-web` | `nettrek` | Swaps the monolithic MP4 validation runtime from the shipped bridge-based one to an independent runtime that calls `@contentauth/c2pa-web` directly (see `runtimes/monolithicC2paWebRuntime.ts`). Has no effect on HLS/DASH. |
 | `?identityTrust=strict` | `relaxed` | Tightens Organization/Publisher Identity, Copyright, AI opt-out, and Creator so each requires an exactly `Trusted` `cawg.identity` before showing anything. The default, `relaxed`, additionally shows those sections for a `Valid` (structurally verified but not on this player's trusted-anchor list) identity; Creator alone also shows `Unknown` (nothing checked) under `relaxed`, unchanged from before this switch existed. |
 | `?showCreativeWork=off` | on | Hides everything derived from the `stds.schema-org.CreativeWork` assertion: Organization Details, About the Producer (authors/organization name), and Organization Identity's Published-on/License lines. Does not affect Copyright, which is `cawg.metadata`-derived, or `?identityTrust=`, which is orthogonal. |
 | `?showUnverifiedIdentity=on`/`=off` | live: on, VOD: off | Lets Organization/Publisher Identity, Copyright, and AI opt-out render for an `'Unknown'` `cawg.identity` verdict — declared but never checked against a trust anchor, which is every verdict live DASH produces (`@qualabs/c2pa-live-dashjs-plugin` performs no identity/trust check at all) and is otherwise a transient pre-verdict state elsewhere. Also gates the same Dublin Core fields (title/publisher/rights) in the timeline hover preview, so the two surfaces agree. A no-op under `?identityTrust=strict`, which never admits `'Unknown'` either way. When off and there's content behind an `'Unknown'` identity, the menu shows a muted hint that something is being withheld, without revealing it. |
-| `?issuerColors=on` | off | Paints each valid timeline segment (and the authenticity label, when shown) by which issuer signed it, instead of the shared Valid/Trusted colour — so a stream that rotates between signers is easy to tell apart at a glance. Issuers get a colour from a small blue-ish palette in the order they're first seen this session; invalid stays red and unknown provenance stays grey regardless. Live only — see note below. |
+| `?issuerColors=off` | on | Paints each valid timeline segment (and the authenticity label, when shown) by which issuer signed it, instead of the shared Valid/Trusted colour — so a stream that rotates between signers is easy to tell apart at a glance. Issuers get a colour from a small blue-ish palette in the order they're first seen this session; invalid stays red and unknown provenance stays grey regardless. Live only — see note below. |
 
 `?window=`, `?gate=` and `?issuerColors=` only ever affect a live source —
 all are no-ops on VOD (`validatedPlaybackGate.ts`, `liveResume.ts`, a VOD
@@ -214,7 +214,7 @@ retains, after which that stretch is never asked about again (otherwise
 withdrawing at a live edge still inside the bad content would ask and withdraw
 forever).
 
-`?label=on` and `?consent=` are independent. A deployment may want to state
+`?label=` and `?consent=` are independent. A deployment may want to state
 provenance continuously without interrupting the viewer, or interrupt on bad
 content without leaving a permanent badge over live output; those are different
 editorial decisions and neither implies the other.
@@ -307,6 +307,10 @@ against its signing time, and an otherwise sound signature by a since-expired
 certificate reads as Valid rather than Trusted. That is what `trust/tsa/` is
 for. TSA trust is anchor-only and gated on `id-kp-timeStamping`, so a
 timestamp authority cannot be allow-listed into trust, only anchored.
+
+## Credits
+
+Manifest validation is provided by third-party engines, each covering the source kind described in [Architecture](#architecture) above: [`@qualabs/c2pa-live-dashjs-plugin`](https://www.npmjs.com/package/@qualabs/c2pa-live-dashjs-plugin?activeTab=versions) (Qualabs) for live DASH, [`@nettrek/c2pa-hls-bridge`](https://www.npmjs.com/package/@nettrek/c2pa-hls-bridge) and [`@nettrek/c2pa-web-crypto`](https://www.npmjs.com/package/@nettrek/c2pa-web-crypto) (Nettrek) for HLS and the default monolithic MP4 engine, and [`@contentauth/c2pa-web`](https://www.npmjs.com/package/@contentauth/c2pa-web) (Content Authenticity Initiative) for the alternate monolithic MP4 engine (`?monolithicEngine=c2pa-web`).
 
 ## License
 

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   DEFAULT_LIVE_RETENTION_SECONDS,
   MIN_LIVE_WINDOW_SECONDS,
@@ -78,6 +78,27 @@ const ICA_TRUST_PROFILES: { value: IcaTrustFixtureName | 'full-prod'; label: str
   { value: 'wrong-issuer', label: 'wrong-issuer' },
 ];
 
+// The shipped defaults for every switch below, i.e. what a deployment gets
+// with no query string at all. Used only to compute the "changed from
+// default" count and to drive "Reset to defaults" - not read anywhere else,
+// so keeping this list in sync with the README's "Runtime parameters" table
+// is only load-bearing for those two things.
+const DEFAULT_LABEL = true;
+const DEFAULT_IDENTITY_TRUST_RELAXED = true;
+const DEFAULT_SHOW_CREATIVE_WORK = true;
+// Demo-only default, deliberately not the shipped library default (which is
+// live-vs-VOD dependent - see resolveShowUnverifiedIdentity). The demo wants
+// unverified identity info visible from the start regardless of source, so
+// the panel seeds ?showUnverifiedIdentity=on on mount unless something has
+// already set it explicitly - see the effect below.
+const DEFAULT_SHOW_UNVERIFIED_IDENTITY = true;
+const DEFAULT_CONSENT: ConsentMode = 'whole-asset';
+const DEFAULT_TRUST: TrustFixtureName | 'full-prod' = 'full-prod';
+const DEFAULT_ICA_TRUST: IcaTrustFixtureName | 'full-prod' = 'full-prod';
+const DEFAULT_ENGINE: MonolithicEngine = 'nettrek';
+const DEFAULT_GATE_ENABLED = true;
+const DEFAULT_ISSUER_COLORS = true;
+
 /**
  * Visual controls for the query-string switches documented in the top-level
  * README's "Runtime parameters" table. Previously URL-only - see that table
@@ -106,9 +127,9 @@ export function PlayerConfigPanel({ mediaSource, onApply }: PlayerConfigPanelPro
   // Not live-aware at mount, unlike the resolver it mirrors: `mediaSource`
   // only tells us the format, and this panel's own `isLiveCapableFormat`
   // below (computed from the same source) is itself an approximation, not
-  // "is playback live right now". Defaulting to unchecked keeps the control
-  // honest about what it actually knows; the query string, once touched,
-  // still overrides the real (live-aware) default wherever it's read.
+  // "is playback live right now". Starts honest about what it actually knows
+  // (the library's real live-vs-VOD default); the mount effect below then
+  // seeds the demo's own always-on preference unless already overridden.
   const [showUnverifiedIdentity, setShowUnverifiedIdentity] = useState<boolean>(
     () => resolveShowUnverifiedIdentity(false)
   );
@@ -129,10 +150,23 @@ export function PlayerConfigPanel({ mediaSource, onApply }: PlayerConfigPanelPro
   // own runtimes regardless of this setting.
   const isMonolithicFormat = adapterKind === 'monolithic';
 
+  // Demo-only default: seeds ?showUnverifiedIdentity=on once, on mount, but
+  // only if nothing has set it yet - an explicit ?showUnverifiedIdentity=off
+  // in the URL (or a shared link) still wins, same as any other override.
+  // Runs once; not meant to react to later changes, which the handler below
+  // already owns.
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('showUnverifiedIdentity') === null) {
+      setShowUnverifiedIdentity(true);
+      applyParam('showUnverifiedIdentity', 'on');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const handleLabelChange = useCallback(
     (checked: boolean) => {
       setLabel(checked);
-      applyParam('label', checked ? 'on' : null);
+      applyParam('label', checked ? null : 'off');
       onApply();
     },
     [onApply]
@@ -226,147 +260,277 @@ export function PlayerConfigPanel({ mediaSource, onApply }: PlayerConfigPanelPro
   const handleIssuerColorsChange = useCallback(
     (checked: boolean) => {
       setIssuerColors(checked);
-      applyParam('issuerColors', checked ? 'on' : null);
+      applyParam('issuerColors', checked ? null : 'off');
       onApply();
     },
     [onApply]
   );
 
+  // Resets every switch to the shipped default in one go: all eleven local
+  // states, all eleven URL params, one single onApply() (not eleven) so the
+  // current video reloads once rather than repeatedly.
+  const handleResetAll = useCallback(() => {
+    setLabel(DEFAULT_LABEL);
+    setIdentityTrustRelaxed(DEFAULT_IDENTITY_TRUST_RELAXED);
+    setShowCreativeWork(DEFAULT_SHOW_CREATIVE_WORK);
+    setShowUnverifiedIdentity(DEFAULT_SHOW_UNVERIFIED_IDENTITY);
+    setConsent(DEFAULT_CONSENT);
+    setTrust(DEFAULT_TRUST);
+    setIcaTrust(DEFAULT_ICA_TRUST);
+    setEngine(DEFAULT_ENGINE);
+    setWindowSeconds(DEFAULT_LIVE_RETENTION_SECONDS);
+    setGateEnabled(DEFAULT_GATE_ENABLED);
+    setIssuerColors(DEFAULT_ISSUER_COLORS);
+
+    applyParam('label', null);
+    applyParam('identityTrust', null);
+    applyParam('showCreativeWork', null);
+    // Explicit 'on', not a clear: the demo's own default (see
+    // DEFAULT_SHOW_UNVERIFIED_IDENTITY above), not the shipped library's
+    // live-vs-VOD default that a cleared param would fall back to.
+    applyParam('showUnverifiedIdentity', 'on');
+    applyParam('consent', null);
+    applyParam('trust', null);
+    applyParam('icaTrust', null);
+    applyParam('monolithicEngine', null);
+    applyParam('window', null);
+    applyParam('gate', null);
+    applyParam('issuerColors', null);
+
+    onApply();
+  }, [onApply]);
+
+  const changedCount = useMemo(() => {
+    let count = 0;
+    if (label !== DEFAULT_LABEL) count += 1;
+    if (identityTrustRelaxed !== DEFAULT_IDENTITY_TRUST_RELAXED) count += 1;
+    if (showCreativeWork !== DEFAULT_SHOW_CREATIVE_WORK) count += 1;
+    if (showUnverifiedIdentity !== DEFAULT_SHOW_UNVERIFIED_IDENTITY) count += 1;
+    if (consent !== DEFAULT_CONSENT) count += 1;
+    if (trust !== DEFAULT_TRUST) count += 1;
+    if (icaTrust !== DEFAULT_ICA_TRUST) count += 1;
+    if (engine !== DEFAULT_ENGINE) count += 1;
+    if (windowSeconds !== DEFAULT_LIVE_RETENTION_SECONDS) count += 1;
+    if (gateEnabled !== DEFAULT_GATE_ENABLED) count += 1;
+    if (issuerColors !== DEFAULT_ISSUER_COLORS) count += 1;
+    return count;
+  }, [
+    label,
+    identityTrustRelaxed,
+    showCreativeWork,
+    showUnverifiedIdentity,
+    consent,
+    trust,
+    icaTrust,
+    engine,
+    windowSeconds,
+    gateEnabled,
+    issuerColors,
+  ]);
+
   return (
     <div className="player-config-panel">
-      <h3>Player Config</h3>
-      <p className="player-config-panel__hint">
-        Diagnostic switches from the README&apos;s &quot;Runtime parameters&quot; table. Hover a
-        control for details. Changing one reloads the current video.
-      </p>
-      <div className="player-config-grid">
-        <label
-          className="player-config-control player-config-control--checkbox"
-          title="Shows the authenticity label in the top-right of the picture, stating the provenance of the moment on screen. Off by default. (?label=on)"
-        >
-          <input
-            type="checkbox"
-            checked={label}
-            onChange={(event) => handleLabelChange(event.target.checked)}
-          />
-          Authenticity label
-        </label>
+      <div className="player-config-panel__header">
+        <div>
+          <h3>Player Config</h3>
+          <p className="player-config-panel__hint">
+            Each control mirrors a query-string switch from the README&apos;s &quot;Runtime
+            parameters&quot; table. Hover a control for the full detail. Changing one reloads the
+            current video.
+          </p>
+        </div>
+        {changedCount > 0 && (
+          <div className="player-config-panel__status">
+            <span>
+              {changedCount} {changedCount === 1 ? 'setting' : 'settings'} changed from default
+            </span>
+            <button type="button" onClick={handleResetAll}>
+              Reset to defaults
+            </button>
+          </div>
+        )}
+      </div>
 
-        <label
-          className="player-config-control player-config-control--checkbox"
-          title="Shows organization/publisher, copyright, AI opt-out, and Creator information for an identity that is only Valid (structurally verified but not on this player's trusted-anchor list), not just Trusted. On by default. Unchecking sets ?identityTrust=strict, which also tightens Creator to Trusted-only. (?identityTrust=strict when unchecked)"
-        >
-          <input
-            type="checkbox"
-            checked={identityTrustRelaxed}
-            onChange={(event) => handleIdentityTrustChange(event.target.checked)}
-          />
-          Show info for Valid (not just Trusted) identities
-        </label>
-
-        <label
-          className="player-config-control player-config-control--checkbox"
-          title="Shows information derived from the stds.schema-org.CreativeWork assertion: Organization Details, About the Producer (authors/organization name), and Organization Identity's Published-on/License lines. On by default. Does not affect Copyright, which is cawg.metadata-derived. (?showCreativeWork=off when unchecked)"
-        >
-          <input
-            type="checkbox"
-            checked={showCreativeWork}
-            onChange={(event) => handleShowCreativeWorkChange(event.target.checked)}
-          />
-          Show CreativeWork information
-        </label>
-
-        <label
-          className="player-config-control player-config-control--checkbox"
-          title="Shows organization/publisher identity, copyright, and AI-usage information for identities this player could not verify (e.g., live DASH via the Qualabs plugin, which performs no trust-anchor check). On by default for live streams, off for on-demand. (?showUnverifiedIdentity=on/off)"
-        >
-          <input
-            type="checkbox"
-            checked={showUnverifiedIdentity}
-            onChange={(event) => handleShowUnverifiedIdentityChange(event.target.checked)}
-          />
-          Show unverified organization/copyright info
-        </label>
-
-        <label
-          className="player-config-control"
-          title="Where the consent question is raised: once per source, only if already known bad (whole-asset, default); the first time invalid content plays (per-stream); or once per contiguous invalid stretch (per-run). (?consent=)"
-        >
-          Consent mode
-          <select
-            value={consent}
-            onChange={(event) => handleConsentChange(event.target.value as ConsentMode)}
+      <div className="player-config-section">
+        <h4 className="player-config-section__heading">Display</h4>
+        <div className="player-config-grid">
+          <label
+            className="player-config-control player-config-control--checkbox"
+            title="Shows the authenticity label in the top-right of the picture, stating the provenance of the moment on screen. On by default. (?label=off when unchecked)"
           >
-            <option value="whole-asset">whole-asset (default)</option>
-            <option value="per-stream">per-stream</option>
-            <option value="per-run">per-run</option>
-          </select>
-        </label>
+            <input
+              type="checkbox"
+              checked={label}
+              onChange={(event) => handleLabelChange(event.target.checked)}
+            />
+            <span className="player-config-control__text">
+              <span className="player-config-control__label">Authenticity label</span>
+              <span className="player-config-control__hint">
+                Shows a provenance badge over the picture.
+              </span>
+            </span>
+          </label>
 
-        <label
-          className="player-config-control"
-          title="Swaps the trust material for one of these profiles, so trusted / valid / untrusted outcomes can be shown on the same file. Unrecognised values fall back to full-prod. (?trust=)"
-        >
-          Trust profile
-          <select
-            value={trust}
-            onChange={(event) =>
-              handleTrustChange(event.target.value as TrustFixtureName | 'full-prod')
-            }
+          <label
+            className="player-config-control player-config-control--checkbox"
+            title="Shows organization/publisher, copyright, AI opt-out, and Creator information for an identity that is only Valid (structurally verified but not on this player's trusted-anchor list), not just Trusted. On by default. Unchecking sets ?identityTrust=strict, which also tightens Creator to Trusted-only. (?identityTrust=strict when unchecked)"
           >
-            {TRUST_PROFILES.map((profile) => (
-              <option key={profile.value} value={profile.value}>
-                {profile.label}
-              </option>
-            ))}
-          </select>
-        </label>
+            <input
+              type="checkbox"
+              checked={identityTrustRelaxed}
+              onChange={(event) => handleIdentityTrustChange(event.target.checked)}
+            />
+            <span className="player-config-control__text">
+              <span className="player-config-control__label">
+                Show info for Valid (not just Trusted) identities
+              </span>
+              <span className="player-config-control__hint">
+                Also shows identity details for structurally valid, not just trusted, signers.
+              </span>
+            </span>
+          </label>
 
-        <label
-          className="player-config-control"
-          title="Which DIDs this player trusts as issuers of CAWG Identity Claims Aggregation (ICA) credentials - a separate, app-level trust list, since the C2PA engine has no DID trust-anchor concept of its own. Unrecognised values fall back to full-prod. (?icaTrust=)"
-        >
-          ICA issuer trust profile
-          <select
-            value={icaTrust}
-            onChange={(event) =>
-              handleIcaTrustChange(event.target.value as IcaTrustFixtureName | 'full-prod')
-            }
+          <label
+            className="player-config-control player-config-control--checkbox"
+            title="Shows information derived from the stds.schema-org.CreativeWork assertion: Organization Details, About the Producer (authors/organization name), and Organization Identity's Published-on/License lines. On by default. Does not affect Copyright, which is cawg.metadata-derived. (?showCreativeWork=off when unchecked)"
           >
-            {ICA_TRUST_PROFILES.map((profile) => (
-              <option key={profile.value} value={profile.value}>
-                {profile.label}
-              </option>
-            ))}
-          </select>
-        </label>
+            <input
+              type="checkbox"
+              checked={showCreativeWork}
+              onChange={(event) => handleShowCreativeWorkChange(event.target.checked)}
+            />
+            <span className="player-config-control__text">
+              <span className="player-config-control__label">Show CreativeWork information</span>
+              <span className="player-config-control__hint">
+                Shows organization, producer and license details from the asset.
+              </span>
+            </span>
+          </label>
 
-        <label
-          className="player-config-control"
-          title="Which runtime validates a monolithic MP4 file. 'nettrek' (default) is the shipped bridge-based runtime, also used for HLS. 'c2pa-web' is an independent runtime that calls @contentauth/c2pa-web directly. Only applies to a monolithic (MP4) source. (?monolithicEngine=)"
-        >
-          Monolithic engine
-          <select
-            value={engine}
-            disabled={!isMonolithicFormat}
-            onChange={(event) => handleEngineChange(event.target.value as MonolithicEngine)}
+          <label
+            className="player-config-control player-config-control--checkbox"
+            title="Shows organization/publisher identity, copyright, and AI-usage information for identities this player could not verify (e.g., live DASH via the Qualabs plugin, which performs no trust-anchor check). On by default in this demo, for both live and on-demand sources - the shipped library instead defaults live: on, VOD: off (see the README). (?showUnverifiedIdentity=on/off)"
           >
-            <option value="nettrek">nettrek (default)</option>
-            <option value="c2pa-web">c2pa-web (standalone)</option>
-          </select>
-        </label>
+            <input
+              type="checkbox"
+              checked={showUnverifiedIdentity}
+              onChange={(event) => handleShowUnverifiedIdentityChange(event.target.checked)}
+            />
+            <span className="player-config-control__text">
+              <span className="player-config-control__label">
+                Show unverified organization/copyright info
+              </span>
+              <span className="player-config-control__hint">
+                Shows identity details even when they couldn&apos;t be checked against a trust
+                anchor.
+              </span>
+            </span>
+          </label>
+        </div>
+      </div>
+
+      <div className="player-config-section player-config-section--elevated">
+        <h4 className="player-config-section__heading">Trust &amp; validation</h4>
+        <p className="player-config-section__note">
+          These change what counts as a valid or trusted signer, not just what&apos;s shown.
+        </p>
+        <div className="player-config-grid">
+          <label
+            className="player-config-control"
+            title="Where the consent question is raised: once per source, only if already known bad (whole-asset, default); the first time invalid content plays (per-stream); or once per contiguous invalid stretch (per-run). (?consent=)"
+          >
+            <span className="player-config-control__label">Consent mode</span>
+            <span className="player-config-control__hint">
+              When to ask before playing unverified content.
+            </span>
+            <select
+              value={consent}
+              onChange={(event) => handleConsentChange(event.target.value as ConsentMode)}
+            >
+              <option value="whole-asset">whole-asset (default)</option>
+              <option value="per-stream">per-stream</option>
+              <option value="per-run">per-run</option>
+            </select>
+          </label>
+
+          <label
+            className="player-config-control"
+            title="Swaps the trust material for one of these profiles, so trusted / valid / untrusted outcomes can be shown on the same file. Unrecognised values fall back to full-prod. (?trust=)"
+          >
+            <span className="player-config-control__label">Trust profile</span>
+            <span className="player-config-control__hint">Which certificates count as trusted.</span>
+            <select
+              value={trust}
+              onChange={(event) =>
+                handleTrustChange(event.target.value as TrustFixtureName | 'full-prod')
+              }
+            >
+              {TRUST_PROFILES.map((profile) => (
+                <option key={profile.value} value={profile.value}>
+                  {profile.label}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label
+            className="player-config-control"
+            title="Which DIDs this player trusts as issuers of CAWG Identity Claims Aggregation (ICA) credentials - a separate, app-level trust list, since the C2PA engine has no DID trust-anchor concept of its own. Unrecognised values fall back to full-prod. (?icaTrust=)"
+          >
+            <span className="player-config-control__label">ICA issuer trust profile</span>
+            <span className="player-config-control__hint">
+              Which issuers this player trusts for identity credentials.
+            </span>
+            <select
+              value={icaTrust}
+              onChange={(event) =>
+                handleIcaTrustChange(event.target.value as IcaTrustFixtureName | 'full-prod')
+              }
+            >
+              {ICA_TRUST_PROFILES.map((profile) => (
+                <option key={profile.value} value={profile.value}>
+                  {profile.label}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label
+            className="player-config-control"
+            title="Which runtime validates a monolithic MP4 file. 'nettrek' (default) is the shipped bridge-based runtime, also used for HLS. 'c2pa-web' is an independent runtime that calls @contentauth/c2pa-web directly. Only applies to a monolithic (MP4) source. (?monolithicEngine=)"
+          >
+            <span className="player-config-control__label">Monolithic engine</span>
+            <span className="player-config-control__hint">Which engine validates MP4 files.</span>
+            <select
+              value={engine}
+              disabled={!isMonolithicFormat}
+              onChange={(event) => handleEngineChange(event.target.value as MonolithicEngine)}
+            >
+              <option value="nettrek">nettrek (default)</option>
+              <option value="c2pa-web">c2pa-web (standalone)</option>
+            </select>
+          </label>
+        </div>
       </div>
 
       <fieldset className="player-config-subsection" disabled={!isLiveCapableFormat}>
         <legend title="These only take effect on a live HLS/DASH source. Enabled here by format, not by confirmed liveness: whether a loaded HLS/DASH file actually is live is only known once its manifest is parsed.">
           Live-only settings
         </legend>
+        {!isLiveCapableFormat && (
+          <p className="player-config-subsection__note">
+            Load a live HLS or DASH stream to use these.
+          </p>
+        )}
         <div className="player-config-grid">
           <label
             className="player-config-control"
             title={`How much of a live stream the player remembers: the timeline window, retained validation history, and failure log retention, in seconds. Values under ${MIN_LIVE_WINDOW_SECONDS} are ignored. Only applies to a live HLS/DASH source. (?window=)`}
           >
-            Live retention window (s)
+            <span className="player-config-control__label">Live retention window (s)</span>
+            <span className="player-config-control__hint">
+              How much of the live stream the player remembers.
+            </span>
             <input
               type="number"
               min={MIN_LIVE_WINDOW_SECONDS}
@@ -386,12 +550,17 @@ export function PlayerConfigPanel({ mediaSource, onApply }: PlayerConfigPanelPro
               disabled={!isLiveCapableFormat}
               onChange={(event) => handleGateChange(event.target.checked)}
             />
-            Validated-playback gate
+            <span className="player-config-control__text">
+              <span className="player-config-control__label">Validated-playback gate</span>
+              <span className="player-config-control__hint">
+                Holds the picture until a live segment&apos;s verdict arrives.
+              </span>
+            </span>
           </label>
 
           <label
             className="player-config-control player-config-control--checkbox"
-            title="Paints each valid segment by which issuer signed it, instead of the shared Valid/Trusted colour - so a stream that rotates between signers is easy to tell apart at a glance. Issuers get a colour in the order they're first seen this session. Invalid stays red and unknown provenance stays grey either way. Off by default. Only applies to a live HLS/DASH source. (?issuerColors=on)"
+            title="Paints each valid segment by which issuer signed it, instead of the shared Valid/Trusted colour - so a stream that rotates between signers is easy to tell apart at a glance. Issuers get a colour in the order they're first seen this session. Invalid stays red and unknown provenance stays grey either way. On by default. Only applies to a live HLS/DASH source. (?issuerColors=off when unchecked)"
           >
             <input
               type="checkbox"
@@ -399,7 +568,12 @@ export function PlayerConfigPanel({ mediaSource, onApply }: PlayerConfigPanelPro
               disabled={!isLiveCapableFormat}
               onChange={(event) => handleIssuerColorsChange(event.target.checked)}
             />
-            Colorize by issuer
+            <span className="player-config-control__text">
+              <span className="player-config-control__label">Colorize by issuer</span>
+              <span className="player-config-control__hint">
+                Paints each valid segment by which issuer signed it.
+              </span>
+            </span>
           </label>
         </div>
       </fieldset>

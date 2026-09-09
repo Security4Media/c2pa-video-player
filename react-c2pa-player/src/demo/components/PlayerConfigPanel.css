@@ -23,7 +23,16 @@
   box-shadow: var(--shadow-sm);
 }
 
+.player-config-panel__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-md);
+}
+
 .player-config-panel h3 {
+  font-family: var(--font-family-display);
   font-size: var(--font-size-lg);
   font-weight: var(--font-weight-semibold);
   color: var(--color-foreground);
@@ -33,7 +42,83 @@
 .player-config-panel__hint {
   font-size: var(--font-size-sm);
   color: var(--color-foreground-muted);
-  margin-bottom: var(--space-lg);
+  max-width: 60ch;
+}
+
+/* Shown only once at least one control has left its shipped default -
+   the whole point is to make an easy-to-lose-track-of state visible, not
+   to occupy space when nothing has changed. */
+.player-config-panel__status {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  flex-shrink: 0;
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+}
+
+.player-config-panel__status span {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-foreground-muted);
+  white-space: nowrap;
+}
+
+.player-config-panel__status button {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  font-family: var(--font-family-base);
+  color: var(--color-primary);
+  background: none;
+  border: none;
+  padding: var(--space-xs) var(--space-sm);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.player-config-panel__status button:hover {
+  background: var(--color-surface-variant);
+}
+
+.player-config-panel__status button:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 var(--ring-width) var(--ring-color);
+}
+
+.player-config-section {
+  margin-top: var(--space-lg);
+}
+
+.player-config-section:first-of-type {
+  margin-top: var(--space-md);
+}
+
+.player-config-section__heading {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-foreground-muted);
+  margin-bottom: var(--space-sm);
+}
+
+.player-config-section__note {
+  font-size: var(--font-size-sm);
+  color: var(--color-foreground-muted);
+  margin: calc(-1 * var(--space-xs)) 0 var(--space-md);
+  max-width: 60ch;
+}
+
+/* Marks a section whose controls change what a verdict means (not just what
+   is displayed) - the same card treatment as the live-only fieldset below,
+   deliberately without its red accent, which stays reserved for "only
+   available on a live source" rather than "consequential". */
+.player-config-section--elevated {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  padding: var(--space-lg);
 }
 
 .player-config-grid {
@@ -50,6 +135,17 @@
   font-weight: var(--font-weight-semibold);
   color: var(--color-foreground);
   min-width: 180px;
+}
+
+.player-config-control__label {
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-foreground);
+}
+
+.player-config-control__hint {
+  font-weight: var(--font-weight-normal);
+  font-size: var(--font-size-xs);
+  color: var(--color-foreground-muted);
 }
 
 .player-config-control select,
@@ -79,14 +175,57 @@
 
 .player-config-control--checkbox {
   flex-direction: row;
-  align-items: center;
+  align-items: flex-start;
   min-width: unset;
+  gap: var(--space-sm);
 }
 
+.player-config-control__text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* Re-skinned as a switch rather than a tickbox: still a native checkbox
+   (full keyboard/a11y behaviour, :disabled and :focus-visible below both
+   come for free), just restyled via appearance:none + a thumb pseudo-element. */
 .player-config-control--checkbox input[type='checkbox'] {
+  appearance: none;
+  position: relative;
+  flex-shrink: 0;
+  width: 40px;
+  height: 24px;
+  margin-top: 2px;
+  border-radius: var(--radius-full);
+  background: var(--color-border);
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.player-config-control--checkbox input[type='checkbox']::before {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
   width: 20px;
   height: 20px;
-  cursor: pointer;
+  border-radius: 50%;
+  background: var(--color-background);
+  box-shadow: var(--shadow-sm);
+  transition: transform var(--transition-fast);
+}
+
+.player-config-control--checkbox input[type='checkbox']:checked {
+  background: var(--color-primary);
+}
+
+.player-config-control--checkbox input[type='checkbox']:checked::before {
+  transform: translateX(16px);
+}
+
+.player-config-control--checkbox input[type='checkbox']:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 var(--ring-width) var(--ring-color);
 }
 
 .player-config-control--checkbox input[type='checkbox']:disabled {
@@ -95,9 +234,10 @@
 }
 
 .player-config-subsection {
-  margin: var(--space-lg) 0 0;
+  margin: var(--space-xl) 0 0;
   padding: var(--space-lg);
   border: 1px solid var(--color-border);
+  border-left: 3px solid var(--color-primary);
   border-radius: var(--radius-md);
   background: var(--color-surface);
 }
@@ -106,9 +246,13 @@
   padding: 0 var(--space-sm);
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-semibold);
+  color: var(--color-foreground);
+}
+
+.player-config-subsection__note {
+  font-size: var(--font-size-sm);
   color: var(--color-foreground-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
+  margin: 0 0 var(--space-md);
 }
 
 .player-config-subsection .player-config-grid {

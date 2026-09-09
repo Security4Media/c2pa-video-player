@@ -20,25 +20,26 @@
  * "Valid"/"Trusted" verdict colour.
  *
  * Live only: a VOD asset has one signer for its whole duration, so there is
- * nothing to distinguish. Off by default, so no existing deployment changes
- * appearance by upgrading. Query string only, following `?window=` and
- * `?gate=`, which this sits alongside in the demo panel's live-only settings.
+ * nothing to distinguish - on by default is harmless there. Query string
+ * only, following `?window=` and `?gate=`, which this sits alongside in the
+ * demo panel's live-only settings.
  */
 
 const currentSearch = () => (typeof window === 'undefined' ? undefined : window.location.search);
 
 /**
- * Reads `?issuerColors=on`.
+ * Reads `?issuerColors=off`.
  *
- * Only `on` enables it. Anything else, including a typo, leaves the timeline
- * painted by verdict alone, same as today.
+ * On by default. Only the exact value `off` disables it, since a mistyped
+ * value should leave issuers distinguishable rather than silently flatten
+ * them back to the shared verdict colour.
  */
 export function resolveColorizeTimelineByIssuer(
   search: string | undefined = currentSearch(),
 ): boolean {
   if (!search) {
-    return false;
+    return true;
   }
 
-  return new URLSearchParams(search).get('issuerColors') === 'on';
+  return new URLSearchParams(search).get('issuerColors') !== 'off';
 }

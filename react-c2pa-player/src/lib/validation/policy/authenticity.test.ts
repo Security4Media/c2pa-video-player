@@ -17,29 +17,29 @@
 import { describe, expect, it } from 'vitest';
 import { resolveConsentMode, resolveShowAuthenticityLabel } from './authenticity';
 
-describe('?label=on', () => {
-  it('is off with no query string at all', () => {
-    expect(resolveShowAuthenticityLabel(undefined)).toBe(false);
-    expect(resolveShowAuthenticityLabel('')).toBe(false);
+describe('?label=off', () => {
+  it('is on with no query string at all', () => {
+    expect(resolveShowAuthenticityLabel(undefined)).toBe(true);
+    expect(resolveShowAuthenticityLabel('')).toBe(true);
   });
 
-  it('is off unless asked for', () => {
-    expect(resolveShowAuthenticityLabel('?window=300')).toBe(false);
+  it('stays on unless turned off', () => {
+    expect(resolveShowAuthenticityLabel('?window=300')).toBe(true);
   });
 
-  it('is on when asked for', () => {
-    expect(resolveShowAuthenticityLabel('?label=on')).toBe(true);
-    expect(resolveShowAuthenticityLabel('?trust=full&label=on&gate=off')).toBe(true);
+  it('is off when asked for', () => {
+    expect(resolveShowAuthenticityLabel('?label=off')).toBe(false);
+    expect(resolveShowAuthenticityLabel('?trust=full&label=off&gate=off')).toBe(false);
   });
 
-  it('leaves the picture clear on anything it does not recognise', () => {
-    // The opposite way round from `?gate=off`, deliberately: that one fails
-    // closed because it disables a protection, this one because it puts
-    // something over live output.
-    expect(resolveShowAuthenticityLabel('?label=true')).toBe(false);
-    expect(resolveShowAuthenticityLabel('?label=ON')).toBe(false);
-    expect(resolveShowAuthenticityLabel('?label=')).toBe(false);
-    expect(resolveShowAuthenticityLabel('?label')).toBe(false);
+  it('leaves the picture as it is on anything it does not recognise', () => {
+    // Same direction as `?gate=off`, deliberately: both fail closed on a
+    // typo, since a mistyped value should leave things as they were rather
+    // than silently changing what's on screen.
+    expect(resolveShowAuthenticityLabel('?label=false')).toBe(true);
+    expect(resolveShowAuthenticityLabel('?label=OFF')).toBe(true);
+    expect(resolveShowAuthenticityLabel('?label=')).toBe(true);
+    expect(resolveShowAuthenticityLabel('?label')).toBe(true);
   });
 });
 
@@ -73,6 +73,6 @@ describe('?consent=per-run', () => {
   it('is independent of the label', () => {
     // The combination nobody tests by hand.
     expect(resolveConsentMode('?consent=per-run')).toBe('per-run');
-    expect(resolveShowAuthenticityLabel('?consent=per-run')).toBe(false);
+    expect(resolveShowAuthenticityLabel('?consent=per-run')).toBe(true);
   });
 });

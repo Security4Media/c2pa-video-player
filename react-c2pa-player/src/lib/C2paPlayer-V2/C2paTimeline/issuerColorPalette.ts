@@ -16,7 +16,7 @@
 
 /**
  * Assigns a colour to each issuer name a live session sees, for
- * `?issuerColors=on` (see policy/issuerColors.ts).
+ * `?issuerColors=` (on by default; see policy/issuerColors.ts).
  *
  * Issuer names are never known ahead of time - a deployment may point this
  * player at any stream, signed by any number of organisations - so there is

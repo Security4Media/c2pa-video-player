@@ -17,10 +17,15 @@
 /* Design Tokens - Color System */
 :root {
   /* Primary Colors */
-  --color-primary: #0e4194;
-  --color-primary-hover: #0a2e6a;
+  --color-primary: #DC0102;
+  --color-primary-hover: #a50102;
   --color-primary-foreground: #ffffff;
-  
+
+  /* Ink Surface (dark hero bands, etc.) */
+  --color-ink: #0c0c0d;
+  --color-ink-foreground: #ffffff;
+  --color-ink-foreground-muted: rgba(255, 255, 255, 0.65);
+
   /* Secondary Colors */
   --color-secondary: #6c757d;
   --color-secondary-hover: #5a6268;
@@ -85,7 +90,8 @@
   --radius-full: 9999px;
   
   /* Typography */
-  --font-family-base: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-family-base: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-family-display: 'Space Grotesk', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   --font-size-xs: 0.75rem;    /* 12px */
   --font-size-sm: 0.875rem;   /* 14px */
   --font-size-base: 1rem;     /* 16px */

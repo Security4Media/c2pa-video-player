@@ -447,9 +447,10 @@ console.log('=== 1. ?label=on: the label states the verdict on screen ===');
 console.log('=== 3. ?consent=per-run: one question per invalid stretch ===');
 // ---------------------------------------------------------------------------
 {
-  // Label deliberately off. This is the combination nobody tests by hand, and
+  // Label deliberately off (now needs an explicit &label=off, since the
+  // switch defaults on). This is the combination nobody tests by hand, and
   // the two switches have to work independently.
-  const page = await open('?consent=per-run');
+  const page = await open('?consent=per-run&label=off');
 
   await playAt(page, INSIDE_RUN_1, 2000);
   const raised = await waitForConsent(page);
@@ -561,7 +562,7 @@ console.log('=== 4. ?consent=per-stream: one question for the whole source ===')
 }
 
 // ---------------------------------------------------------------------------
-console.log('=== 5. neither parameter: today’s behaviour, unchanged ===');
+console.log('=== 5. neither parameter: label on by default, consent unchanged ===');
 // ---------------------------------------------------------------------------
 {
   const page = await open('');
@@ -578,7 +579,7 @@ console.log('=== 5. neither parameter: today’s behaviour, unchanged ===');
   }));
   console.log(`   ${JSON.stringify({ label: label.present, consent: consent.shown, ...bar })}`);
 
-  check('no label over the picture', !label.present);
+  check('the label appears over the picture, on by default', label.present);
   check('no consent question', !consent.shown);
   check('playback is not held', !consent.paused);
   check('the timeline still paints its verdicts', bar.segments > 0, `${bar.segments} segments`);
