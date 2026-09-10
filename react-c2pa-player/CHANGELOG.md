@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.1.0](https://github.com/Security4Media/c2pa-video-player/compare/v2.0.0...v2.1.0) (2026-09-10)
+
+
+### Features
+
+* add GitHub contribute CTA to demo hero ([#37](https://github.com/Security4Media/c2pa-video-player/issues/37)) ([02b74d8](https://github.com/Security4Media/c2pa-video-player/commit/02b74d8104975f3833e761d059b8b8d5b97212a7))
+
 ## [2.0.0](https://github.com/Security4Media/c2pa-video-player/compare/v1.2.0...v2.0.0) (2026-09-09)
 
 
