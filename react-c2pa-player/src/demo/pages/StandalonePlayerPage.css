@@ -34,6 +34,7 @@
 /* Hero Band - full-bleed dark surface showcasing the Security4Media mark
    and its supporting members/vendors, above the white workspace card. */
 .hero {
+  position: relative;
   background: var(--color-ink);
   color: var(--color-ink-foreground);
   padding: var(--space-2xl) var(--space-lg);
@@ -62,6 +63,53 @@
   font-weight: var(--font-weight-medium);
   color: var(--color-ink-foreground);
   max-width: 620px;
+}
+
+/* Top-right CTA, anchored to the hero banner - scrolls away with the
+   page content like everything else, rather than staying pinned. */
+.github-cta {
+  position: absolute;
+  top: var(--space-lg);
+  right: var(--space-lg);
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-md) var(--space-xl);
+  border-radius: var(--radius-full);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  background: rgba(12, 12, 13, 0.75);
+  backdrop-filter: blur(6px);
+  color: var(--color-ink-foreground);
+  font-family: var(--font-family-base);
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  text-decoration: none;
+  box-shadow: var(--shadow-md);
+  transition:
+    background var(--transition-base),
+    color var(--transition-base),
+    border-color var(--transition-base),
+    transform var(--transition-base);
+}
+
+.github-cta:hover,
+.github-cta:focus-visible {
+  background: var(--color-ink-foreground);
+  color: var(--color-ink);
+  border-color: var(--color-ink-foreground);
+  transform: translateY(-1px);
+}
+
+.github-cta:focus-visible {
+  outline: 2px solid var(--color-ink-foreground);
+  outline-offset: 2px;
+}
+
+.github-cta__icon {
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
 }
 
 .hero__partners {
@@ -134,6 +182,16 @@
 
 /* Responsive Design */
 @media (max-width: 768px) {
+  .github-cta {
+    top: var(--space-md);
+    right: var(--space-md);
+    padding: var(--space-md);
+  }
+
+  .github-cta span {
+    display: none;
+  }
+
   .hero {
     padding: var(--space-xl) var(--space-md);
   }
